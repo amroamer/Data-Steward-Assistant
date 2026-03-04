@@ -58,6 +58,7 @@ import {
   type ResultRow,
   type DataModelJSON,
   type PiiScanResult,
+  type DqAnalysisResult,
   detectAndExtractAllAnalyses,
   mergeResults,
   mergeDqResults,
@@ -67,6 +68,8 @@ import {
   getAnalysisLabel,
   detectPiiScanJSON,
   generatePiiScanSummary,
+  detectDqAnalysisJSON,
+  generateDqAnalysisSummary,
 } from "@/lib/result-store";
 import DataModelDiagram from "@/components/DataModelDiagram";
 import {
@@ -124,8 +127,8 @@ const translations = {
     cardDataClassificationDesc: "Classify data fields per Saudi SDAIA NDMO standards",
     cardBusinessDefs: "Business Definitions",
     cardBusinessDefsDesc: "Generate comprehensive business definitions for data fields",
-    cardDataQuality: "Data Quality Rules",
-    cardDataQualityDesc: "Suggest quality rules and dimensions for data elements",
+    cardDataQuality: "Full DQ Rules (Technical + Logical + Business)",
+    cardDataQualityDesc: "Generate technical, logical & business data quality rules",
     cardDataModel: "Analytical Data Model",
     cardDataModelDesc: "Design a star schema with fact & dimension tables",
     cardPiiDetection: "PII Detection",
@@ -204,8 +207,8 @@ const translations = {
     cardDataClassificationDesc: "تصنيف حقول البيانات وفقاً لمعايير SDAIA NDMO السعودية",
     cardBusinessDefs: "تعريفات الأعمال",
     cardBusinessDefsDesc: "إنشاء تعريفات أعمال شاملة لحقول البيانات",
-    cardDataQuality: "قواعد جودة البيانات",
-    cardDataQualityDesc: "اقتراح قواعد وأبعاد الجودة لعناصر البيانات",
+    cardDataQuality: "توليد قواعد جودة البيانات الكاملة",
+    cardDataQualityDesc: "توليد القواعد التقنية والمنطقية وقواعد الأعمال لجودة البيانات",
     cardDataModel: "نموذج البيانات التحليلي",
     cardDataModelDesc: "تصميم مخطط نجمي مع جداول الحقائق والأبعاد",
     cardPiiDetection: "كشف البيانات الشخصية",
@@ -281,9 +284,9 @@ const FEATURE_CARDS = [
   },
   {
     icon: CheckCircle,
-    title: "Data Quality Rules",
-    description: "Suggest quality rules and dimensions for data elements",
-    prompt: "I want to define data quality rules for my data elements. Can you help me understand the key data quality dimensions and what rules I should apply?",
+    title: "Full DQ Rules",
+    description: "Generate technical, logical & business data quality rules",
+    prompt: "Generate full data quality rules for all fields in the uploaded data. Include all layers: technical rules, logical rules, business rules, cross-field rules, and business logic warnings.",
     color: "text-[#774896]",
     bg: "bg-[#774896]/5",
     iconBg: "bg-[#774896]/10",
@@ -311,9 +314,9 @@ const FEATURE_CARDS = [
     title: "Data Insights Report",
     description: "Analyze data and generate comprehensive insights report",
     prompt: "I'd like to generate a data insights report. Upload an Excel file with your data and I'll analyze it to find key trends, anomalies, patterns, and provide actionable recommendations.",
-    color: "text-[#00338D]",
-    bg: "bg-[#00338D]/5",
-    iconBg: "bg-[#00338D]/10",
+    color: "text-[#1A4B8C]",
+    bg: "bg-[#1A4B8C]/5",
+    iconBg: "bg-[#1A4B8C]/10",
   },
 ];
 
@@ -634,6 +637,8 @@ export default function ChatPage() {
   const [latestDataModel, setLatestDataModel] = useState<DataModelJSON | null>(null);
   const [piiScans, setPiiScans] = useState<Record<number, PiiScanResult>>({});
   const [latestPiiScan, setLatestPiiScan] = useState<PiiScanResult | null>(null);
+  const [dqAnalyses, setDqAnalyses] = useState<Record<number, DqAnalysisResult>>({});
+  const [latestDqAnalysis, setLatestDqAnalysis] = useState<DqAnalysisResult | null>(null);
 
   const [insightsReports, setInsightsReports] = useState<{ report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[]>([]);
   const [insightsForMessage, setInsightsForMessage] = useState<Record<number, InsightsReport>>({});
@@ -726,8 +731,10 @@ export default function ChatPage() {
     const modelMap: Record<number, DataModelJSON> = {};
     const piiMap: Record<number, PiiScanResult> = {};
     const insightsMap: Record<number, InsightsReport> = {};
+    const dqMap: Record<number, DqAnalysisResult> = {};
     let lastModel: DataModelJSON | null = null;
     let lastPii: PiiScanResult | null = null;
+    let lastDq: DqAnalysisResult | null = null;
     for (const msg of activeConversation.messages) {
       if (msg.role !== "assistant") continue;
       const insights = detectInsightsJSON(msg.content);
@@ -752,6 +759,13 @@ export default function ChatPage() {
         piiMap[msg.id] = piiScan;
         lastPii = piiScan;
         overrides[msg.id] = generatePiiScanSummary(piiScan);
+        continue;
+      }
+      const dqResult = detectDqAnalysisJSON(msg.content);
+      if (dqResult) {
+        dqMap[msg.id] = dqResult;
+        lastDq = dqResult;
+        overrides[msg.id] = generateDqAnalysisSummary(dqResult);
         continue;
       }
       const model = detectDataModelJSON(msg.content);
@@ -783,6 +797,10 @@ export default function ChatPage() {
       setPiiScans(prev => ({ ...prev, ...piiMap }));
       setLatestPiiScan(lastPii);
     }
+    if (Object.keys(dqMap).length > 0) {
+      setDqAnalyses(prev => ({ ...prev, ...dqMap }));
+      setLatestDqAnalysis(lastDq);
+    }
     if (Object.keys(insightsMap).length > 0) {
       setInsightsForMessage(prev => ({ ...prev, ...insightsMap }));
       const rehydrated = Object.entries(insightsMap).map(([, report]) => {
@@ -808,6 +826,8 @@ export default function ChatPage() {
     setLatestDataModel(null);
     setPiiScans({});
     setLatestPiiScan(null);
+    setDqAnalyses({});
+    setLatestDqAnalysis(null);
     setInsightsReports([]);
     setInsightsForMessage({});
     setIsInsightsMode(false);
@@ -851,6 +871,28 @@ export default function ChatPage() {
       toast({
         title: t.toastUpdated,
         description: t.piiScanToast(piiScan.scan_summary.pii_columns_found),
+      });
+      return;
+    }
+
+    const dqResult = detectDqAnalysisJSON(content);
+    if (dqResult) {
+      setLatestDqAnalysis(dqResult);
+      setIncludedAnalyses(prev => {
+        const updated = [...prev];
+        if (!updated.includes("data_quality")) updated.push("data_quality");
+        return updated;
+      });
+      if (messageId) {
+        setDqAnalyses(prev => ({ ...prev, [messageId]: dqResult }));
+      }
+      const summary = generateDqAnalysisSummary(dqResult);
+      if (messageId) {
+        setSummaryOverrides(prev => ({ ...prev, [messageId]: summary }));
+      }
+      toast({
+        title: t.toastUpdated,
+        description: `${dqResult.analysis_summary.total_rules_generated} DQ rules generated across ${dqResult.analysis_summary.total_fields_analyzed} fields`,
       });
       return;
     }
@@ -1017,9 +1059,10 @@ export default function ChatPage() {
 
                   const detectedInsights = detectInsightsJSON(accumulated);
                   const detectedPii = !detectedInsights ? detectPiiScanJSON(accumulated) : null;
-                  const detectedModel = !detectedInsights && !detectedPii ? detectDataModelJSON(accumulated) : null;
-                  const analysisResults = !detectedInsights && !detectedPii && !detectedModel ? detectAndExtractAllAnalyses(accumulated) : [];
-                  if (detectedInsights || detectedPii || detectedModel || analysisResults.length > 0) {
+                  const detectedDq = !detectedInsights && !detectedPii ? detectDqAnalysisJSON(accumulated) : null;
+                  const detectedModel = !detectedInsights && !detectedPii && !detectedDq ? detectDataModelJSON(accumulated) : null;
+                  const analysisResults = !detectedInsights && !detectedPii && !detectedDq && !detectedModel ? detectAndExtractAllAnalyses(accumulated) : [];
+                  if (detectedInsights || detectedPii || detectedDq || detectedModel || analysisResults.length > 0) {
                     processAIResponse(accumulated);
 
                     await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
@@ -1035,6 +1078,10 @@ export default function ChatPage() {
                         } else if (detectedPii) {
                           setPiiScans(prev => ({ ...prev, [lastMsg.id]: detectedPii }));
                           const summary = generatePiiScanSummary(detectedPii);
+                          setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: summary }));
+                        } else if (detectedDq) {
+                          setDqAnalyses(prev => ({ ...prev, [lastMsg.id]: detectedDq }));
+                          const summary = generateDqAnalysisSummary(detectedDq);
                           setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: summary }));
                         } else if (detectedModel) {
                           setDataModels(prev => ({ ...prev, [lastMsg.id]: detectedModel }));
@@ -1104,7 +1151,7 @@ export default function ChatPage() {
       return;
     }
 
-    if (sessionFieldNames && sessionFieldNames.length > 0 && (resultRows.length > 0 || latestDataModel || latestPiiScan)) {
+    if (sessionFieldNames && sessionFieldNames.length > 0 && (resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis)) {
       setPendingFile(file);
       setShowResetDialog(true);
     } else {
@@ -1120,7 +1167,7 @@ export default function ChatPage() {
       toast({ title: t.cameraError, variant: "destructive" });
       return;
     }
-    if (sessionFieldNames && sessionFieldNames.length > 0 && (resultRows.length > 0 || latestDataModel || latestPiiScan)) {
+    if (sessionFieldNames && sessionFieldNames.length > 0 && (resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis)) {
       setPendingFile(file);
       setShowResetDialog(true);
     } else {
@@ -1155,8 +1202,8 @@ export default function ChatPage() {
   };
 
   const handleDownloadResult = () => {
-    if (resultRows.length > 0 || latestDataModel || latestPiiScan) {
-      generateResultExcel(resultRows, includedAnalyses, latestDataModel || undefined, latestPiiScan || undefined);
+    if (resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis) {
+      generateResultExcel(resultRows, includedAnalyses, latestDataModel || undefined, latestPiiScan || undefined, latestDqAnalysis || undefined);
     }
   };
 
@@ -1339,12 +1386,12 @@ export default function ChatPage() {
                 <Globe className="w-3.5 h-3.5" />
                 {lang === "en" ? "EN" : "AR"}
               </Button>
-              {(resultRows.length > 0 || latestDataModel || latestPiiScan) && (
+              {(resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis) && (
                 <Button
                   size="sm"
                   onClick={handleDownloadResult}
                   className="gap-1.5 text-[11px] flex-shrink-0 text-white font-medium h-8 px-3 rounded-md"
-                  style={{ backgroundColor: "#0094D3" }}
+                  style={{ backgroundColor: "#2E7D32" }}
                   data-testid="button-header-download-result"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -1441,8 +1488,9 @@ export default function ChatPage() {
                                 <MessageBubble
                                   message={thread.assistantMsg}
                                   summaryOverride={summaryOverrides[thread.assistantMsg.id]}
-                                  onDownloadResult={(resultRows.length > 0 || latestDataModel || latestPiiScan) ? handleDownloadResult : undefined}
+                                  onDownloadResult={(resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis) ? handleDownloadResult : undefined}
                                   dataModel={dataModels[thread.assistantMsg.id] || undefined}
+                                  dqAnalysis={dqAnalyses[thread.assistantMsg.id] || undefined}
                                   insightsReport={insightsForMessage[thread.assistantMsg.id] || undefined}
                                   allInsightsReports={insightsReports}
                                   profiledColumns={profiledColumns}
@@ -1484,7 +1532,7 @@ export default function ChatPage() {
             </ScrollArea>
             </div>
 
-            {(resultRows.length > 0 || latestDataModel || latestPiiScan) && (
+            {(resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis) && (
               <div className="border-t border-border bg-emerald-50/50 px-4 py-2.5 flex-shrink-0" data-testid="result-banner">
                 <div className="max-w-3xl mx-auto flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
@@ -1498,14 +1546,14 @@ export default function ChatPage() {
                       )}
                     </p>
                     <p className="text-[10px] text-emerald-600/80 truncate">
-                      {getIncludedAnalysisLabels(includedAnalyses)}{resultRows.length > 0 ? ` (${resultRows.length} fields)` : ""}{latestDataModel ? ` + Data Model: ${latestDataModel.model_name}` : ""}{latestPiiScan ? ` + PII Scan (${latestPiiScan.scan_summary.pii_columns_found} PII columns)` : ""}
+                      {getIncludedAnalysisLabels(includedAnalyses)}{resultRows.length > 0 ? ` (${resultRows.length} fields)` : ""}{latestDataModel ? ` + Data Model: ${latestDataModel.model_name}` : ""}{latestPiiScan ? ` + PII Scan (${latestPiiScan.scan_summary.pii_columns_found} PII columns)` : ""}{latestDqAnalysis ? ` + DQ Rules (${latestDqAnalysis.analysis_summary.total_rules_generated} rules)` : ""}
                     </p>
                   </div>
                   <Button
                     size="sm"
                     onClick={handleDownloadResult}
                     className="gap-1.5 text-[11px] flex-shrink-0 text-white font-medium h-8 px-3 rounded-md"
-                    style={{ backgroundColor: "#0094D3" }}
+                    style={{ backgroundColor: "#2E7D32" }}
                     data-testid="button-download-result"
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -1635,6 +1683,7 @@ function MessageBubble({
   summaryOverride,
   onDownloadResult,
   dataModel,
+  dqAnalysis,
   insightsReport,
   allInsightsReports,
   profiledColumns = [],
@@ -1646,6 +1695,7 @@ function MessageBubble({
   summaryOverride?: string;
   onDownloadResult?: () => void;
   dataModel?: DataModelJSON | null;
+  dqAnalysis?: DqAnalysisResult | null;
   insightsReport?: InsightsReport | null;
   allInsightsReports?: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
   profiledColumns?: BackendColumnProfile[];
@@ -1657,6 +1707,7 @@ function MessageBubble({
   const isRtl = lang === "ar";
   const shouldShowSummary = !isUser && !isStreaming && summaryOverride;
   const hasDataModel = !isUser && !isStreaming && dataModel;
+  const hasDqAnalysis = !isUser && !isStreaming && dqAnalysis;
   const hasInsights = !isUser && !isStreaming && insightsReport;
   const [showApproach, setShowApproach] = useState(false);
 
@@ -1773,13 +1824,54 @@ function MessageBubble({
                 </div>
               )}
             </div>
+            {hasDqAnalysis && dqAnalysis && (
+              <div className="mt-3 space-y-2" data-testid={`dq-scorecard-${message.id}`}>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: lang === "ar" ? "إجمالي القواعد" : "Total Rules", value: dqAnalysis.analysis_summary.total_rules_generated, color: "#1A4B8C" },
+                    { label: lang === "ar" ? "قواعد تقنية" : "Technical", value: dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Technical").length, 0), color: "#0094D3" },
+                    { label: lang === "ar" ? "قواعد منطقية" : "Logical", value: dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Logical").length, 0), color: "#51BAB4" },
+                    { label: lang === "ar" ? "قواعد أعمال" : "Business", value: dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Business").length, 0), color: "#774896" },
+                    { label: lang === "ar" ? "قواعد عبر الحقول" : "Cross-Field", value: dqAnalysis.cross_field_rules.length, color: "#067647" },
+                    { label: lang === "ar" ? "تحذيرات" : "Warnings", value: dqAnalysis.business_logic_warnings.length, color: "#D97706" },
+                  ].map((tile, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg border p-2 text-center"
+                      style={{ borderColor: tile.color + "40", backgroundColor: tile.color + "08" }}
+                      data-testid={`dq-tile-${i}`}
+                    >
+                      <div className="text-lg font-bold" style={{ color: tile.color }}>{tile.value}</div>
+                      <div className="text-[10px] text-muted-foreground leading-tight">{tile.label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  {lang === "ar"
+                    ? `تم تحليل ${dqAnalysis.analysis_summary.total_fields_analyzed} حقل — ${dqAnalysis.analysis_summary.total_rules_generated} قاعدة جودة`
+                    : `${dqAnalysis.analysis_summary.total_fields_analyzed} fields analyzed — ${dqAnalysis.analysis_summary.total_rules_generated} quality rules generated`}
+                </div>
+                {onDownloadResult && (
+                  <Button
+                    size="sm"
+                    onClick={onDownloadResult}
+                    className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md"
+                    style={{ backgroundColor: "#2E7D32" }}
+                    data-testid={`button-download-dq-${message.id}`}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {tr.downloadResultXlsx}
+                  </Button>
+                )}
+              </div>
+            )}
             {hasInsights && (
                 <div className="mt-2 space-y-2" data-testid={`insights-card-${message.id}`}>
                   <Button
                     size="sm"
                     onClick={() => handleDownloadInsights(insightsReport!)}
                     className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md"
-                    style={{ backgroundColor: "#00338D" }}
+                    style={{ backgroundColor: "#1A4B8C" }}
                     data-testid={`button-download-insights-${message.id}`}
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -1807,13 +1899,13 @@ function MessageBubble({
                   )}
                 </div>
             )}
-            {shouldShowSummary && onDownloadResult && !hasDataModel && !hasInsights && (
+            {shouldShowSummary && onDownloadResult && !hasDataModel && !hasDqAnalysis && !hasInsights && (
               <div className="mt-2">
                 <Button
                   size="sm"
                   onClick={onDownloadResult}
                   className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md"
-                  style={{ backgroundColor: "#0094D3" }}
+                  style={{ backgroundColor: "#2E7D32" }}
                   data-testid={`button-download-result-${message.id}`}
                 >
                   <Download className="w-3.5 h-3.5" />

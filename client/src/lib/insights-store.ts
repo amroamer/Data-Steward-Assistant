@@ -181,7 +181,7 @@ export function detectInsightsJSON(content: string): InsightsReport | null {
   return null;
 }
 
-const DARK_BLUE = "00338D";
+const DARK_BLUE = "1A4B8C";
 const WHITE = "FFFFFF";
 const LIGHT_GREY = "F0F0F0";
 const ALT_ROW = "F5F8FF";

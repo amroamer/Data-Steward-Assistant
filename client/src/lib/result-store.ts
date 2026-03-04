@@ -31,6 +31,67 @@ export interface PiiScanResult {
   columns: PiiScanColumn[];
 }
 
+export interface DqFieldRuleItem {
+  rule_id: string;
+  rule_name: string;
+  rule_layer: string;
+  dq_dimension: string;
+  rule_type: string;
+  rule_description: string;
+  rule_expression: string;
+  severity: string;
+  expected_behavior: string;
+  failure_example: string;
+  pass_example: string;
+  remediation: string;
+}
+
+export interface DqFieldRuleGroup {
+  field_name: string;
+  inferred_data_type: string;
+  business_context: string;
+  rules: DqFieldRuleItem[];
+}
+
+export interface DqCrossFieldRule {
+  rule_id: string;
+  rule_name: string;
+  involved_fields: string[];
+  rule_description: string;
+  rule_expression: string;
+  business_rationale: string;
+  severity: string;
+  failure_example: string;
+  remediation: string;
+}
+
+export interface DqBusinessWarning {
+  warning_id: string;
+  field_name: string;
+  warning_type: string;
+  description: string;
+  recommendation: string;
+}
+
+export interface DqAnalysisSummary {
+  total_fields_analyzed: number;
+  total_rules_generated: number;
+  technical_rules_count: number;
+  logical_rules_count: number;
+  business_rules_count: number;
+  cross_field_rules_count: number;
+  warnings_count: number;
+  fields_with_critical_rules: number;
+  overall_complexity: string;
+}
+
+export interface DqAnalysisResult {
+  analysis_summary: DqAnalysisSummary;
+  field_rules: DqFieldRuleGroup[];
+  cross_field_rules: DqCrossFieldRule[];
+  business_logic_warnings: DqBusinessWarning[];
+}
+
 export interface ResultRow {
   field_name: string;
   business_term?: string;
@@ -397,12 +458,137 @@ function appendPiiScanSheet(wb: XLSX.WorkBook, scan: PiiScanResult): void {
   XLSX.utils.book_append_sheet(wb, ws, "pii_scan");
 }
 
-export function generateResultExcel(rows: ResultRow[], includedAnalyses: AnalysisType[], dataModel?: DataModelJSON, piiScan?: PiiScanResult): void {
+export function detectDqAnalysisJSON(content: string): DqAnalysisResult | null {
+  const allBlocks = content.matchAll(/```(?:json)?\s*([\s\S]*?)```/g);
+  for (const match of allBlocks) {
+    const candidate = match[1].trim();
+    if (!candidate) continue;
+    try {
+      const parsed = JSON.parse(candidate);
+      if (
+        parsed &&
+        parsed.analysis_summary &&
+        Array.isArray(parsed.field_rules) &&
+        typeof parsed.analysis_summary.total_rules_generated === "number" &&
+        !parsed.fact_tables &&
+        !parsed.scan_summary
+      ) {
+        return parsed as DqAnalysisResult;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+export function generateDqAnalysisSummary(dq: DqAnalysisResult): string {
+  const s = dq.analysis_summary;
+  const lines: string[] = [];
+  lines.push(`✅ Data Quality Rules Generated`);
+  lines.push(`Analyzed ${s.total_fields_analyzed} fields — ${s.total_rules_generated} rules generated across 7 DQ dimensions.`);
+  lines.push(`Technical: ${s.technical_rules_count} | Logical: ${s.logical_rules_count} | Business: ${s.business_rules_count} | Cross-field: ${s.cross_field_rules_count}`);
+  lines.push(`Critical rules: ${s.fields_with_critical_rules} | Business warnings: ${s.warnings_count}`);
+  lines.push(`Results saved to result.xlsx — Sheets: dq_rules_by_field, cross_field_rules, business_warnings`);
+  return lines.join("\n");
+}
+
+function appendDqSheets(wb: XLSX.WorkBook, dq: DqAnalysisResult): void {
+  const fieldHeaders = [
+    "Field Name", "Inferred Data Type", "Business Context",
+    "Rule ID", "Rule Name", "Rule Layer", "DQ Dimension", "Rule Type",
+    "Rule Description", "Rule Expression", "Severity",
+    "Expected Behavior", "Failure Example", "Pass Example", "Remediation"
+  ];
+  const fieldData: string[][] = [fieldHeaders];
+
+  for (const group of dq.field_rules) {
+    for (const rule of group.rules) {
+      fieldData.push([
+        group.field_name,
+        group.inferred_data_type || "",
+        group.business_context || "",
+        rule.rule_id || "",
+        rule.rule_name || "",
+        rule.rule_layer || "",
+        rule.dq_dimension || "",
+        rule.rule_type || "",
+        rule.rule_description || "",
+        rule.rule_expression || "",
+        rule.severity || "",
+        rule.expected_behavior || "",
+        rule.failure_example || "",
+        rule.pass_example || "",
+        rule.remediation || "",
+      ]);
+    }
+  }
+
+  if (fieldData.length > 1) {
+    const ws = XLSX.utils.aoa_to_sheet(fieldData);
+    autoWidthSheet(ws, fieldData);
+    ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
+    XLSX.utils.book_append_sheet(wb, ws, "dq_rules_by_field");
+  }
+
+  const cfHeaders = [
+    "Rule ID", "Rule Name", "Involved Fields",
+    "Rule Description", "Rule Expression", "Business Rationale",
+    "Severity", "Failure Example", "Remediation"
+  ];
+  const cfData: string[][] = [cfHeaders];
+
+  for (const rule of dq.cross_field_rules || []) {
+    cfData.push([
+      rule.rule_id || "",
+      rule.rule_name || "",
+      Array.isArray(rule.involved_fields) ? rule.involved_fields.join(", ") : "",
+      rule.rule_description || "",
+      rule.rule_expression || "",
+      rule.business_rationale || "",
+      rule.severity || "",
+      rule.failure_example || "",
+      rule.remediation || "",
+    ]);
+  }
+
+  if (cfData.length > 1) {
+    const ws = XLSX.utils.aoa_to_sheet(cfData);
+    autoWidthSheet(ws, cfData);
+    ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
+    XLSX.utils.book_append_sheet(wb, ws, "cross_field_rules");
+  }
+
+  const bwHeaders = [
+    "Warning ID", "Field Name", "Warning Type",
+    "Description", "Recommendation"
+  ];
+  const bwData: string[][] = [bwHeaders];
+
+  for (const warning of dq.business_logic_warnings || []) {
+    bwData.push([
+      warning.warning_id || "",
+      warning.field_name || "",
+      warning.warning_type || "",
+      warning.description || "",
+      warning.recommendation || "",
+    ]);
+  }
+
+  if (bwData.length > 1) {
+    const ws = XLSX.utils.aoa_to_sheet(bwData);
+    autoWidthSheet(ws, bwData);
+    ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
+    XLSX.utils.book_append_sheet(wb, ws, "business_warnings");
+  }
+}
+
+export function generateResultExcel(rows: ResultRow[], includedAnalyses: AnalysisType[], dataModel?: DataModelJSON, piiScan?: PiiScanResult, dqAnalysis?: DqAnalysisResult): void {
   const orderedAnalyses = ANALYSIS_ORDER.filter((a) => includedAnalyses.includes(a));
 
   const wb = XLSX.utils.book_new();
 
   for (const analysis of orderedAnalyses) {
+    if (analysis === "data_quality" && dqAnalysis) continue;
+
     const config = ANALYSIS_COLUMNS[analysis];
     const headers = ["Field Name", ...config.headers];
     const keys = ["field_name", ...config.keys];
@@ -463,6 +649,10 @@ export function generateResultExcel(rows: ResultRow[], includedAnalyses: Analysi
     const wsData = [headers, ...rows.map((row) => keys.map((k) => row[k] || ""))];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     XLSX.utils.book_append_sheet(wb, ws, "Analysis Results");
+  }
+
+  if (dqAnalysis) {
+    appendDqSheets(wb, dqAnalysis);
   }
 
   if (dataModel) {
