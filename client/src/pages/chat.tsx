@@ -42,6 +42,7 @@ import {
   PanelLeftOpen,
   GripVertical,
   ScanEye,
+  Globe,
 } from "lucide-react";
 import type { Conversation, Message } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
@@ -67,6 +68,140 @@ import {
   PanelGroup,
   PanelResizeHandle,
 } from "react-resizable-panels";
+
+type Lang = "en" | "ar";
+
+const translations = {
+  en: {
+    newChat: "New Chat",
+    noConversations: "No conversations yet",
+    deleteSession: "Delete this session?",
+    yesDelete: "Yes, Delete",
+    cancel: "Cancel",
+    deleteAllSessions: "Delete all sessions?",
+    yesDeleteAll: "Yes, Delete All",
+    clearAllSessions: "Clear All Sessions",
+    poweredBy: "Powered by Claude AI",
+    appTitle: "ZATCA Data Owner Agent",
+    heroTitle: "Data Owner Agent",
+    heroDescription: "Your AI assistant for data governance. Upload Excel files to classify data, generate definitions, or define quality rules.",
+    collapse: "Collapse",
+    expand: "Expand",
+    resultXlsx: "result.xlsx",
+    downloadResultXlsx: "Download result.xlsx",
+    resultReady: "result.xlsx ready",
+    processing: "Processing...",
+    analyzing: "Analyzing your data...",
+    placeholderWithFile: "Ask for business definitions, data classification, or data quality rules...",
+    placeholderNoFile: "Upload an Excel file and ask about data classification, quality rules, or business definitions...",
+    uploadFooter: "Upload Excel files (.xlsx, .xls, .csv) with data fields for analysis",
+    resetTitle: "Reset result.xlsx?",
+    resetDescription: (fileName: string, analyses: string) =>
+      `You already have analysis results from "${fileName}". Uploading a new file will reset result.xlsx and start fresh with the new file. Your current results (${analyses}) will be lost.`,
+    keepCurrent: "Keep Current",
+    resetUpload: "Reset & Upload New",
+    sessionFields: "Session fields:",
+    toastUpdated: "result.xlsx updated",
+    toastError: "Error",
+    toastErrorDesc: "Failed to send message. Please try again.",
+    invalidFile: "Invalid file",
+    invalidFileDesc: "Please upload an Excel (.xlsx, .xls) or CSV file.",
+    cardDataClassification: "Data Classification",
+    cardDataClassificationDesc: "Classify data fields per Saudi SDAIA NDMO standards",
+    cardBusinessDefs: "Business Definitions",
+    cardBusinessDefsDesc: "Generate comprehensive business definitions for data fields",
+    cardDataQuality: "Data Quality Rules",
+    cardDataQualityDesc: "Suggest quality rules and dimensions for data elements",
+    cardDataModel: "Analytical Data Model",
+    cardDataModelDesc: "Design a star schema with fact & dimension tables",
+    cardPiiDetection: "PII Detection",
+    cardPiiDetectionDesc: "Scan data for personal & sensitive information per PDPL",
+    factTables: "Fact Tables",
+    dimensionTables: "Dimension Tables",
+    downloadPng: "Download Diagram as PNG",
+    downloadDdl: "Download DDL Script",
+    newAnalysis: "New Analysis",
+    more: "more",
+    piiScanToast: (count: number) => `PII scan complete — ${count} PII columns found`,
+    dataModelToast: (name: string) => `Data model "${name}" added with DDL scripts`,
+    analysisToast: (labels: string) => `Added ${labels} analysis results`,
+    tagPiiScan: "PII Scan",
+    tagDataModel: "Data Model",
+    tagBusinessDefs: "Business Definitions",
+    tagDataClassification: "Data Classification",
+    tagDataQuality: "Data Quality Rules",
+  },
+  ar: {
+    newChat: "محادثة جديدة",
+    noConversations: "لا توجد محادثات بعد",
+    deleteSession: "حذف هذه الجلسة؟",
+    yesDelete: "نعم، حذف",
+    cancel: "إلغاء",
+    deleteAllSessions: "حذف جميع الجلسات؟",
+    yesDeleteAll: "نعم، حذف الكل",
+    clearAllSessions: "مسح جميع الجلسات",
+    poweredBy: "مدعوم بواسطة Claude AI",
+    appTitle: "وكيل مالك البيانات - زاتكا",
+    heroTitle: "وكيل مالك البيانات",
+    heroDescription: "مساعدك الذكي لحوكمة البيانات. قم بتحميل ملفات Excel لتصنيف البيانات أو إنشاء التعريفات أو تحديد قواعد الجودة.",
+    collapse: "طي الكل",
+    expand: "توسيع الكل",
+    resultXlsx: "result.xlsx",
+    downloadResultXlsx: "تحميل result.xlsx",
+    resultReady: "result.xlsx جاهز",
+    processing: "جارٍ المعالجة...",
+    analyzing: "جارٍ تحليل بياناتك...",
+    placeholderWithFile: "اطلب تعريفات الأعمال أو تصنيف البيانات أو قواعد جودة البيانات...",
+    placeholderNoFile: "قم بتحميل ملف Excel واسأل عن تصنيف البيانات أو قواعد الجودة أو تعريفات الأعمال...",
+    uploadFooter: "قم بتحميل ملفات Excel (.xlsx, .xls, .csv) مع حقول البيانات للتحليل",
+    resetTitle: "إعادة تعيين result.xlsx؟",
+    resetDescription: (fileName: string, analyses: string) =>
+      `لديك بالفعل نتائج تحليل من "${fileName}". تحميل ملف جديد سيعيد تعيين result.xlsx ويبدأ من جديد. ستفقد نتائجك الحالية (${analyses}).`,
+    keepCurrent: "الاحتفاظ بالحالي",
+    resetUpload: "إعادة تعيين وتحميل جديد",
+    sessionFields: "حقول الجلسة:",
+    toastUpdated: "تم تحديث result.xlsx",
+    toastError: "خطأ",
+    toastErrorDesc: "فشل إرسال الرسالة. يرجى المحاولة مرة أخرى.",
+    invalidFile: "ملف غير صالح",
+    invalidFileDesc: "يرجى تحميل ملف Excel (.xlsx, .xls) أو CSV.",
+    cardDataClassification: "تصنيف البيانات",
+    cardDataClassificationDesc: "تصنيف حقول البيانات وفقاً لمعايير SDAIA NDMO السعودية",
+    cardBusinessDefs: "تعريفات الأعمال",
+    cardBusinessDefsDesc: "إنشاء تعريفات أعمال شاملة لحقول البيانات",
+    cardDataQuality: "قواعد جودة البيانات",
+    cardDataQualityDesc: "اقتراح قواعد وأبعاد الجودة لعناصر البيانات",
+    cardDataModel: "نموذج البيانات التحليلي",
+    cardDataModelDesc: "تصميم مخطط نجمي مع جداول الحقائق والأبعاد",
+    cardPiiDetection: "كشف البيانات الشخصية",
+    cardPiiDetectionDesc: "فحص البيانات للمعلومات الشخصية والحساسة وفقاً لنظام حماية البيانات",
+    factTables: "جداول الحقائق",
+    dimensionTables: "جداول الأبعاد",
+    downloadPng: "تحميل المخطط كصورة PNG",
+    downloadDdl: "تحميل سكريبت DDL",
+    newAnalysis: "تحليل جديد",
+    more: "المزيد",
+    piiScanToast: (count: number) => `اكتمل فحص البيانات الشخصية — تم العثور على ${count} أعمدة`,
+    dataModelToast: (name: string) => `تمت إضافة نموذج البيانات "${name}" مع سكريبتات DDL`,
+    analysisToast: (labels: string) => `تمت إضافة نتائج تحليل ${labels}`,
+    tagPiiScan: "فحص البيانات الشخصية",
+    tagDataModel: "نموذج البيانات",
+    tagBusinessDefs: "تعريفات الأعمال",
+    tagDataClassification: "تصنيف البيانات",
+    tagDataQuality: "قواعد جودة البيانات",
+  },
+} as const;
+
+type Translation = (typeof translations)[Lang];
+type TranslationKey = keyof Translation;
+
+const featureCardKeys: { titleKey: TranslationKey; descKey: TranslationKey }[] = [
+  { titleKey: "cardDataClassification", descKey: "cardDataClassificationDesc" },
+  { titleKey: "cardBusinessDefs", descKey: "cardBusinessDefsDesc" },
+  { titleKey: "cardDataQuality", descKey: "cardDataQualityDesc" },
+  { titleKey: "cardDataModel", descKey: "cardDataModelDesc" },
+  { titleKey: "cardPiiDetection", descKey: "cardPiiDetectionDesc" },
+];
 
 const FEATURE_CARDS = [
   {
@@ -121,13 +256,14 @@ interface ThreadPair {
   assistantMsg?: Message;
 }
 
-function detectAnalysisTag(userContent: string, assistantContent?: string): string | null {
+function detectAnalysisTag(userContent: string, assistantContent?: string, t?: Translation): string | null {
+  const tr = t || translations.en;
   const combined = `${userContent} ${assistantContent || ""}`.toLowerCase();
-  if (combined.includes("pii") || combined.includes("personal data") || combined.includes("sensitive data") || combined.includes("privacy scan") || combined.includes("pdpl") || combined.includes("scan_summary")) return "PII Scan";
-  if (combined.includes("data model") || combined.includes("star schema") || combined.includes("dimensional model") || combined.includes("analytical model") || combined.includes("fact_tables")) return "Data Model";
-  if (combined.includes("business definition") || combined.includes("business def")) return "Business Definitions";
-  if (combined.includes("classification") || combined.includes("classify")) return "Data Classification";
-  if (combined.includes("quality") || combined.includes("dq rule")) return "Data Quality Rules";
+  if (combined.includes("pii") || combined.includes("personal data") || combined.includes("sensitive data") || combined.includes("privacy scan") || combined.includes("pdpl") || combined.includes("scan_summary")) return tr.tagPiiScan;
+  if (combined.includes("data model") || combined.includes("star schema") || combined.includes("dimensional model") || combined.includes("analytical model") || combined.includes("fact_tables")) return tr.tagDataModel;
+  if (combined.includes("business definition") || combined.includes("business def")) return tr.tagBusinessDefs;
+  if (combined.includes("classification") || combined.includes("classify")) return tr.tagDataClassification;
+  if (combined.includes("quality") || combined.includes("dq rule")) return tr.tagDataQuality;
   return null;
 }
 
@@ -196,6 +332,10 @@ export default function ChatPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [lang, setLang] = useState<Lang>("en");
+
+  const t = translations[lang];
+  const isRtl = lang === "ar";
 
   const [resultRows, setResultRows] = useState<ResultRow[]>([]);
   const [includedAnalyses, setIncludedAnalyses] = useState<AnalysisType[]>([]);
@@ -360,8 +500,8 @@ export default function ChatPage() {
         setSummaryOverrides(prev => ({ ...prev, [messageId]: summary }));
       }
       toast({
-        title: "result.xlsx updated",
-        description: `PII scan complete — ${piiScan.scan_summary.pii_columns_found} PII columns found`,
+        title: t.toastUpdated,
+        description: t.piiScanToast(piiScan.scan_summary.pii_columns_found),
       });
       return;
     }
@@ -375,7 +515,7 @@ export default function ChatPage() {
       const factCount = model.fact_tables.length;
       const dimCount = model.dimension_tables.length;
       const relCount = model.relationships.length;
-      const totalFields = [...model.fact_tables, ...model.dimension_tables].reduce((acc, t) => acc + t.fields.length, 0);
+      const totalFields = [...model.fact_tables, ...model.dimension_tables].reduce((acc, tbl) => acc + tbl.fields.length, 0);
       const summary = `✅ Analytical data model "${model.model_name}" generated — ${factCount} fact table${factCount !== 1 ? "s" : ""}, ${dimCount} dimension table${dimCount !== 1 ? "s" : ""}, ${relCount} relationship${relCount !== 1 ? "s" : ""}, ${totalFields} total fields.\n\nSheets added to result.xlsx: data_model_fields, data_model_relationships, data_model_ddl`;
       if (messageId) {
         setSummaryOverrides(prev => ({ ...prev, [messageId]: summary }));
@@ -385,8 +525,8 @@ export default function ChatPage() {
         return prev;
       });
       toast({
-        title: "result.xlsx updated",
-        description: `Data model "${model.model_name}" added with DDL scripts`,
+        title: t.toastUpdated,
+        description: t.dataModelToast(model.model_name),
       });
       return;
     }
@@ -426,10 +566,10 @@ export default function ChatPage() {
       setSummaryOverrides(prev => ({ ...prev, [messageId]: summary }));
     }
 
-    const labels = newTypes.map((t) => getAnalysisLabel(t)).join(", ");
+    const labels = newTypes.map((typ) => getAnalysisLabel(typ)).join(", ");
     toast({
-      title: "result.xlsx updated",
-      description: `Added ${labels} analysis results`,
+      title: t.toastUpdated,
+      description: t.analysisToast(labels),
     });
   };
 
@@ -438,7 +578,7 @@ export default function ChatPage() {
 
     let conversationId = activeConversationId;
     if (!conversationId) {
-      const title = content.substring(0, 50) || "New Analysis";
+      const title = content.substring(0, 50) || t.newAnalysis;
       const newConv = await createConversation.mutateAsync(title);
       conversationId = newConv.id;
     }
@@ -460,7 +600,7 @@ export default function ChatPage() {
         };
         return old
           ? { ...old, messages: [...(old.messages || []), newMessage] }
-          : { id: conversationId, title: "New Chat", messages: [newMessage] };
+          : { id: conversationId, title: t.newChat, messages: [newMessage] };
       }
     );
 
@@ -543,7 +683,7 @@ export default function ChatPage() {
                   }
                 }
                 if (data.error) {
-                  toast({ title: "Error", description: data.error, variant: "destructive" });
+                  toast({ title: t.toastError, description: data.error, variant: "destructive" });
                 }
               } catch {}
             }
@@ -551,7 +691,7 @@ export default function ChatPage() {
         }
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
+      toast({ title: t.toastError, description: t.toastErrorDesc, variant: "destructive" });
     } finally {
       setIsStreaming(false);
       setStreamingContent("");
@@ -581,7 +721,7 @@ export default function ChatPage() {
       "text/csv",
     ];
     if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
-      toast({ title: "Invalid file", description: "Please upload an Excel (.xlsx, .xls) or CSV file.", variant: "destructive" });
+      toast({ title: t.invalidFile, description: t.invalidFileDesc, variant: "destructive" });
       return;
     }
 
@@ -663,18 +803,18 @@ export default function ChatPage() {
   const threads = groupMessagesIntoThreads(messages);
 
   return (
-    <div className="flex h-screen bg-background" data-testid="chat-page">
+    <div className="flex h-screen bg-background" dir={isRtl ? "rtl" : "ltr"} data-testid="chat-page">
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reset result.xlsx?</AlertDialogTitle>
+            <AlertDialogTitle>{t.resetTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              You already have analysis results from "{uploadedFileName}". Uploading a new file will reset result.xlsx and start fresh with the new file. Your current results ({getIncludedAnalysisLabels(includedAnalyses)}) will be lost.
+              {t.resetDescription(uploadedFileName || "", getIncludedAnalysisLabels(includedAnalyses))}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleResetCancel} data-testid="button-reset-cancel">Keep Current</AlertDialogCancel>
-            <AlertDialogAction onClick={handleResetConfirm} data-testid="button-reset-confirm">Reset & Upload New</AlertDialogAction>
+            <AlertDialogCancel onClick={handleResetCancel} data-testid="button-reset-cancel">{t.keepCurrent}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetConfirm} data-testid="button-reset-confirm">{t.resetUpload}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -714,7 +854,7 @@ export default function ChatPage() {
                     data-testid="button-new-chat"
                   >
                     <Plus className="w-4 h-4" />
-                    New Chat
+                    {t.newChat}
                   </Button>
                 </div>
                 <Separator />
@@ -728,7 +868,7 @@ export default function ChatPage() {
                       <div className="text-center py-10 px-4">
                         <MessageSquare className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
                         <p className="text-xs text-muted-foreground">
-                          No conversations yet
+                          {t.noConversations}
                         </p>
                       </div>
                     ) : (
@@ -742,7 +882,7 @@ export default function ChatPage() {
                         >
                           {deletingConvId === conv.id ? (
                             <div className="px-3 py-2.5 rounded-md bg-destructive/8 border border-destructive/15">
-                              <p className="text-[11px] text-destructive font-medium mb-2">Delete this session?</p>
+                              <p className="text-[11px] text-destructive font-medium mb-2">{t.deleteSession}</p>
                               <div className="flex gap-2">
                                 <Button
                                   size="sm"
@@ -751,7 +891,7 @@ export default function ChatPage() {
                                   onClick={() => handleDeleteConversation(conv.id)}
                                   data-testid={`button-confirm-delete-${conv.id}`}
                                 >
-                                  Yes, Delete
+                                  {t.yesDelete}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -760,7 +900,7 @@ export default function ChatPage() {
                                   onClick={() => setDeletingConvId(null)}
                                   data-testid={`button-cancel-delete-${conv.id}`}
                                 >
-                                  Cancel
+                                  {t.cancel}
                                 </Button>
                               </div>
                             </div>
@@ -800,7 +940,7 @@ export default function ChatPage() {
                     <>
                       {showClearAllConfirm ? (
                         <div className="px-2 py-2 rounded-md bg-destructive/8 border border-destructive/15">
-                          <p className="text-[11px] text-destructive font-medium mb-2">Delete all sessions?</p>
+                          <p className="text-[11px] text-destructive font-medium mb-2">{t.deleteAllSessions}</p>
                           <div className="flex gap-2">
                             <Button
                               size="sm"
@@ -809,7 +949,7 @@ export default function ChatPage() {
                               onClick={handleDeleteAllConversations}
                               data-testid="button-confirm-clear-all"
                             >
-                              Yes, Delete All
+                              {t.yesDeleteAll}
                             </Button>
                             <Button
                               size="sm"
@@ -818,7 +958,7 @@ export default function ChatPage() {
                               onClick={() => setShowClearAllConfirm(false)}
                               data-testid="button-cancel-clear-all"
                             >
-                              Cancel
+                              {t.cancel}
                             </Button>
                           </div>
                         </div>
@@ -831,13 +971,13 @@ export default function ChatPage() {
                           data-testid="button-clear-all-sessions"
                         >
                           <Trash2 className="w-3 h-3" />
-                          Clear All Sessions
+                          {t.clearAllSessions}
                         </Button>
                       )}
                     </>
                   )}
                   <p className="text-[10px] text-muted-foreground/60 text-center">
-                    Powered by Claude AI
+                    {t.poweredBy}
                   </p>
                 </div>
               </div>
@@ -870,7 +1010,7 @@ export default function ChatPage() {
               )}
               <div className="flex-1 min-w-0">
                 <h2 className="text-sm font-semibold truncate">
-                  {activeConversation?.title || "ZATCA Data Owner Agent"}
+                  {activeConversation?.title || t.appTitle}
                 </h2>
               </div>
               {threads.length > 1 && (
@@ -883,7 +1023,7 @@ export default function ChatPage() {
                     data-testid="button-collapse-all"
                   >
                     <Minimize2 className="w-3 h-3" />
-                    Collapse
+                    {t.collapse}
                   </Button>
                   <Button
                     size="sm"
@@ -893,10 +1033,20 @@ export default function ChatPage() {
                     data-testid="button-expand-all"
                   >
                     <Maximize2 className="w-3 h-3" />
-                    Expand
+                    {t.expand}
                   </Button>
                 </div>
               )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 px-2.5 gap-1.5 text-[11px] font-medium flex-shrink-0"
+                onClick={() => setLang(lang === "en" ? "ar" : "en")}
+                data-testid="button-lang-toggle"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                {lang === "en" ? "EN" : "AR"}
+              </Button>
               {(resultRows.length > 0 || latestDataModel || latestPiiScan) && (
                 <Button
                   size="sm"
@@ -906,7 +1056,7 @@ export default function ChatPage() {
                   data-testid="button-header-download-result"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  result.xlsx
+                  {t.resultXlsx}
                 </Button>
               )}
             </div>
@@ -916,24 +1066,24 @@ export default function ChatPage() {
                 {!activeConversationId && messages.length === 0 && !isStreaming ? (
                   <div className="flex flex-col items-center justify-center min-h-[60vh]">
                     <img src={zatcaLogoPath} alt="ZATCA" className="h-12 mb-6" />
-                    <h2 className="text-2xl font-bold mb-2 tracking-tight">Data Owner Agent</h2>
+                    <h2 className="text-2xl font-bold mb-2 tracking-tight">{t.heroTitle}</h2>
                     <p className="text-muted-foreground text-center mb-8 max-w-md text-sm leading-relaxed">
-                      Your AI assistant for data governance. Upload Excel files to classify data, generate definitions, or define quality rules.
+                      {t.heroDescription}
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 w-full max-w-4xl">
-                      {FEATURE_CARDS.map((card) => (
+                      {FEATURE_CARDS.map((card, cardIdx) => (
                         <button
                           key={card.title}
                           onClick={() => handleFeatureCard(card.prompt)}
-                          className={`${card.bg} rounded-xl p-5 text-left transition-all border border-transparent hover:border-border hover:shadow-sm group`}
+                          className={`${card.bg} rounded-xl p-5 ${isRtl ? "text-right" : "text-left"} transition-all border border-transparent hover:border-border hover:shadow-sm group`}
                           data-testid={`card-feature-${card.title.toLowerCase().replace(/\s+/g, "-")}`}
                         >
                           <div className={`w-9 h-9 rounded-lg ${card.iconBg} flex items-center justify-center mb-3`}>
                             <card.icon className={`w-4.5 h-4.5 ${card.color}`} />
                           </div>
-                          <h3 className="text-sm font-semibold mb-1">{card.title}</h3>
+                          <h3 className="text-sm font-semibold mb-1">{t[featureCardKeys[cardIdx].titleKey] as string}</h3>
                           <p className="text-xs text-muted-foreground leading-relaxed">
-                            {card.description}
+                            {t[featureCardKeys[cardIdx].descKey] as string}
                           </p>
                         </button>
                       ))}
@@ -945,7 +1095,8 @@ export default function ChatPage() {
                       const isCollapsed = collapsedThreads.has(idx);
                       const tag = detectAnalysisTag(
                         thread.userMsg.content,
-                        thread.assistantMsg?.content
+                        thread.assistantMsg?.content,
+                        t
                       );
                       const { displayText: previewText } = stripExcelContent(thread.userMsg.content);
                       const preview = previewText.substring(0, 60) + (previewText.length > 60 ? "..." : "");
@@ -959,8 +1110,8 @@ export default function ChatPage() {
                         >
                           <button
                             onClick={() => toggleThread(idx)}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 text-left bg-muted/40 hover:bg-muted/60 transition-colors"
-                            style={{ borderLeft: "3px solid #067647" }}
+                            className={`w-full flex items-center gap-3 px-4 py-2.5 ${isRtl ? "text-right" : "text-left"} bg-muted/40 hover:bg-muted/60 transition-colors`}
+                            style={isRtl ? { borderRight: "3px solid #067647" } : { borderLeft: "3px solid #067647" }}
                             data-testid={`thread-header-${idx}`}
                           >
                             {isCollapsed ? (
@@ -980,6 +1131,8 @@ export default function ChatPage() {
                             <div className="px-4 py-4 space-y-4" data-testid={`thread-content-${idx}`}>
                               <MessageBubble
                                 message={thread.userMsg}
+                                lang={lang}
+                                t={t}
                               />
                               {thread.assistantMsg && (
                                 <MessageBubble
@@ -987,6 +1140,8 @@ export default function ChatPage() {
                                   summaryOverride={summaryOverrides[thread.assistantMsg.id]}
                                   onDownloadResult={(resultRows.length > 0 || latestDataModel || latestPiiScan) ? handleDownloadResult : undefined}
                                   dataModel={dataModels[thread.assistantMsg.id] || undefined}
+                                  lang={lang}
+                                  t={t}
                                 />
                               )}
                             </div>
@@ -998,10 +1153,10 @@ export default function ChatPage() {
                       <div className="rounded-xl border border-border overflow-hidden bg-card/30" data-testid="thread-streaming">
                         <div
                           className="flex items-center gap-3 px-4 py-2.5 bg-muted/40"
-                          style={{ borderLeft: "3px solid #067647" }}
+                          style={isRtl ? { borderRight: "3px solid #067647" } : { borderLeft: "3px solid #067647" }}
                         >
                           <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground flex-shrink-0" />
-                          <span className="text-[12px] text-foreground font-medium truncate flex-1">Processing...</span>
+                          <span className="text-[12px] text-foreground font-medium truncate flex-1">{t.processing}</span>
                         </div>
                         <div className="px-4 py-4">
                           <div className="flex gap-3">
@@ -1010,7 +1165,7 @@ export default function ChatPage() {
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Analyzing your data...</span>
+                              <span>{t.analyzing}</span>
                             </div>
                           </div>
                         </div>
@@ -1030,7 +1185,7 @@ export default function ChatPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-emerald-800">
-                      result.xlsx ready
+                      {t.resultReady}
                       {uploadedFileName && (
                         <span className="font-normal text-emerald-600"> — {uploadedFileName}</span>
                       )}
@@ -1047,7 +1202,7 @@ export default function ChatPage() {
                     data-testid="button-download-result"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    Download result.xlsx
+                    {t.downloadResultXlsx}
                   </Button>
                 </div>
               </div>
@@ -1076,7 +1231,7 @@ export default function ChatPage() {
                 {sessionFieldNames && sessionFieldNames.length > 0 && !selectedFile && (
                   <div className="flex items-center gap-2 mb-2 text-[10px] text-muted-foreground/70">
                     <FileSpreadsheet className="w-3 h-3 flex-shrink-0" />
-                    <span className="truncate">Session fields: {sessionFieldNames.slice(0, 6).join(", ")}{sessionFieldNames.length > 6 ? `, +${sessionFieldNames.length - 6} more` : ""}</span>
+                    <span className="truncate">{t.sessionFields} {sessionFieldNames.slice(0, 6).join(", ")}{sessionFieldNames.length > 6 ? `, +${sessionFieldNames.length - 6} ${t.more}` : ""}</span>
                   </div>
                 )}
                 <form onSubmit={handleSubmit} className="flex items-end gap-2">
@@ -1106,8 +1261,8 @@ export default function ChatPage() {
                     onKeyDown={handleKeyDown}
                     placeholder={
                       sessionFieldNames
-                        ? "Ask for business definitions, data classification, or data quality rules..."
-                        : "Upload an Excel file and ask about data classification, quality rules, or business definitions..."
+                        ? t.placeholderWithFile
+                        : t.placeholderNoFile
                     }
                     className="min-h-[44px] max-h-32 resize-none flex-1 rounded-xl text-sm"
                     disabled={isStreaming}
@@ -1128,7 +1283,7 @@ export default function ChatPage() {
                   </Button>
                 </form>
                 <p className="text-[10px] text-muted-foreground/50 text-center mt-2">
-                  Upload Excel files (.xlsx, .xls, .csv) with data fields for analysis
+                  {t.uploadFooter}
                 </p>
               </div>
             </div>
@@ -1145,14 +1300,20 @@ function MessageBubble({
   summaryOverride,
   onDownloadResult,
   dataModel,
+  lang = "en",
+  t,
 }: {
   message: Message;
   isStreaming?: boolean;
   summaryOverride?: string;
   onDownloadResult?: () => void;
   dataModel?: DataModelJSON | null;
+  lang?: Lang;
+  t?: Translation;
 }) {
+  const tr = t || translations[lang];
   const isUser = message.role === "user";
+  const isRtl = lang === "ar";
   const shouldShowSummary = !isUser && !isStreaming && summaryOverride;
   const hasDataModel = !isUser && !isStreaming && dataModel;
 
@@ -1173,24 +1334,25 @@ function MessageBubble({
         )}
       </div>
       <div
-        className={`flex-1 min-w-0 ${isUser ? "text-right" : ""}`}
+        className={`flex-1 min-w-0 ${isUser ? (isRtl ? "text-left" : "text-right") : (isRtl ? "text-right" : "")}`}
       >
         {hasDataModel ? (
-          <div className="text-left">
+          <div className={isRtl ? "text-right" : "text-left"}>
             {shouldShowSummary && (
-              <div className="inline-block text-left rounded-xl px-4 py-3 text-sm max-w-full bg-card border border-card-border mb-3">
+              <div className={`inline-block ${isRtl ? "text-right" : "text-left"} rounded-xl px-4 py-3 text-sm max-w-full bg-card border border-card-border mb-3`}>
                 <div className="whitespace-pre-wrap break-words leading-relaxed">{summaryOverride}</div>
               </div>
             )}
             <DataModelDiagram
               model={dataModel!}
               onDownloadExcel={onDownloadResult}
+              lang={lang}
             />
           </div>
         ) : (
           <>
             <div
-              className={`inline-block text-left rounded-xl px-4 py-3 text-sm max-w-full ${
+              className={`inline-block ${isRtl ? "text-right" : "text-left"} rounded-xl px-4 py-3 text-sm max-w-full ${
                 isUser
                   ? "bg-primary text-primary-foreground"
                   : "bg-card border border-card-border"
@@ -1212,7 +1374,7 @@ function MessageBubble({
                 <div className="prose prose-sm max-w-none break-words">
                   <ReactMarkdown>{message.content}</ReactMarkdown>
                   {isStreaming && (
-                    <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />
+                    <span className={`inline-block w-2 h-4 bg-primary animate-pulse ${isRtl ? "mr-0.5" : "ml-0.5"} align-text-bottom`} />
                   )}
                 </div>
               )}
@@ -1227,7 +1389,7 @@ function MessageBubble({
                   data-testid={`button-download-result-${message.id}`}
                 >
                   <Download className="w-3.5 h-3.5" />
-                  Download result.xlsx
+                  {tr.downloadResultXlsx}
                 </Button>
               </div>
             )}

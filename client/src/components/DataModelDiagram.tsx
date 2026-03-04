@@ -175,13 +175,32 @@ export interface DataModelDiagramHandle {
   captureAsPng: () => Promise<void>;
 }
 
+const diagramTranslations = {
+  en: {
+    factTables: "Fact Tables",
+    dimensionTables: "Dimension Tables",
+    downloadPng: "Download Diagram as PNG",
+    downloadDdl: "Download DDL Script",
+    downloadResultXlsx: "Download result.xlsx",
+  },
+  ar: {
+    factTables: "جداول الحقائق",
+    dimensionTables: "جداول الأبعاد",
+    downloadPng: "تحميل المخطط كصورة PNG",
+    downloadDdl: "تحميل سكريبت DDL",
+    downloadResultXlsx: "تحميل result.xlsx",
+  },
+};
+
 interface DataModelDiagramProps {
   model: DataModelJSON;
   onDownloadExcel?: () => void;
+  lang?: "en" | "ar";
 }
 
 const DataModelDiagram = forwardRef<DataModelDiagramHandle, DataModelDiagramProps>(
-  function DataModelDiagram({ model, onDownloadExcel }, ref) {
+  function DataModelDiagram({ model, onDownloadExcel, lang = "en" }, ref) {
+    const dt = diagramTranslations[lang];
     const containerRef = useRef<HTMLDivElement>(null);
     const [positions, setPositions] = useState<Record<string, TablePosition>>(() =>
       computeInitialPositions(model.fact_tables, model.dimension_tables)
@@ -479,11 +498,11 @@ const DataModelDiagram = forwardRef<DataModelDiagramHandle, DataModelDiagramProp
           <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground flex-wrap">
             <span className="flex items-center gap-1">
               <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: FACT_COLOR }} />
-              Fact Tables ({model.fact_tables.length})
+              {dt.factTables} ({model.fact_tables.length})
             </span>
             <span className="flex items-center gap-1">
               <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: DIM_COLOR }} />
-              Dimension Tables ({model.dimension_tables.length})
+              {dt.dimensionTables} ({model.dimension_tables.length})
             </span>
             <span className="flex items-center gap-1"><Key className="w-2.5 h-2.5 text-yellow-500" /> PK</span>
             <span className="flex items-center gap-1"><Link2 className="w-2.5 h-2.5 text-cyan-500" /> FK</span>
@@ -531,7 +550,7 @@ const DataModelDiagram = forwardRef<DataModelDiagramHandle, DataModelDiagramProp
             data-testid="button-download-png"
           >
             <Download className="w-3.5 h-3.5" />
-            Download Diagram as PNG
+            {dt.downloadPng}
           </Button>
           <Button
             size="sm"
@@ -541,7 +560,7 @@ const DataModelDiagram = forwardRef<DataModelDiagramHandle, DataModelDiagramProp
             data-testid="button-download-ddl"
           >
             <FileCode className="w-3.5 h-3.5" />
-            Download DDL Script
+            {dt.downloadDdl}
           </Button>
           {onDownloadExcel && (
             <Button
@@ -552,7 +571,7 @@ const DataModelDiagram = forwardRef<DataModelDiagramHandle, DataModelDiagramProp
               data-testid="button-download-excel-model"
             >
               <Download className="w-3.5 h-3.5" />
-              Download result.xlsx
+              {dt.downloadResultXlsx}
             </Button>
           )}
         </div>

@@ -59,6 +59,18 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 - Server sends `fieldNames` SSE event when an Excel file is uploaded, allowing the frontend to track session fields
 - System prompt instructs Claude to always include structured summary tables with exact column headers per analysis type
 
+### Multi-Language Support (Arabic / English)
+- `lang` state (`"en" | "ar"`) toggles between English (LTR) and Arabic (RTL)
+- Globe icon toggle button in the top header bar shows "EN" or "AR"
+- `translations` object at top of chat.tsx contains all static UI strings in both languages
+- `dir="rtl"` / `dir="ltr"` set on root container for RTL layout switching
+- Thread header borders flip between `borderLeft` and `borderRight` based on language
+- Feature card text alignment, streaming cursor margin, and message bubble alignment are conditionally mirrored
+- `detectAnalysisTag()` returns translated tag labels
+- `DataModelDiagram` accepts `lang` prop and translates legend/button labels via `diagramTranslations`
+- AI responses are NOT translated — they remain in whatever language Claude responds in
+- Language preference persists in React state for the session (not across sessions)
+
 ---
 
 ## User Preferences
