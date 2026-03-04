@@ -1,0 +1,151 @@
+Add a new capability to the Data Owner Agent called "Data Insights Report". This feature is standalone — it always creates its own separate Excel file called insights_report_[timestamp].xlsx and never writes to or modifies result.xlsx.
+
+Trigger Detection
+Activate when the user uploads an Excel file with actual data (columns and rows) and says anything like:
+
+"give me insights"
+"analyze this data"
+"what does this data tell me"
+"generate insights report"
+"summarize this data"
+"what are the key findings"
+"data report"
+"explore this dataset"
+
+
+Step 1 — File Reading & Profiling
+When the user uploads the Excel file, profile the data in JavaScript before sending to Claude:
+
+Total number of rows and columns
+For each column detect: data type (numeric, text, date, boolean, mixed), null count, null percentage, unique value count
+For numeric columns calculate: min, max, mean, median, standard deviation
+For text columns identify: top 5 most frequent values and their counts
+For date columns identify: earliest date, latest date, date range span
+Send only this profiled statistical summary to Claude plus a sample of 10 rows — never send the full raw dataset
+
+
+Step 2 — Claude Analysis
+Send the profiled data to Claude with a system prompt instructing it to act as a senior data analyst and business intelligence expert. Instruct Claude to return only this JSON structure, no prose:
+json{
+  "report_title": "...",
+  "dataset_summary": {
+    "total_rows": 0,
+    "total_columns": 0,
+    "date_range": "...",
+    "data_completeness_pct": 0,
+    "overall_data_quality": "Good | Acceptable | Poor"
+  },
+  "key_insights": [
+    {
+      "insight_no": 1,
+      "category": "Trend | Anomaly | Distribution | Correlation | Completeness | Outlier | Pattern | Concentration",
+      "title": "...",
+      "description": "...",
+      "affected_columns": ["..."],
+      "business_impact": "High | Medium | Low",
+      "confidence": "High | Medium | Low"
+    }
+  ],
+  "column_profiles": [
+    {
+      "column_name": "...",
+      "data_type": "...",
+      "null_pct": 0,
+      "unique_count": 0,
+      "top_values": ["..."],
+      "insight": "...",
+      "anomaly_flag": true,
+      "anomaly_description": "..."
+    }
+  ],
+  "recommendations": [
+    {
+      "recommendation_no": 1,
+      "title": "...",
+      "description": "...",
+      "priority": "High | Medium | Low",
+      "effort": "Low | Medium | High"
+    }
+  ],
+  "data_quality_flags": [
+    {
+      "column_name": "...",
+      "issue_type": "High Nulls | Duplicate Values | Inconsistent Format | Outliers | Mixed Types | Suspicious Pattern",
+      "severity": "Critical | High | Medium | Low",
+      "affected_rows_estimate": 0,
+      "suggested_fix": "..."
+    }
+  ]
+}
+
+Step 3 — Chat Response (Summary Only)
+Display only a short summary in the chat bubble, never the full results:
+
+📊 Data Insights Report Generated
+Analyzed 1,240 rows across 18 columns.
+Found 12 key insights — 4 High impact, 6 Medium, 2 Low.
+Data completeness: 94.2% | Overall quality: Acceptable
+3 anomalies detected across 2 columns.
+Full report saved to insights_report_[timestamp].xlsx
+
+Then show a dedicated download button labeled "📥 Download Insights Report" styled in KPMG dark blue (#00338D) — this is completely separate from the "Download result.xlsx" button and should never replace or affect it.
+Also render a compact inline insight scorecard in the chat bubble showing four tiles in a 2x2 grid:
+
+📋 Total Insights Found: N
+🔴 High Impact: N
+⚠️ Anomalies Detected: N
+✅ Data Completeness: N%
+
+Style the scorecard tiles with KPMG dark blue (#00338D) border, light background, bold numbers, small labels. Keep it compact — this is the only visual that renders in the chat.
+
+Step 4 — Create Standalone insights_report_[timestamp].xlsx
+Create a brand new Excel workbook named insights_report_[timestamp].xlsx where timestamp is formatted as YYYYMMDD_HHMMSS. This file is fully independent and has nothing to do with result.xlsx.
+Sheet 1: executive_summary
+A styled summary sheet — not a plain data table. Build it as a formatted layout:
+
+Row 1: Report title in large bold KPMG dark blue text (#00338D)
+Row 2: Generated date and source file name
+Rows 4-8: Dataset summary stats as a 2-column key-value layout (metric | value)
+Row 10 onwards: List of top 5 high-impact insights as formatted text blocks
+Apply KPMG dark blue header styling and light grey section backgrounds
+
+Sheet 2: key_insights
+| insight_no | category | title | description | affected_columns | business_impact | confidence |
+
+Header: KPMG dark blue, white bold text
+business_impact color-coded: High → red fill, Medium → orange fill, Low → green fill
+category column: each unique category gets a distinct pastel background
+Alternating row shading (#F5F8FF)
+Auto-width, freeze header
+
+Sheet 3: column_profiles
+| column_name | data_type | null_pct | unique_count | top_values | insight | anomaly_flag | anomaly_description |
+
+null_pct formatted as percentage
+anomaly_flag shows YES in red bold or NO in green
+Rows where anomaly_flag is YES get a light red row background (#FFEBEE)
+Header: KPMG dark blue, white bold text
+
+Sheet 4: recommendations
+| recommendation_no | title | description | priority | effort |
+
+priority color-coded: High → red, Medium → orange, Low → green
+effort color-coded: Low → green, Medium → yellow, High → red
+Header: KPMG dark blue, white bold text
+
+Sheet 5: data_quality_flags
+| column_name | issue_type | severity | affected_rows_estimate | suggested_fix |
+
+severity color-coded: Critical → dark red, High → red, Medium → orange, Low → yellow
+Sort rows by severity descending so Critical issues appear first
+Header: KPMG dark blue, white bold text
+Auto-width, freeze header
+
+Apply alternating row shading (#F5F8FF) across all sheets for readability.
+
+Step 5 — Session State
+
+Store the full insights JSON in React session state separately from the result.xlsx state — these are two independent data stores
+If the user asks follow-up questions like "tell me more about the anomaly in column X" or "explain insight 3", Claude should use the stored insights JSON as context and respond conversationally in the chat with a short prose answer — follow-up responses are the only exception where prose in the chat is acceptable, but still no raw data tables
+Each time a new insights report is generated (new file uploaded), create a fresh timestamped file — do not overwrite the previous one, so the user can download multiple reports from the same session if they analyzed multiple files
+Keep a small "Previous Insight Reports" list below the download button if more than one report has been generated in the session, showing each report's filename and a download button for each

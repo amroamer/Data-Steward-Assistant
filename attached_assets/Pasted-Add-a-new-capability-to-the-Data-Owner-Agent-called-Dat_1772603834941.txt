@@ -1,0 +1,98 @@
+Add a new capability to the Data Owner Agent called "Data Insights Report".
+
+Trigger Detection
+Activate when the user uploads an Excel file with actual data (columns and rows) and says anything like:
+
+"give me insights"
+"analyze this data"
+"what does this data tell me"
+"generate insights report"
+"summarize this data"
+"what are the key findings"
+"data report"
+"explore this dataset"
+
+
+Step 1 — File Reading & Profiling
+When the user uploads the Excel file, before sending to Claude, profile the data in JavaScript:
+
+Total number of rows and columns
+For each column detect: data type (numeric, text, date, boolean, mixed), null count, null percentage, unique value count, and for numeric columns calculate min, max, mean, median, and standard deviation
+For text columns identify the top 5 most frequent values and their counts
+For date columns identify the earliest and latest dates and the date range span
+Send this profiled summary to Claude — never send the raw full dataset, only the statistical profile and a sample of 10 rows
+
+
+Step 2 — Claude Analysis
+Send the profiled data to Claude with a system prompt instructing it to act as a senior data analyst and business intelligence expert. Instruct Claude to return only this JSON structure, no prose:
+json{
+  "report_title": "...",
+  "dataset_summary": {
+    "total_rows": 0,
+    "total_columns": 0,
+    "date_range": "...",
+    "data_completeness_pct": 0,
+    "overall_data_quality": "Good | Acceptable | Poor"
+  },
+  "key_insights": [
+    {
+      "insight_no": 1,
+      "category": "Trend | Anomaly | Distribution | Correlation | Completeness | Outlier | Pattern | Concentration",
+      "title": "...",
+      "description": "...",
+      "affected_columns": ["..."],
+      "business_impact": "High | Medium | Low",
+      "confidence": "High | Medium | Low"
+    }
+  ],
+  "column_profiles": [
+    {
+      "column_name": "...",
+      "data_type": "...",
+      "null_pct": 0,
+      "unique_count": 0,
+      "top_values": ["..."],
+      "insight": "...",
+      "anomaly_flag": true,
+      "anomaly_description": "..."
+    }
+  ],
+  "recommendations": [
+    {
+      "recommendation_no": 1,
+      "title": "...",
+      "description": "...",
+      "priority": "High | Medium | Low",
+      "effort": "Low | Medium | High"
+    }
+  ],
+  "data_quality_flags": [
+    {
+      "column_name": "...",
+      "issue_type": "High Nulls | Duplicate Values | Inconsistent Format | Outliers | Mixed Types | Suspicious Pattern",
+      "severity": "Critical | High | Medium | Low",
+      "affected_rows_estimate": 0,
+      "suggested_fix": "..."
+    }
+  ]
+}
+
+Step 3 — Chat Response (Summary Only)
+Display only a short summary in the chat bubble, never the full results:
+
+📊 Data Insights Report Generated
+Analyzed 1,240 rows across 18 columns.
+Found 12 key insights — 4 High impact, 6 Medium, 2 Low.
+Data completeness: 94.2% | Overall quality: Acceptable
+3 anomalies detected across 2 columns.
+Full report saved to result.xlsx — Sheets: insights_summary, column_profiles, recommendations, data_quality_flags
+
+Then show the "Download result.xlsx" button in ZATCA Color.
+Also render a compact inline insight scorecard in the chat bubble showing four tiles in a 2x2 grid:
+
+📋 Total Insights Found: N
+🔴 High Impact: N
+⚠️ Anomalies Detected: N
+✅ Data Completeness: N%
+
+Style the scorecard tiles with ZATCA color border, light background, bold numbers, and small labels. Keep it compact — this is the only visual that renders in the chat.
