@@ -58,8 +58,15 @@ Rules for the table:
 - The first column MUST always be "Field Name" containing the exact field/column names from the user's data
 - Include ONE ROW per field being analyzed
 - If a field needs multiple DQ rules, create separate rows for each rule (same Field Name, different DQ Dimension)
-- You may include additional narrative text, explanations, and detailed breakdowns BEFORE or AFTER the summary table
+- You may include a brief introductory sentence before the table
 - The summary table is essential — it enables the app to merge results into a cumulative Excel file
+
+## OUTPUT RESTRICTIONS — Keep responses focused and clean:
+- For **Data Classification**: Output ONLY the field-level classification table. Do NOT include Classification Distribution Summary tables, governance recommendations, regulation references, per-field narrative breakdowns, or emoji-decorated section headers. Just a brief intro and the table.
+- For **Business Definitions**: Output ONLY the field-level definitions table. Do NOT include per-field narrative breakdowns. Just a brief intro and the table.
+- For **Data Quality Rules**: Output ONLY the field-level DQ rules table. Just a brief intro and the table.
+- For **Nudge & Sludge**: Output ONLY the field-level analysis table. Just a brief intro and the table.
+- In general: keep responses concise and table-focused. The user wants structured data they can download, not lengthy prose.
 
 Always be thorough, practical, and align your recommendations with international data governance best practices and Saudi NDMO regulations.`;
 
