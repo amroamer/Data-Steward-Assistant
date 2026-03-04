@@ -66,9 +66,8 @@ import DataModelDiagram from "@/components/DataModelDiagram";
 import {
   type InsightsReport,
   detectInsightsJSON,
+  looksLikeInsightsJSON,
   generateInsightsExcel,
-  generateInsightsSummary,
-  getInsightsScorecard,
 } from "@/lib/insights-store";
 import zatcaLogoPath from "@assets/zatca-logo.svg";
 import {
@@ -485,7 +484,11 @@ export default function ChatPage() {
       const insights = detectInsightsJSON(msg.content);
       if (insights) {
         insightsMap[msg.id] = insights;
-        overrides[msg.id] = generateInsightsSummary(insights);
+        overrides[msg.id] = t.insightsReportGenerated;
+        continue;
+      }
+      if (looksLikeInsightsJSON(msg.content)) {
+        overrides[msg.id] = t.insightsReportGenerated;
         continue;
       }
       const piiScan = detectPiiScanJSON(msg.content);
@@ -566,9 +569,8 @@ export default function ChatPage() {
       if (messageId) {
         setInsightsForMessage(prev => ({ ...prev, [messageId]: insightsReport }));
       }
-      const summary = generateInsightsSummary(insightsReport);
       if (messageId) {
-        setSummaryOverrides(prev => ({ ...prev, [messageId]: summary }));
+        setSummaryOverrides(prev => ({ ...prev, [messageId]: t.insightsReportGenerated }));
       }
       toast({
         title: t.insightsReportGenerated,
@@ -1487,28 +1489,8 @@ function MessageBubble({
                 </div>
               )}
             </div>
-            {hasInsights && (() => {
-              const sc = getInsightsScorecard(insightsReport!);
-              return (
-                <div className="mt-3 space-y-3" data-testid={`insights-card-${message.id}`}>
-                  <div className="grid grid-cols-2 gap-2 max-w-sm">
-                    <div className="rounded-lg border-2 px-3 py-2 bg-white" style={{ borderColor: "#00338D" }} data-testid="scorecard-total-insights">
-                      <p className="text-[10px] text-muted-foreground">{tr.scorecardTotalInsights}</p>
-                      <p className="text-lg font-bold" style={{ color: "#00338D" }}>{sc.totalInsights}</p>
-                    </div>
-                    <div className="rounded-lg border-2 px-3 py-2 bg-white" style={{ borderColor: "#00338D" }} data-testid="scorecard-high-impact">
-                      <p className="text-[10px] text-muted-foreground">{tr.scorecardHighImpact}</p>
-                      <p className="text-lg font-bold text-red-600">{sc.highImpact}</p>
-                    </div>
-                    <div className="rounded-lg border-2 px-3 py-2 bg-white" style={{ borderColor: "#00338D" }} data-testid="scorecard-anomalies">
-                      <p className="text-[10px] text-muted-foreground">{tr.scorecardAnomalies}</p>
-                      <p className="text-lg font-bold text-amber-600">{sc.anomalies}</p>
-                    </div>
-                    <div className="rounded-lg border-2 px-3 py-2 bg-white" style={{ borderColor: "#00338D" }} data-testid="scorecard-completeness">
-                      <p className="text-[10px] text-muted-foreground">{tr.scorecardCompleteness}</p>
-                      <p className="text-lg font-bold text-emerald-600">{sc.completeness}%</p>
-                    </div>
-                  </div>
+            {hasInsights && (
+                <div className="mt-2 space-y-2" data-testid={`insights-card-${message.id}`}>
                   <Button
                     size="sm"
                     onClick={() => handleDownloadInsights(insightsReport!)}
@@ -1540,8 +1522,7 @@ function MessageBubble({
                     </div>
                   )}
                 </div>
-              );
-            })()}
+            )}
             {shouldShowSummary && onDownloadResult && !hasDataModel && !hasInsights && (
               <div className="mt-2">
                 <Button

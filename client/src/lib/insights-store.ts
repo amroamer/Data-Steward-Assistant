@@ -66,30 +66,9 @@ export interface InsightsReport {
   data_quality_flags: DataQualityFlag[];
 }
 
-export function detectInsightsJSON(content: string): InsightsReport | null {
-  const allBlocks = Array.from(content.matchAll(/```(?:json)?\s*([\s\S]*?)```/g));
-  for (const match of allBlocks) {
-    const candidate = match[1].trim();
-    if (!candidate) continue;
-    try {
-      const parsed = JSON.parse(candidate);
-      if (
-        parsed &&
-        typeof parsed.report_title === "string" &&
-        parsed.dataset_summary &&
-        typeof parsed.dataset_summary.total_rows === "number" &&
-        typeof parsed.dataset_summary.total_columns === "number" &&
-        Array.isArray(parsed.key_insights) &&
-        Array.isArray(parsed.column_profiles)
-      ) {
-        return parsed as InsightsReport;
-      }
-    } catch {}
-  }
-
+function tryParseInsights(text: string): InsightsReport | null {
   try {
-    const trimmed = content.trim();
-    const parsed = JSON.parse(trimmed);
+    const parsed = JSON.parse(text);
     if (
       parsed &&
       typeof parsed.report_title === "string" &&
@@ -102,6 +81,61 @@ export function detectInsightsJSON(content: string): InsightsReport | null {
       return parsed as InsightsReport;
     }
   } catch {}
+  return null;
+}
+
+function repairAndParse(raw: string): InsightsReport | null {
+  try {
+    let braceCount = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < raw.length; i++) {
+      const ch = raw[i];
+      if (escaped) { escaped = false; continue; }
+      if (ch === "\\") { escaped = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (!inString) {
+        if (ch === "{" || ch === "[") braceCount++;
+        if (ch === "}" || ch === "]") braceCount--;
+      }
+    }
+    let repaired = raw;
+    while (braceCount > 0) { repaired += braceCount > 1 ? "]}" : "}"; braceCount--; }
+    const parsed = JSON.parse(repaired);
+    if (parsed.report_title && parsed.dataset_summary) {
+      return {
+        report_title: parsed.report_title ?? "Data Insights Report",
+        dataset_summary: parsed.dataset_summary ?? { total_rows: 0, total_columns: 0 },
+        key_insights: Array.isArray(parsed.key_insights) ? parsed.key_insights : [],
+        column_profiles: Array.isArray(parsed.column_profiles) ? parsed.column_profiles : [],
+        recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
+        data_quality_flags: Array.isArray(parsed.data_quality_flags) ? parsed.data_quality_flags : [],
+      } as InsightsReport;
+    }
+  } catch {}
+  return null;
+}
+
+export function looksLikeInsightsJSON(content: string): boolean {
+  return content.includes('"report_title"') && content.includes('"dataset_summary"') && content.includes('"key_insights"');
+}
+
+export function detectInsightsJSON(content: string): InsightsReport | null {
+  const allBlocks = Array.from(content.matchAll(/```(?:json)?\s*([\s\S]*?)```/g));
+  for (const match of allBlocks) {
+    const candidate = match[1].trim();
+    if (!candidate) continue;
+    const result = tryParseInsights(candidate);
+    if (result) return result;
+  }
+
+  const result2 = tryParseInsights(content.trim());
+  if (result2) return result2;
+
+  if (looksLikeInsightsJSON(content)) {
+    const raw = content.replace(/^```(?:json)?\s*/m, "").replace(/```\s*$/m, "").trim();
+    return repairAndParse(raw);
+  }
 
   return null;
 }
