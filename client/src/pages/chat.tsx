@@ -478,6 +478,27 @@ function formatTimestamp(date: Date | string): string {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function inferStepsForCommand(content: string, t: Translation): ThinkingStep[] {
+  const lower = content.toLowerCase();
+  const steps: string[] = [t.stepReadingFile, t.stepProfilingData];
+  if (lower.includes("quality") || lower.includes("dq") || lower.includes("جودة")) {
+    steps.push(t.stepGenerating, t.stepExecuting, t.stepSaving);
+  } else if (lower.includes("classification") || lower.includes("تصنيف")) {
+    steps.push(t.stepGenerating, t.stepSaving);
+  } else if (lower.includes("definition") || lower.includes("تعريف")) {
+    steps.push(t.stepGenerating, t.stepSaving);
+  } else if (lower.includes("model") || lower.includes("نموذج") || lower.includes("star schema")) {
+    steps.push(t.stepGenerating, t.stepSaving);
+  } else if (lower.includes("pii") || lower.includes("بيانات شخصية") || lower.includes("privacy")) {
+    steps.push(t.stepGenerating, t.stepSaving);
+  } else if (lower.includes("insight") || lower.includes("رؤى")) {
+    steps.push(t.stepGenerating, t.stepSaving);
+  } else {
+    steps.push(t.stepGenerating);
+  }
+  return steps.map(label => ({ label, status: "done" as const }));
+}
+
 function stripExcelContent(content: string): { displayText: string; fileName: string | null } {
   const uploadPatterns = [
     { regex: /(?:^|\n\n)\*\*Uploaded File: (.+?)\*\*/, marker: "**Uploaded File:" },
@@ -950,24 +971,10 @@ export default function ChatPage() {
   }, []);
 
   const getThinkingStepsForCommand = useCallback((content: string): ThinkingStep[] => {
-    const lower = content.toLowerCase();
-    const steps: string[] = [t.stepReadingFile, t.stepProfilingData];
-    if (lower.includes("quality") || lower.includes("dq") || lower.includes("جودة")) {
-      steps.push(t.stepGenerating, t.stepExecuting, t.stepSaving);
-    } else if (lower.includes("classification") || lower.includes("تصنيف")) {
-      steps.push(t.stepGenerating, t.stepSaving);
-    } else if (lower.includes("definition") || lower.includes("تعريف")) {
-      steps.push(t.stepGenerating, t.stepSaving);
-    } else if (lower.includes("model") || lower.includes("نموذج") || lower.includes("star schema")) {
-      steps.push(t.stepGenerating, t.stepSaving);
-    } else if (lower.includes("pii") || lower.includes("بيانات شخصية") || lower.includes("privacy")) {
-      steps.push(t.stepGenerating, t.stepSaving);
-    } else if (lower.includes("insight") || lower.includes("رؤى")) {
-      steps.push(t.stepGenerating, t.stepSaving);
-    } else {
-      steps.push(t.stepGenerating);
-    }
-    return steps.map((label, i) => ({ label, status: i === 0 ? "active" as const : "pending" as const }));
+    return inferStepsForCommand(content, t).map((step, i) => ({
+      ...step,
+      status: i === 0 ? "active" as const : "pending" as const,
+    }));
   }, [t]);
 
   const resetResultState = () => {
@@ -1977,8 +1984,14 @@ function ThreadCard({
   const hasInsights = insightsReport != null;
   const hasSummary = !!summaryOverride;
 
-  const stepsToShow = isActiveStreaming ? liveSteps : (completedSteps || []);
   const isDone = !!assistantMsg && !isActiveStreaming;
+  const stepsToShow = isActiveStreaming
+    ? liveSteps
+    : (completedSteps && completedSteps.length > 0)
+      ? completedSteps
+      : isDone
+        ? inferStepsForCommand(userMsg.content, t)
+        : [];
   const excelName = attachedFile || uploadedFileName;
 
   const borderColor = isActiveStreaming ? "#E65100" : (assistantMsg ? "#2E7D32" : "#2563EB");
