@@ -1,0 +1,18 @@
+I want to add a persistent result Excel file feature to the app. Here's exactly how it should work:
+Core Concept: Cumulative result.xlsx
+When the user uploads an Excel sheet and asks for any analysis (business definitions, data classification, data quality rules, etc.), the app should maintain a single cumulative result.xlsx file in memory for that session. Each new analysis request adds new columns to that same file rather than creating a new one.
+Detailed Behavior:
+
+First request — User uploads an Excel sheet and asks for business definitions. The app analyzes the fields and creates result.xlsx with these columns: field_name, business_term, business_definition, data_type, example. A "Download result.xlsx" button appears in the chat.
+Second request — User asks for data classification (no need to re-upload the file, the app remembers the fields from the uploaded sheet in the current session). The app looks up the existing result.xlsx, and appends new columns to it: classification_level, classification_rationale, data_owner, sensitivity_category — aligned by field_name as the key. The updated result.xlsx is available for download again.
+Third request — Same pattern. If the user asks for data quality rules, new columns are added: dq_dimension, dq_rule, dq_threshold, dq_priority. Always appended to the same file, matched on field_name.
+
+Implementation Requirements:
+
+Store the current result.xlsx state in React state as a data structure (array of objects keyed by field_name), not as a file blob — rebuild the Excel file fresh on each download using SheetJS.
+When a new analysis comes in, merge the new columns into the existing state by matching on field_name. If a field exists, add the new properties to it. If it doesn't exist yet, add it as a new row.
+The "Download result.xlsx" button should always reflect the latest cumulative state.
+Show the user a visual indicator in the chat (e.g., a small banner) that says "result.xlsx has been updated — now includes: business definitions + data classification" so they know what's currently in the file.
+The app should detect from the AI response what type of analysis was returned (business definitions, data classification, data quality, etc.) and know which columns to extract and merge.
+Column ordering in the Excel output should always be: field_name first, then business definition columns, then classification columns, then data quality columns — in that logical order regardless of which order the user requested them.
+If the user uploads a new/different Excel sheet mid-session, prompt them: "This will reset result.xlsx and start fresh with the new file. Continue?" — and reset the state if they confirm.
