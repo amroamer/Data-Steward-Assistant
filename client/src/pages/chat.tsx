@@ -47,8 +47,10 @@ import {
   Menu,
   Info,
   Image,
+  Camera,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTouchDevice } from "@/hooks/use-touch-device";
 import type { Conversation, Message } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
 import {
@@ -161,6 +163,8 @@ const translations = {
     approachPii: "PII scan analyzed column names and sample data patterns against Saudi PDPL personal data categories, common PII patterns, and international privacy standards.",
     approachModel: "Star schema was designed by identifying business measures (facts) and descriptive attributes (dimensions) from field relationships and data patterns.",
     approachInsights: "Insights were generated from statistical profiling of all columns, including distribution analysis, null patterns, anomaly detection, and trend identification.",
+    cameraCapture: "Take a photo",
+    cameraError: "Could not access camera. Please check your camera permissions.",
   },
   ar: {
     newChat: "محادثة جديدة",
@@ -239,6 +243,8 @@ const translations = {
     approachPii: "فحص البيانات الشخصية حلل أسماء الأعمدة وأنماط البيانات النموذجية مقابل فئات البيانات الشخصية في نظام حماية البيانات الشخصية السعودي وأنماط PII الشائعة.",
     approachModel: "تم تصميم المخطط النجمي من خلال تحديد مقاييس الأعمال (الحقائق) والسمات الوصفية (الأبعاد) من علاقات الحقول وأنماط البيانات.",
     approachInsights: "تم إنشاء الرؤى من التحليل الإحصائي لجميع الأعمدة، بما في ذلك تحليل التوزيع وأنماط القيم الفارغة واكتشاف الشذوذ وتحديد الاتجاهات.",
+    cameraCapture: "التقاط صورة",
+    cameraError: "تعذر الوصول إلى الكاميرا. يرجى التحقق من أذونات الكاميرا.",
   },
 } as const;
 
@@ -391,6 +397,27 @@ function stripExcelContent(content: string): { displayText: string; fileName: st
   }
 
   return { displayText: content, fileName: null };
+}
+
+function ImagePreview({ file }: { file: File }) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  if (!previewUrl) return <Image className="w-4 h-4 text-emerald-600 flex-shrink-0" />;
+
+  return (
+    <img
+      src={previewUrl}
+      alt={file.name}
+      className="w-8 h-8 rounded object-cover flex-shrink-0 border border-emerald-200"
+      data-testid="img-file-preview"
+    />
+  );
 }
 
 function SidebarContent({
@@ -623,7 +650,9 @@ export default function ChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isTouchDevice = useTouchDevice();
   const { toast } = useToast();
 
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
@@ -1071,6 +1100,22 @@ export default function ChatPage() {
     }
   };
 
+  const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: t.cameraError, variant: "destructive" });
+      return;
+    }
+    if (sessionFieldNames && sessionFieldNames.length > 0 && (resultRows.length > 0 || latestDataModel || latestPiiScan)) {
+      setPendingFile(file);
+      setShowResetDialog(true);
+    } else {
+      setSelectedFile(file);
+    }
+  };
+
   const handleResetConfirm = () => {
     resetResultState();
     setSelectedFile(pendingFile);
@@ -1460,7 +1505,11 @@ export default function ChatPage() {
               <div className="max-w-3xl mx-auto">
                 {selectedFile && (
                   <div className="flex items-center gap-2 mb-3 bg-emerald-50 rounded-lg px-3 py-2 border border-emerald-200">
-                    <FileSpreadsheet className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    {selectedFile.type.startsWith("image/") ? (
+                      <ImagePreview file={selectedFile} />
+                    ) : (
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    )}
                     <span className="text-sm truncate flex-1 text-emerald-800 font-medium">{selectedFile.name}</span>
                     <Button
                       size="icon"
@@ -1469,6 +1518,7 @@ export default function ChatPage() {
                       onClick={() => {
                         setSelectedFile(null);
                         if (fileInputRef.current) fileInputRef.current.value = "";
+                        if (cameraInputRef.current) cameraInputRef.current.value = "";
                       }}
                       data-testid="button-remove-file"
                     >
@@ -1491,6 +1541,15 @@ export default function ChatPage() {
                     className="hidden"
                     data-testid="input-file"
                   />
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleCameraCapture}
+                    className="hidden"
+                    data-testid="input-camera"
+                  />
                   <Button
                     type="button"
                     size="icon"
@@ -1502,6 +1561,20 @@ export default function ChatPage() {
                   >
                     <Paperclip className="w-4.5 h-4.5" />
                   </Button>
+                  {isTouchDevice && (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 flex-shrink-0 touch-device-only"
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={isStreaming}
+                      title={t.cameraCapture}
+                      data-testid="button-camera-capture"
+                    >
+                      <Camera className="w-4.5 h-4.5" />
+                    </Button>
+                  )}
                   <Textarea
                     ref={textareaRef}
                     value={inputValue}

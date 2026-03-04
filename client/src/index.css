@@ -200,4 +200,14 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+
+  .touch-device-only {
+    display: none !important;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .touch-device-only {
+    display: inline-flex !important;
+  }
 }
