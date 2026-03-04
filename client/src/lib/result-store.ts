@@ -128,11 +128,19 @@ const HEADER_MAPPINGS: Record<AnalysisType, Record<string, string[]>> = {
 function mapHeaderToKey(header: string, analysisType: AnalysisType): string | null {
   const norm = normalizeHeader(header);
   const typeMap = HEADER_MAPPINGS[analysisType];
+
   for (const [key, patterns] of Object.entries(typeMap)) {
-    if (patterns.some((p) => norm === p || norm.includes(p))) {
+    if (patterns.some((p) => norm === p)) {
       return key;
     }
   }
+
+  for (const [key, patterns] of Object.entries(typeMap)) {
+    if (patterns.some((p) => norm.includes(p))) {
+      return key;
+    }
+  }
+
   return null;
 }
 
