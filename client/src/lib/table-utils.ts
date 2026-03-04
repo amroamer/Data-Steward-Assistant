@@ -17,12 +17,22 @@ function isPipeRow(line: string): boolean {
   return trimmed.includes("|") && trimmed.split("|").filter((s) => s.trim()).length >= 1;
 }
 
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
 function parsePipeRow(line: string): string[] {
   const normalized = normalizePipeRow(line);
   return normalized
     .slice(1, -1)
     .split("|")
-    .map((cell) => cell.trim().replace(/\*\*/g, ""));
+    .map((cell) => decodeHtmlEntities(cell.trim().replace(/\*\*/g, "")));
 }
 
 function isSeparatorRow(line: string): boolean {

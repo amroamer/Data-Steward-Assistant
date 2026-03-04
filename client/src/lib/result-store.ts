@@ -63,14 +63,25 @@ function normalizeHeader(header: string): string {
   return header.toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
 }
 
+const FIELD_NAME_EXACT = ["field_name", "field", "column_name", "column", "data_element", "attribute", "name"];
+const FIELD_NAME_PARTIAL = ["field", "name", "column", "element", "attribute"];
+
+function hasFieldNameColumn(headers: string[]): boolean {
+  for (const pattern of FIELD_NAME_EXACT) {
+    if (headers.some((h) => normalizeHeader(h) === pattern)) return true;
+  }
+  for (const pattern of FIELD_NAME_PARTIAL) {
+    if (headers.some((h) => normalizeHeader(h).includes(pattern))) return true;
+  }
+  return false;
+}
+
 function findFieldNameColumn(headers: string[]): number {
-  const patterns = ["field_name", "field", "column_name", "column", "data_element", "attribute", "name"];
-  for (const pattern of patterns) {
+  for (const pattern of FIELD_NAME_EXACT) {
     const idx = headers.findIndex((h) => normalizeHeader(h) === pattern);
     if (idx !== -1) return idx;
   }
-  const partialPatterns = ["field", "name", "column", "element"];
-  for (const pattern of partialPatterns) {
+  for (const pattern of FIELD_NAME_PARTIAL) {
     const idx = headers.findIndex((h) => normalizeHeader(h).includes(pattern));
     if (idx !== -1) return idx;
   }
@@ -202,6 +213,8 @@ export function detectAndExtractAllAnalyses(content: string): AnalysisResult[] {
   const accumulatedDqRows = new Map<AnalysisType, { fieldName: string; columns: Record<string, string> }[]>();
 
   for (const table of tables) {
+    if (!hasFieldNameColumn(table.headers)) continue;
+
     const analysisType = detectTableAnalysisType(table);
     if (!analysisType) continue;
 
