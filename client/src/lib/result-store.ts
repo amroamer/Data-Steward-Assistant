@@ -197,25 +197,50 @@ export interface AnalysisResult {
 
 export function detectAndExtractAllAnalyses(content: string): AnalysisResult[] {
   const tables = extractTablesFromMarkdown(content);
-  const results: AnalysisResult[] = [];
-  const processedTypes = new Set<AnalysisType>();
+
+  const accumulatedFieldData = new Map<AnalysisType, Record<string, Record<string, string>>>();
+  const accumulatedDqRows = new Map<AnalysisType, { fieldName: string; columns: Record<string, string> }[]>();
 
   for (const table of tables) {
     const analysisType = detectTableAnalysisType(table);
     if (!analysisType) continue;
-    if (processedTypes.has(analysisType)) continue;
-    processedTypes.add(analysisType);
 
     if (analysisType === "data_quality") {
       const dqMultiRows = extractDqMultiRows(table);
+      const existing = accumulatedDqRows.get(analysisType) || [];
+      accumulatedDqRows.set(analysisType, [...existing, ...dqMultiRows]);
+
       const fieldData = extractFieldDataFromTable(table, analysisType);
-      results.push({ analysisType, fieldData, dqMultiRows });
+      const existingFd = accumulatedFieldData.get(analysisType) || {};
+      for (const [fieldName, columns] of Object.entries(fieldData)) {
+        existingFd[fieldName] = { ...(existingFd[fieldName] || {}), ...columns };
+      }
+      accumulatedFieldData.set(analysisType, existingFd);
     } else {
       const fieldData = extractFieldDataFromTable(table, analysisType);
-      if (Object.keys(fieldData).length > 0) {
-        results.push({ analysisType, fieldData });
+      const existingFd = accumulatedFieldData.get(analysisType) || {};
+      for (const [fieldName, columns] of Object.entries(fieldData)) {
+        existingFd[fieldName] = { ...(existingFd[fieldName] || {}), ...columns };
       }
+      accumulatedFieldData.set(analysisType, existingFd);
     }
+  }
+
+  const results: AnalysisResult[] = [];
+  const allTypes = new Set<AnalysisType>([
+    ...accumulatedFieldData.keys(),
+    ...accumulatedDqRows.keys(),
+  ]);
+
+  for (const analysisType of allTypes) {
+    const fieldData = accumulatedFieldData.get(analysisType) || {};
+    const dqRows = accumulatedDqRows.get(analysisType);
+    if (Object.keys(fieldData).length === 0 && (!dqRows || dqRows.length === 0)) continue;
+    const result: AnalysisResult = { analysisType, fieldData };
+    if (dqRows && dqRows.length > 0) {
+      result.dqMultiRows = dqRows;
+    }
+    results.push(result);
   }
 
   return results;
