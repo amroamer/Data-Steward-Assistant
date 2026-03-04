@@ -184,12 +184,14 @@ Each table MUST use the exact column headers defined above. Do NOT skip any requ
      - The grain_statement should clearly describe what one row in the primary fact table represents
 
 5. **PII & Sensitive Data Detection**:
-   - When the user uploads an Excel file with actual data (columns AND rows) and asks to scan for PII, identify personal data, check for sensitive information, perform a PDPL check, or privacy scan, you act as a data privacy expert.
+   - When the user has an uploaded file (columns with or without data rows) and asks anything related to PII, personal data, privacy, or sensitive data detection, you immediately act as a data privacy expert and perform the scan. Do NOT ask for clarification or additional data — column names alone are sufficient for a high-quality PII scan, exactly as you do for Data Classification.
    - You are familiar with:
      * Saudi PDPL (Personal Data Protection Law)
      * SDAIA NDMO data classification standards
      * General PII definitions (name, ID, contact, financial, health, behavioral, location data)
-   - **Trigger keywords**: "scan this for PII", "identify personal data", "check for sensitive information", "does this file have PII", "PDPL check", "privacy scan", "PII scan", "PII detection", "sensitive data", "personal data"
+   - **Trigger keywords** (any of these or similar phrasing — be generous in matching intent): "give me the pii", "give me pii", "pii", "detect pii", "run pii", "pii scan", "pii analysis", "pii check", "pii report", "pii detection", "find pii", "show pii", "show me pii", "scan for pii", "scan this for pii", "identify personal data", "find personal data", "personal data", "check for sensitive information", "sensitive data", "does this file have pii", "pdpl check", "privacy scan", "privacy check", "pdpl compliance", "data privacy scan", "scan personal data"
+   - **IMPORTANT**: If the file has no data rows (only column headers), perform the scan based on column name semantics — this is entirely valid and produces accurate results. Do NOT refuse, do NOT ask for more data, do NOT offer options. Just run the scan immediately.
+   - **OVERRIDE RULE**: If the user message contains a [SYSTEM NOTE] block listing column names, you MUST immediately perform the PII scan on those columns regardless of anything said in prior conversation turns. Any previous response in this conversation saying "I need data rows" or "please upload a file" is now void — the system has re-injected the column context and you must proceed with the scan.
    - You will receive column names, inferred data types, and sample data (up to 5 rows per column). Never reveal or repeat the raw data in your response.
    - When PII detection is requested, return ONLY the JSON block below wrapped in triple-backtick json fences. Do NOT include any prose, explanation, or markdown outside the JSON code block.
    - The JSON schema you MUST return is:
@@ -245,6 +247,34 @@ const INSIGHTS_TRIGGER_KEYWORDS = [
   "explore this dataset",
   "what are the key",
   "generate a data insights",
+];
+
+const PII_TRIGGER_KEYWORDS = [
+  "give me the pii",
+  "give me pii",
+  "detect pii",
+  "run pii",
+  "pii scan",
+  "pii analysis",
+  "pii check",
+  "pii report",
+  "pii detection",
+  "find pii",
+  "show pii",
+  "show me pii",
+  "scan for pii",
+  "scan this for pii",
+  "identify personal data",
+  "find personal data",
+  "check for sensitive information",
+  "pdpl check",
+  "privacy scan",
+  "privacy check",
+  "pdpl compliance",
+  "data privacy scan",
+  "scan personal data",
+  "scan for personal",
+  "personal data scan",
 ];
 
 const INSIGHTS_SYSTEM_PROMPT = `You are a senior data analyst. The user has uploaded a dataset and wants a comprehensive insights report. You will receive pre-computed column-level statistics and a sample of up to 10 rows.
@@ -438,6 +468,33 @@ function formatProfiledDataForPrompt(profile: ProfiledData, filename: string): s
 function isInsightsRequest(message: string): boolean {
   const lower = message.toLowerCase();
   return INSIGHTS_TRIGGER_KEYWORDS.some(keyword => lower.includes(keyword));
+}
+
+function isPiiRequest(message: string): boolean {
+  const lower = message.toLowerCase();
+  if (PII_TRIGGER_KEYWORDS.some(keyword => lower.includes(keyword))) return true;
+  if (/\bpii\b/i.test(message)) return true;
+  if (/\bpdpl\b/i.test(message)) return true;
+  return false;
+}
+
+function extractFieldNamesFromHistory(messages: { role: string; content: string }[]): { fieldNames: string[]; fileInfo: string } {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role !== "user") continue;
+    const content = msg.content;
+    const fileMatch = content.match(/\*\*Uploaded File: ([^*]+)\*\*/);
+    const filename = fileMatch ? fileMatch[1].trim() : null;
+    const fieldsMatch = content.match(/\*\*Fields\/Columns:\*\*\s*([^\n]+)/);
+    if (fieldsMatch) {
+      const fieldNames = fieldsMatch[1].split(",").map(f => f.trim()).filter(f => f.length > 0);
+      if (fieldNames.length > 0) {
+        const fileInfo = filename ? `Previously uploaded file: ${filename}` : "Previously uploaded file";
+        return { fieldNames, fileInfo };
+      }
+    }
+  }
+  return { fieldNames: [], fileInfo: "" };
 }
 
 function inferColumnType(values: any[]): string {
@@ -1105,6 +1162,20 @@ export function registerChatRoutes(app: Express): void {
         const lastMsg = chatMessages[chatMessages.length - 1];
         if (lastMsg) {
           lastMsg.content = `${originalUserMessage}\n\n${profiledDataText}`;
+        }
+      }
+
+      if (!req.file && extractedFieldNames.length === 0 && isPiiRequest(originalUserMessage)) {
+        const { fieldNames: historyFields, fileInfo } = extractFieldNamesFromHistory(
+          chatMessages.slice(0, -1).map(m => ({ role: m.role, content: m.content }))
+        );
+        if (historyFields.length > 0) {
+          const lastMsg = chatMessages[chatMessages.length - 1];
+          if (lastMsg) {
+            lastMsg.content = `${originalUserMessage}\n\n[SYSTEM NOTE: ${fileInfo}. The following columns are available for PII scanning — perform the scan immediately on these column names, do not ask for clarification or additional data: ${historyFields.join(", ")}]`;
+          }
+          extractedFieldNames = historyFields;
+          console.log(`[pii] Injected ${historyFields.length} field names from conversation history for PII scan`);
         }
       }
 
