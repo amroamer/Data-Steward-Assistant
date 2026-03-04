@@ -205,6 +205,10 @@ const translations = {
     fileUploaded: "File uploaded",
     noOutputsYet: "No outputs generated yet",
     noActivityYet: "No activity yet",
+    sentAt: "Sent:",
+    completedAt: "Completed:",
+    followUp: "Ask Follow-up",
+    excelFile: "Excel File:",
   },
   ar: {
     newChat: "وكيل مالك بيانات جديد",
@@ -312,6 +316,10 @@ const translations = {
     fileUploaded: "تم تحميل الملف",
     noOutputsYet: "لم يتم إنشاء مخرجات بعد",
     noActivityYet: "لا يوجد نشاط بعد",
+    sentAt: "أُرسل:",
+    completedAt: "اكتمل:",
+    followUp: "متابعة",
+    excelFile: "ملف Excel:",
   },
 } as const;
 
@@ -763,6 +771,7 @@ export default function ChatPage() {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>("idle");
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
+  const [completedStepsForMessage, setCompletedStepsForMessage] = useState<Record<number, ThinkingStep[]>>({});
   const [mobileOutputsOpen, setMobileOutputsOpen] = useState(false);
 
   const [deletingConvId, setDeletingConvId] = useState<number | null>(null);
@@ -1223,6 +1232,10 @@ export default function ChatPage() {
                     if (convData?.messages) {
                       const lastMsg = convData.messages[convData.messages.length - 1];
                       if (lastMsg?.role === "assistant") {
+                        setCompletedStepsForMessage(prev => ({
+                          ...prev,
+                          [lastMsg.id]: thinkingSteps.map(s => ({ ...s, status: "done" as const })),
+                        }));
                         const msgSummaryParts: string[] = [];
                         if (detectedInsights) {
                           setInsightsForMessage(prev => ({ ...prev, [lastMsg.id]: detectedInsights }));
@@ -1255,8 +1268,18 @@ export default function ChatPage() {
                       }
                     }
                   } else {
-                    queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
-                    queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+                    await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
+                    await queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+                    const convData2 = queryClient.getQueryData<any>(["/api/conversations", conversationId]);
+                    if (convData2?.messages) {
+                      const lastMsg2 = convData2.messages[convData2.messages.length - 1];
+                      if (lastMsg2?.role === "assistant") {
+                        setCompletedStepsForMessage(prev => ({
+                          ...prev,
+                          [lastMsg2.id]: thinkingSteps.map(s => ({ ...s, status: "done" as const })),
+                        }));
+                      }
+                    }
                   }
                 }
                 if (data.error) {
@@ -1618,76 +1641,43 @@ export default function ChatPage() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-0">
                   {threads.map((thread, idx) => {
                     const isCollapsed = collapsedThreads.has(idx);
+                    const isLastThread = idx === threads.length - 1;
+                    const isActiveStreaming = isLastThread && isStreaming;
                     const tag = detectAnalysisTag(
                       thread.userMsg.content,
                       thread.assistantMsg?.content,
                       t
                     );
-                    const { displayText: previewText } = stripExcelContent(thread.userMsg.content);
-                    const timestamp = formatTimestamp(thread.userMsg.createdAt);
-
                     return (
-                      <div
+                      <ThreadCard
                         key={thread.userMsg.id}
-                        className="animate-slide-up"
-                        style={{ animationDelay: `${idx * 30}ms` }}
-                        data-testid={`thread-block-${idx}`}
-                      >
-                        <UserCommandCard
-                          message={thread.userMsg}
-                          displayText={previewText}
-                          timestamp={timestamp}
-                          isCollapsed={isCollapsed}
-                          onToggle={() => toggleThread(idx)}
-                          tag={tag}
-                          isRtl={isRtl}
-                          t={t}
-                        />
-                        {!isCollapsed && thread.assistantMsg && (
-                          <AgentResponseCard
-                            message={thread.assistantMsg}
-                            summaryOverride={summaryOverrides[thread.assistantMsg.id]}
-                            onDownloadResult={(resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis) ? handleDownloadResult : undefined}
-                            dataModel={dataModels[thread.assistantMsg.id] || undefined}
-                            dqAnalysis={dqAnalyses[thread.assistantMsg.id] || undefined}
-                            insightsReport={insightsForMessage[thread.assistantMsg.id] || undefined}
-                            allInsightsReports={insightsReports}
-                            profiledColumns={profiledColumns}
-                            lang={lang}
-                            t={t}
-                            tag={tag}
-                            onAskFollowUp={(text) => { setInputValue(text); textareaRef.current?.focus(); }}
-                          />
-                        )}
-                      </div>
+                        thread={thread}
+                        idx={idx}
+                        isCollapsed={isCollapsed}
+                        onToggle={() => toggleThread(idx)}
+                        tag={tag}
+                        isRtl={isRtl}
+                        t={t}
+                        lang={lang}
+                        isActiveStreaming={isActiveStreaming}
+                        liveSteps={thinkingSteps}
+                        completedSteps={thread.assistantMsg ? completedStepsForMessage[thread.assistantMsg.id] : undefined}
+                        streamingContent={isActiveStreaming ? streamingContent : ""}
+                        summaryOverride={thread.assistantMsg ? summaryOverrides[thread.assistantMsg.id] : undefined}
+                        onDownloadResult={(resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis) ? handleDownloadResult : undefined}
+                        dataModel={thread.assistantMsg ? (dataModels[thread.assistantMsg.id] || undefined) : undefined}
+                        dqAnalysis={thread.assistantMsg ? (dqAnalyses[thread.assistantMsg.id] || undefined) : undefined}
+                        insightsReport={thread.assistantMsg ? (insightsForMessage[thread.assistantMsg.id] || undefined) : undefined}
+                        allInsightsReports={insightsReports}
+                        profiledColumns={profiledColumns}
+                        uploadedFileName={uploadedFileName}
+                        onAskFollowUp={(text) => { setInputValue(text); textareaRef.current?.focus(); }}
+                      />
                     );
                   })}
-                  {thinkingSteps.length > 0 && (
-                    <>
-                      <ThinkingProgressCard steps={thinkingSteps} t={t} isRtl={isRtl} isDone={agentStatus === "done"} />
-                      {streamingContent && (
-                        <div
-                          className="rounded-xl bg-white shadow-sm p-4 animate-slide-up"
-                          style={{ borderLeft: isRtl ? "none" : "3px solid #E65100", borderRight: isRtl ? "3px solid #E65100" : "none" }}
-                          data-testid="streaming-content"
-                        >
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: "#067647" }}>
-                              <Bot className="w-3.5 h-3.5 text-white" />
-                            </div>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "#E65100" }} />
-                          </div>
-                          <div className="prose prose-sm max-w-none break-words" style={{ color: "#1A1A2E" }}>
-                            <ReactMarkdown>{streamingContent}</ReactMarkdown>
-                            <span className={`inline-block w-2 h-4 bg-primary animate-pulse ${isRtl ? "mr-0.5" : "ml-0.5"} align-text-bottom`} />
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
                   <div ref={messagesEndRef} />
                 </div>
               )}
@@ -1960,43 +1950,293 @@ function OutputsPanel({
   );
 }
 
-function UserCommandCard({
-  message, displayText, timestamp, isCollapsed, onToggle, tag, isRtl, t,
+function ThreadCard({
+  thread, idx, isCollapsed, onToggle, tag, isRtl, t, lang,
+  isActiveStreaming, liveSteps, completedSteps, streamingContent,
+  summaryOverride, onDownloadResult, dataModel, dqAnalysis, insightsReport,
+  allInsightsReports, profiledColumns = [], uploadedFileName, onAskFollowUp,
 }: {
-  message: Message; displayText: string; timestamp: string; isCollapsed: boolean; onToggle: () => void; tag: string | null; isRtl: boolean; t: Translation;
+  thread: ThreadPair; idx: number; isCollapsed: boolean; onToggle: () => void;
+  tag: string | null; isRtl: boolean; t: Translation; lang: Lang;
+  isActiveStreaming: boolean; liveSteps: ThinkingStep[]; completedSteps?: ThinkingStep[];
+  streamingContent: string; summaryOverride?: string; onDownloadResult?: () => void;
+  dataModel?: DataModelJSON | null; dqAnalysis?: DqAnalysisResult | null;
+  insightsReport?: InsightsReport | null;
+  allInsightsReports?: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
+  profiledColumns?: BackendColumnProfile[]; uploadedFileName?: string | null;
+  onAskFollowUp?: (text: string) => void;
 }) {
-  const { fileName } = stripExcelContent(message.content);
+  const { userMsg, assistantMsg } = thread;
+  const { displayText, fileName: attachedFile } = stripExcelContent(userMsg.content);
   const preview = displayText.substring(0, 80) + (displayText.length > 80 ? "..." : "");
+  const userTimestamp = formatTimestamp(userMsg.createdAt);
+  const agentTimestamp = assistantMsg ? formatTimestamp(assistantMsg.createdAt) : null;
+
+  const hasDataModel = dataModel != null;
+  const hasDqAnalysis = dqAnalysis != null;
+  const hasInsights = insightsReport != null;
+  const hasSummary = !!summaryOverride;
+
+  const stepsToShow = isActiveStreaming ? liveSteps : (completedSteps || []);
+  const isDone = !!assistantMsg && !isActiveStreaming;
+  const excelName = attachedFile || uploadedFileName;
+
+  const borderColor = isActiveStreaming ? "#E65100" : (assistantMsg ? "#2E7D32" : "#2563EB");
+
+  const handleDownloadInsights = (report: InsightsReport, srcFile?: string, cols?: BackendColumnProfile[]) => {
+    generateInsightsExcel(report, srcFile || "data.xlsx", cols || profiledColumns);
+  };
 
   return (
     <div
-      className="rounded-t-xl bg-white/80 cursor-pointer"
-      style={{ borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none" }}
-      onClick={onToggle}
-      data-testid={`user-command-${message.id}`}
+      className="rounded-xl bg-white shadow-sm mb-3 overflow-hidden animate-slide-up"
+      style={{
+        borderLeft: isRtl ? "none" : `3px solid ${borderColor}`,
+        borderRight: isRtl ? `3px solid ${borderColor}` : "none",
+        animationDelay: `${idx * 30}ms`,
+      }}
+      data-testid={`thread-block-${idx}`}
     >
-      <div className="flex items-center gap-3 px-4 py-2.5">
+      {/* Collapsed header — always visible */}
+      <div
+        className="flex items-center gap-3 px-4 py-2.5 cursor-pointer select-none"
+        onClick={onToggle}
+        data-testid={`user-command-${userMsg.id}`}
+      >
         <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
           <User className="w-3.5 h-3.5" style={{ color: "#6B7280" }} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] font-semibold" style={{ color: "#2563EB" }}>{t.commandLabel}</span>
             {tag && (
               <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#2563EB15", color: "#2563EB" }}>{tag}</span>
             )}
           </div>
           <p className="text-xs truncate" style={{ color: "#1A1A2E" }}>{preview}</p>
-          {fileName && (
+          {excelName && (
             <div className="flex items-center gap-1 mt-0.5">
               <Paperclip className="w-2.5 h-2.5" style={{ color: "#9CA3AF" }} />
-              <span className="text-[9px]" style={{ color: "#9CA3AF" }}>{fileName}</span>
+              <span className="text-[9px]" style={{ color: "#9CA3AF" }}>{excelName}</span>
             </div>
           )}
         </div>
-        <span className="text-[9px] flex-shrink-0 tabular-nums" style={{ color: "#9CA3AF" }}>{timestamp}</span>
-        {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" style={{ color: "#9CA3AF" }} /> : <ChevronDown className="w-3.5 h-3.5" style={{ color: "#9CA3AF" }} />}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <span className="text-[9px] tabular-nums" style={{ color: "#9CA3AF" }}>{userTimestamp}</span>
+          {isActiveStreaming ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "#E65100" }} />
+          ) : assistantMsg ? (
+            <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "#2E7D32" }} />
+          ) : (
+            <Circle className="w-3.5 h-3.5" style={{ color: "#D1D5DB" }} />
+          )}
+          {isCollapsed
+            ? <ChevronRight className="w-3.5 h-3.5" style={{ color: "#9CA3AF" }} />
+            : <ChevronDown className="w-3.5 h-3.5" style={{ color: "#9CA3AF" }} />}
+        </div>
       </div>
+
+      {/* Expanded body */}
+      {!isCollapsed && (
+        <div className="border-t" style={{ borderColor: "#E5E7EB" }}>
+
+          {/* Full user command */}
+          <div className="px-4 py-3" style={{ backgroundColor: "#F8FAFC" }}>
+            <div className="flex items-start gap-2">
+              <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <User className="w-3 h-3" style={{ color: "#6B7280" }} />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs leading-relaxed whitespace-pre-wrap break-words" style={{ color: "#374151" }}>
+                  {displayText || userMsg.content}
+                </p>
+                {excelName && (
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <FileSpreadsheet className="w-3 h-3" style={{ color: "#51BAB4" }} />
+                    <span className="text-[10px] font-medium" style={{ color: "#51BAB4" }}>{excelName}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Agent steps */}
+          {stepsToShow.length > 0 && (
+            <div className="px-4 py-3 border-t" style={{ borderColor: "#E5E7EB" }}>
+              <div className="flex items-center gap-2 mb-2.5">
+                {isDone ? (
+                  <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "#2E7D32" }} />
+                ) : (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "#E65100" }} />
+                )}
+                <span className="text-[11px] font-semibold" style={{ color: isDone ? "#2E7D32" : "#E65100" }}>
+                  {isDone ? t.agentCompleted : t.agentWorking}
+                </span>
+              </div>
+              <div className="space-y-1.5 ml-5">
+                {stepsToShow.map((step, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    {(step.status === "done" || isDone) ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#2E7D32" }} />
+                    ) : step.status === "active" ? (
+                      <Loader2 className="w-3.5 h-3.5 flex-shrink-0 animate-spin" style={{ color: "#E65100" }} />
+                    ) : (
+                      <Circle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#D1D5DB" }} />
+                    )}
+                    <span
+                      className="text-[11px]"
+                      style={{
+                        color: (step.status === "done" || isDone) ? "#2E7D32" : step.status === "active" ? "#E65100" : "#9CA3AF",
+                        fontWeight: step.status === "active" && !isDone ? 600 : 400,
+                      }}
+                    >
+                      {step.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Streaming content preview */}
+          {isActiveStreaming && streamingContent && (
+            <div className="px-4 py-3 border-t" style={{ borderColor: "#E5E7EB" }}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: "#067647" }}>
+                  <Bot className="w-3 h-3 text-white" />
+                </div>
+                <Loader2 className="w-3 h-3 animate-spin" style={{ color: "#E65100" }} />
+              </div>
+              <div className="prose prose-sm max-w-none break-words" style={{ color: "#1A1A2E" }}>
+                <ReactMarkdown>{streamingContent}</ReactMarkdown>
+                <span className={`inline-block w-1.5 h-3.5 bg-primary animate-pulse ${isRtl ? "mr-0.5" : "ml-0.5"} align-text-bottom`} />
+              </div>
+            </div>
+          )}
+
+          {/* Agent response body */}
+          {assistantMsg && (
+            <div className="px-4 py-3 border-t space-y-3" style={{ borderColor: "#E5E7EB" }}>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: "#067647" }}>
+                  <Bot className="w-3 h-3 text-white" />
+                </div>
+                {tag && (
+                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#0D2E5C", color: "#ffffff" }}>{tag}</span>
+                )}
+                <span className="text-[10px] font-medium" style={{ color: "#2E7D32" }}>✅ Complete</span>
+                <div className="flex-1" />
+                {agentTimestamp && (
+                  <span className="text-[9px] tabular-nums" style={{ color: "#9CA3AF" }}>{agentTimestamp}</span>
+                )}
+              </div>
+
+              {hasSummary && (
+                <div className="text-xs leading-relaxed whitespace-pre-wrap break-words" style={{ color: "#1A1A2E" }}>{summaryOverride}</div>
+              )}
+
+              {hasDataModel && (
+                <DataModelDiagram model={dataModel!} onDownloadExcel={onDownloadResult} lang={lang} />
+              )}
+
+              {hasDqAnalysis && dqAnalysis && (
+                <div className="space-y-2" data-testid={`dq-scorecard-${assistantMsg.id}`}>
+                  <DqDonutChart dqAnalysis={dqAnalysis} lang={lang} />
+                  <div className="text-[11px]" style={{ color: "#6B7280" }}>
+                    {lang === "ar"
+                      ? `تم تحليل ${dqAnalysis.analysis_summary.total_fields_analyzed} حقل — ${dqAnalysis.analysis_summary.total_rules_generated} قاعدة جودة`
+                      : `${dqAnalysis.analysis_summary.total_fields_analyzed} fields analyzed — ${dqAnalysis.analysis_summary.total_rules_generated} quality rules generated`}
+                  </div>
+                </div>
+              )}
+
+              {hasInsights && (
+                <div className="space-y-2" data-testid={`insights-card-${assistantMsg.id}`}>
+                  <Button
+                    size="sm"
+                    onClick={() => handleDownloadInsights(insightsReport!)}
+                    className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md ripple-button"
+                    style={{ backgroundColor: "#1A4B8C" }}
+                    data-testid={`button-download-insights-${assistantMsg.id}`}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {t.downloadInsightsReport}
+                  </Button>
+                  {allInsightsReports && allInsightsReports.length > 1 && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-medium" style={{ color: "#6B7280" }}>{t.previousReports}</p>
+                      {allInsightsReports.map((rpt, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <FileSpreadsheet className="w-3 h-3 flex-shrink-0" style={{ color: "#6B7280" }} />
+                          <span className="text-[10px] truncate flex-1" style={{ color: "#6B7280" }}>{rpt.excelFileName}</span>
+                          <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px]" onClick={() => handleDownloadInsights(rpt.report, rpt.fileName, rpt.columns)} data-testid={`button-download-prev-insights-${i}`}>
+                            <Download className="w-2.5 h-2.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!hasSummary && !hasDataModel && !hasDqAnalysis && !hasInsights && (
+                <div className="prose prose-sm max-w-none break-words" style={{ color: "#1A1A2E" }}>
+                  <ReactMarkdown>{assistantMsg.content}</ReactMarkdown>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Footer: timestamps + download + follow-up */}
+          <div className="px-4 py-2 border-t flex items-center gap-3 flex-wrap" style={{ borderColor: "#E5E7EB", backgroundColor: "#F8FAFC" }}>
+            <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
+              <div className="flex items-center gap-1">
+                <Clock className="w-3 h-3" style={{ color: "#9CA3AF" }} />
+                <span className="text-[9px]" style={{ color: "#9CA3AF" }}>{t.sentAt}</span>
+                <span className="text-[9px] font-medium tabular-nums" style={{ color: "#6B7280" }}>{userTimestamp}</span>
+              </div>
+              {agentTimestamp && (
+                <>
+                  <span className="text-[9px]" style={{ color: "#D1D5DB" }}>→</span>
+                  <div className="flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" style={{ color: "#2E7D32" }} />
+                    <span className="text-[9px]" style={{ color: "#9CA3AF" }}>{t.completedAt}</span>
+                    <span className="text-[9px] font-medium tabular-nums" style={{ color: "#6B7280" }}>{agentTimestamp}</span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {onDownloadResult && assistantMsg && (
+                <Button
+                  size="sm"
+                  onClick={onDownloadResult}
+                  className="gap-1 text-[10px] text-white font-medium h-6 px-2 rounded-md ripple-button"
+                  style={{ backgroundColor: "#2E7D32" }}
+                  data-testid={`button-download-result-${assistantMsg.id}`}
+                >
+                  <Download className="w-2.5 h-2.5" />
+                  {t.resultXlsx}
+                </Button>
+              )}
+              {onAskFollowUp && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1 text-[10px] h-6 px-2 border"
+                  style={{ color: "#2563EB", borderColor: "#2563EB30" }}
+                  onClick={() => onAskFollowUp("")}
+                  data-testid={`button-followup-${userMsg.id}`}
+                >
+                  <MessageSquare className="w-2.5 h-2.5" />
+                  {t.followUp}
+                </Button>
+              )}
+            </div>
+          </div>
+
+        </div>
+      )}
     </div>
   );
 }
@@ -2055,174 +2295,3 @@ function DqDonutChart({ dqAnalysis, lang }: { dqAnalysis: DqAnalysisResult; lang
   );
 }
 
-function AgentResponseCard({
-  message, summaryOverride, onDownloadResult, dataModel, dqAnalysis, insightsReport, allInsightsReports, profiledColumns = [], lang = "en", t, tag, onAskFollowUp,
-}: {
-  message: Message; summaryOverride?: string; onDownloadResult?: () => void;
-  dataModel?: DataModelJSON | null; dqAnalysis?: DqAnalysisResult | null;
-  insightsReport?: InsightsReport | null;
-  allInsightsReports?: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
-  profiledColumns?: BackendColumnProfile[]; lang?: Lang; t?: Translation; tag?: string | null;
-  onAskFollowUp?: (text: string) => void;
-}) {
-  const tr = t || translations[lang];
-  const isRtl = lang === "ar";
-  const hasDataModel = dataModel != null;
-  const hasDqAnalysis = dqAnalysis != null;
-  const hasInsights = insightsReport != null;
-  const hasSummary = !!summaryOverride;
-  const [expanded, setExpanded] = useState(true);
-  const timestamp = formatTimestamp(message.createdAt);
-
-  const borderColor = "#2E7D32";
-  const statusText = "✅ Complete";
-  const statusColor = "#2E7D32";
-
-  const handleDownloadInsights = (report: InsightsReport, srcFile?: string, cols?: BackendColumnProfile[]) => {
-    generateInsightsExcel(report, srcFile || "data.xlsx", cols || profiledColumns);
-  };
-
-  return (
-    <div
-      className="rounded-b-xl bg-white shadow-sm mb-3 animate-slide-up"
-      style={{ borderLeft: isRtl ? "none" : `3px solid ${borderColor}`, borderRight: isRtl ? `3px solid ${borderColor}` : "none" }}
-      data-testid={`agent-response-${message.id}`}
-    >
-      <div className="flex items-center gap-2 px-4 py-2 border-b" style={{ borderColor: "#E5E7EB" }}>
-        <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: "#067647" }}>
-          <Bot className="w-3.5 h-3.5 text-white" />
-        </div>
-        {tag && (
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#0D2E5C", color: "#ffffff" }}>{tag}</span>
-        )}
-        <span className="text-[10px] font-medium" style={{ color: statusColor }}>{statusText}</span>
-        <div className="flex-1" />
-        <span className="text-[9px] tabular-nums" style={{ color: "#9CA3AF" }}>{timestamp}</span>
-        <button onClick={() => setExpanded(!expanded)} className="p-0.5" data-testid={`button-toggle-response-${message.id}`}>
-          {expanded ? <ChevronDown className="w-3.5 h-3.5" style={{ color: "#9CA3AF" }} /> : <ChevronRight className="w-3.5 h-3.5" style={{ color: "#9CA3AF" }} />}
-        </button>
-      </div>
-
-      {expanded && (
-        <div className="px-4 py-3 space-y-3">
-          {hasSummary && (
-            <div className="text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ color: "#1A1A2E" }}>{summaryOverride}</div>
-          )}
-
-          {hasDataModel && (
-            <DataModelDiagram model={dataModel!} onDownloadExcel={onDownloadResult} lang={lang} />
-          )}
-
-          {hasDqAnalysis && dqAnalysis && (
-            <div className="space-y-3" data-testid={`dq-scorecard-${message.id}`}>
-              <DqDonutChart dqAnalysis={dqAnalysis} lang={lang} />
-              <div className="text-[11px]" style={{ color: "#6B7280" }}>
-                {lang === "ar"
-                  ? `تم تحليل ${dqAnalysis.analysis_summary.total_fields_analyzed} حقل — ${dqAnalysis.analysis_summary.total_rules_generated} قاعدة جودة`
-                  : `${dqAnalysis.analysis_summary.total_fields_analyzed} fields analyzed — ${dqAnalysis.analysis_summary.total_rules_generated} quality rules generated`}
-              </div>
-            </div>
-          )}
-
-          {hasInsights && (
-            <div className="space-y-2" data-testid={`insights-card-${message.id}`}>
-              <Button
-                size="sm"
-                onClick={() => handleDownloadInsights(insightsReport!)}
-                className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md ripple-button"
-                style={{ backgroundColor: "#1A4B8C" }}
-                data-testid={`button-download-insights-${message.id}`}
-              >
-                <Download className="w-3.5 h-3.5" />
-                {tr.downloadInsightsReport}
-              </Button>
-              {allInsightsReports && allInsightsReports.length > 1 && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-medium" style={{ color: "#6B7280" }}>{tr.previousReports}</p>
-                  {allInsightsReports.map((rpt, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <FileSpreadsheet className="w-3 h-3 flex-shrink-0" style={{ color: "#6B7280" }} />
-                      <span className="text-[10px] truncate flex-1" style={{ color: "#6B7280" }}>{rpt.excelFileName}</span>
-                      <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px]" onClick={() => handleDownloadInsights(rpt.report, rpt.fileName, rpt.columns)} data-testid={`button-download-prev-insights-${i}`}>
-                        <Download className="w-2.5 h-2.5" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {!hasSummary && !hasDataModel && !hasDqAnalysis && !hasInsights && (
-            <div className="prose prose-sm max-w-none break-words" style={{ color: "#1A1A2E" }}>
-              <ReactMarkdown>{message.content}</ReactMarkdown>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 pt-2 border-t" style={{ borderColor: "#E5E7EB" }}>
-            {onDownloadResult && (
-              <Button
-                size="sm"
-                onClick={onDownloadResult}
-                className="gap-1.5 text-[10px] text-white font-medium h-7 px-2.5 rounded-md ripple-button"
-                style={{ backgroundColor: "#2E7D32" }}
-                data-testid={`button-download-result-${message.id}`}
-              >
-                <Download className="w-3 h-3" />
-                {tr.downloadResultXlsx}
-              </Button>
-            )}
-            {onAskFollowUp && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="gap-1.5 text-[10px] h-7 px-2.5"
-                style={{ color: "#6B7280" }}
-                onClick={() => onAskFollowUp("")}
-                data-testid={`button-followup-${message.id}`}
-              >
-                <MessageSquare className="w-3 h-3" />
-                {tr.askFollowUp}
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ThinkingProgressCard({ steps, t, isRtl, isDone }: { steps: ThinkingStep[]; t: Translation; isRtl: boolean; isDone?: boolean }) {
-  return (
-    <div className="rounded-xl bg-white shadow-sm p-4 animate-slide-up" style={{ borderLeft: isRtl ? "none" : `3px solid ${isDone ? "#2E7D32" : "#E65100"}`, borderRight: isRtl ? `3px solid ${isDone ? "#2E7D32" : "#E65100"}` : "none" }} data-testid="thinking-progress">
-      <div className="flex items-center gap-2 mb-3">
-        {isDone ? (
-          <CheckCircle2 className="w-4 h-4" style={{ color: "#2E7D32" }} />
-        ) : (
-          <Loader2 className="w-4 h-4 animate-spin" style={{ color: "#E65100" }} />
-        )}
-        <span className="text-sm font-semibold" style={{ color: "#1A1A2E" }}>{isDone ? t.agentCompleted : t.agentWorking}</span>
-      </div>
-      <div className="border-t" style={{ borderColor: "#E5E7EB" }} />
-      <div className="mt-3 space-y-2">
-        {steps.map((step, i) => (
-          <div key={i} className="flex items-center gap-2.5">
-            {step.status === "done" ? (
-              <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: "#2E7D32" }} />
-            ) : step.status === "active" ? (
-              <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" style={{ color: "#E65100" }} />
-            ) : (
-              <Circle className="w-4 h-4 flex-shrink-0" style={{ color: "#D1D5DB" }} />
-            )}
-            <span
-              className="text-xs"
-              style={{ color: step.status === "done" ? "#2E7D32" : step.status === "active" ? "#E65100" : "#9CA3AF", fontWeight: step.status === "active" ? 600 : 400 }}
-            >
-              {step.label}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
