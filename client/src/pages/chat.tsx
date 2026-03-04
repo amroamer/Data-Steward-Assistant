@@ -997,6 +997,8 @@ export default function ChatPage() {
                 if (data.type === "error") {
                   setIsStreaming(false);
                   setStreamingContent("");
+                  await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
+                  await queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
                   toast({
                     title: language === "ar" ? "خطأ" : "Error",
                     description: data.content || (language === "ar" ? "حدث خطأ أثناء معالجة الصورة" : "An error occurred while processing the image"),
@@ -1285,7 +1287,7 @@ export default function ChatPage() {
           id="main"
           order={2}
         >
-          <div className="h-full flex flex-col min-w-0">
+          <div className="h-full flex flex-col min-w-0 min-h-0">
             <div className="h-14 border-b border-border flex items-center gap-3 px-4 bg-background/95 backdrop-blur-sm flex-shrink-0">
               {(isMobile || sidebarCollapsed) && (
                 <Button
@@ -1351,10 +1353,11 @@ export default function ChatPage() {
               )}
             </div>
 
-            <ScrollArea className="flex-1">
+            <div className="flex-1 min-h-0 overflow-hidden">
+            <ScrollArea className="h-full">
               <div className="max-w-3xl mx-auto w-full px-4 py-6">
                 {!activeConversationId && messages.length === 0 && !isStreaming ? (
-                  <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                  <div className="flex flex-col items-center justify-center">
                     <img src={zatcaLogoPath} alt="ZATCA" className="h-12 mb-6" />
                     <h2 className="text-2xl font-bold mb-2 tracking-tight">{t.heroTitle}</h2>
                     <p className="text-muted-foreground text-center mb-8 max-w-md text-sm leading-relaxed">
@@ -1479,6 +1482,7 @@ export default function ChatPage() {
                 )}
               </div>
             </ScrollArea>
+            </div>
 
             {(resultRows.length > 0 || latestDataModel || latestPiiScan) && (
               <div className="border-t border-border bg-emerald-50/50 px-4 py-2.5 flex-shrink-0" data-testid="result-banner">
