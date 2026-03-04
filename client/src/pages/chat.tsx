@@ -432,11 +432,11 @@ function detectAnalysisTag(userContent: string, assistantContent?: string, t?: T
   const userOnly = userContent.toLowerCase();
   if (combined.includes("report_title") && combined.includes("key_insights")) return tr.tagInsights;
   if (combined.includes("insights report") || combined.includes("give me insights") || combined.includes("analyze this data") || combined.includes("explore this dataset") || combined.includes("key findings")) return tr.tagInsights;
+  if (userOnly.includes("quality") || userOnly.includes("dq rule") || combined.includes("dq-") || combined.includes("rule_layer") || combined.includes("dq_dimension")) return tr.tagDataQuality;
   if (combined.includes("classification") || combined.includes("classify")) return tr.tagDataClassification;
   if (combined.includes("scan_summary") || userOnly.includes("pii") || userOnly.includes("pdpl") || userOnly.includes("privacy scan") || userOnly.includes("personal data") || userOnly.includes("sensitive data")) return tr.tagPiiScan;
   if (combined.includes("data model") || combined.includes("star schema") || combined.includes("dimensional model") || combined.includes("analytical model") || combined.includes("fact_tables")) return tr.tagDataModel;
   if (combined.includes("business definition") || combined.includes("business def")) return tr.tagBusinessDefs;
-  if (combined.includes("quality") || combined.includes("dq rule")) return tr.tagDataQuality;
   return null;
 }
 
@@ -2121,10 +2121,17 @@ function ThreadCard({
                 </div>
                 <Loader2 className="w-3 h-3 animate-spin" style={{ color: "#E65100" }} />
               </div>
-              <div className="prose prose-sm max-w-none break-words" style={{ color: "#1A1A2E" }}>
-                <ReactMarkdown>{streamingContent}</ReactMarkdown>
-                <span className={`inline-block w-1.5 h-3.5 bg-primary animate-pulse ${isRtl ? "mr-0.5" : "ml-0.5"} align-text-bottom`} />
-              </div>
+              {/^\s*```(?:json)?\s*\{[\s\S]*"(?:analysis_summary|scan_summary|fact_tables|report_title)"/.test(streamingContent) ? (
+                <div className="flex items-center gap-2 text-[11px]" style={{ color: "#6B7280" }}>
+                  <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" style={{ color: "#2563EB" }} />
+                  <span>Generating analysis — results will appear in the Outputs panel when complete...</span>
+                </div>
+              ) : (
+                <div className="prose prose-sm max-w-none break-words" style={{ color: "#1A1A2E" }}>
+                  <ReactMarkdown>{streamingContent}</ReactMarkdown>
+                  <span className={`inline-block w-1.5 h-3.5 bg-primary animate-pulse ${isRtl ? "mr-0.5" : "ml-0.5"} align-text-bottom`} />
+                </div>
+              )}
             </div>
           )}
 
@@ -2193,11 +2200,27 @@ function ThreadCard({
                 </div>
               )}
 
-              {!hasSummary && !hasDataModel && !hasDqAnalysis && !hasInsights && (
-                <div className="prose prose-sm max-w-none break-words" style={{ color: "#1A1A2E" }}>
-                  <ReactMarkdown>{assistantMsg.content}</ReactMarkdown>
-                </div>
-              )}
+              {!hasSummary && !hasDataModel && !hasDqAnalysis && !hasInsights && (() => {
+                const hasStructuredJson = /```(?:json)?\s*[\s\S]*?"(?:analysis_summary|scan_summary|fact_tables|report_title)"/.test(assistantMsg.content);
+                if (hasStructuredJson) {
+                  return (
+                    <div className="flex items-start gap-2 p-3 rounded-lg" style={{ backgroundColor: "#F0F9F4", border: "1px solid #BBF7D0" }}>
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: "#2E7D32" }}>
+                        <span className="text-white text-[8px] font-bold">✓</span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium" style={{ color: "#2E7D32" }}>Analysis complete</p>
+                        <p className="text-[11px]" style={{ color: "#6B7280" }}>Results are displayed in the Outputs panel. Download the Excel file to view the full report.</p>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="prose prose-sm max-w-none break-words" style={{ color: "#1A1A2E" }}>
+                    <ReactMarkdown>{assistantMsg.content}</ReactMarkdown>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

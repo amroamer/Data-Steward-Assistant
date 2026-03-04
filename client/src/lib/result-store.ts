@@ -458,11 +458,49 @@ function appendPiiScanSheet(wb: XLSX.WorkBook, scan: PiiScanResult): void {
   XLSX.utils.book_append_sheet(wb, ws, "pii_scan");
 }
 
+function repairTruncatedDqJson(candidate: string): DqAnalysisResult | null {
+  if (!candidate.includes('"analysis_summary"') || !candidate.includes('"field_rules"')) return null;
+  const closers = [
+    ']}],"cross_field_rules":[],"business_logic_warnings":[]}',
+    '],"cross_field_rules":[],"business_logic_warnings":[]}',
+    ',"cross_field_rules":[],"business_logic_warnings":[]}',
+  ];
+  const positions: number[] = [];
+  for (let i = candidate.length - 1; i >= Math.floor(candidate.length * 0.2); i--) {
+    if (candidate[i] === '}') positions.push(i + 1);
+  }
+  for (const pos of positions) {
+    const trimmed = candidate.slice(0, pos);
+    for (const closer of closers) {
+      try {
+        const parsed = JSON.parse(trimmed + closer);
+        if (parsed && parsed.analysis_summary && Array.isArray(parsed.field_rules) && parsed.field_rules.length > 0) {
+          const allRules = parsed.field_rules.flatMap((f: any) => f.rules || []);
+          parsed.analysis_summary.total_fields_analyzed = parsed.field_rules.length;
+          parsed.analysis_summary.total_rules_generated = allRules.length;
+          parsed.analysis_summary.technical_rules_count = allRules.filter((r: any) => r.rule_layer === "Technical").length;
+          parsed.analysis_summary.logical_rules_count = allRules.filter((r: any) => r.rule_layer === "Logical").length;
+          parsed.analysis_summary.business_rules_count = allRules.filter((r: any) => r.rule_layer === "Business").length;
+          parsed.analysis_summary.cross_field_rules_count = 0;
+          parsed.analysis_summary.warnings_count = 0;
+          parsed.analysis_summary.fields_with_critical_rules = allRules.filter((r: any) => r.severity === "Critical").length;
+          if (!parsed.cross_field_rules) parsed.cross_field_rules = [];
+          if (!parsed.business_logic_warnings) parsed.business_logic_warnings = [];
+          return parsed as DqAnalysisResult;
+        }
+      } catch {}
+    }
+  }
+  return null;
+}
+
 export function detectDqAnalysisJSON(content: string): DqAnalysisResult | null {
   const allBlocks = content.matchAll(/```(?:json)?\s*([\s\S]*?)```/g);
+  const candidates: string[] = [];
   for (const match of allBlocks) {
     const candidate = match[1].trim();
     if (!candidate) continue;
+    candidates.push(candidate);
     try {
       const parsed = JSON.parse(candidate);
       if (
@@ -476,6 +514,20 @@ export function detectDqAnalysisJSON(content: string): DqAnalysisResult | null {
         return parsed as DqAnalysisResult;
       }
     } catch {}
+  }
+  for (const candidate of candidates) {
+    if (candidate.includes('"analysis_summary"') && candidate.includes('"field_rules"') && !candidate.includes('"fact_tables"') && !candidate.includes('"scan_summary"')) {
+      const recovered = repairTruncatedDqJson(candidate);
+      if (recovered) return recovered;
+    }
+  }
+  const openBlock = content.match(/```(?:json)?\s*([\s\S]*?)$/);
+  if (openBlock) {
+    const candidate = openBlock[1].trim();
+    if (candidate.includes('"analysis_summary"') && candidate.includes('"field_rules"')) {
+      const recovered = repairTruncatedDqJson(candidate);
+      if (recovered) return recovered;
+    }
   }
   return null;
 }
