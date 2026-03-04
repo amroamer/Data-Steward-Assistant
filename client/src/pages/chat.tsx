@@ -41,6 +41,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   GripVertical,
+  ScanEye,
 } from "lucide-react";
 import type { Conversation, Message } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
@@ -48,6 +49,7 @@ import {
   type AnalysisType,
   type ResultRow,
   type DataModelJSON,
+  type PiiScanResult,
   detectAndExtractAllAnalyses,
   mergeResults,
   mergeDqResults,
@@ -55,6 +57,8 @@ import {
   generateAnalysisSummary,
   getIncludedAnalysisLabels,
   getAnalysisLabel,
+  detectPiiScanJSON,
+  generatePiiScanSummary,
 } from "@/lib/result-store";
 import DataModelDiagram from "@/components/DataModelDiagram";
 import {
@@ -100,6 +104,15 @@ const FEATURE_CARDS = [
     bg: "bg-orange-50 dark:bg-orange-950/30",
     iconBg: "bg-orange-100 dark:bg-orange-900/30",
   },
+  {
+    icon: ScanEye,
+    title: "PII Detection",
+    description: "Scan data for personal & sensitive information per PDPL",
+    prompt: "I want to scan my data for PII and sensitive information. Please help me understand what you can detect and how the privacy scan works.",
+    color: "text-red-600 dark:text-red-400",
+    bg: "bg-red-50 dark:bg-red-950/30",
+    iconBg: "bg-red-100 dark:bg-red-900/30",
+  },
 ];
 
 interface ThreadPair {
@@ -109,6 +122,7 @@ interface ThreadPair {
 
 function detectAnalysisTag(userContent: string, assistantContent?: string): string | null {
   const combined = `${userContent} ${assistantContent || ""}`.toLowerCase();
+  if (combined.includes("pii") || combined.includes("personal data") || combined.includes("sensitive data") || combined.includes("privacy scan") || combined.includes("pdpl") || combined.includes("scan_summary")) return "PII Scan";
   if (combined.includes("data model") || combined.includes("star schema") || combined.includes("dimensional model") || combined.includes("analytical model") || combined.includes("fact_tables")) return "Data Model";
   if (combined.includes("business definition") || combined.includes("business def")) return "Business Definitions";
   if (combined.includes("classification") || combined.includes("classify")) return "Data Classification";
@@ -191,6 +205,8 @@ export default function ChatPage() {
   const [summaryOverrides, setSummaryOverrides] = useState<Record<number, string>>({});
   const [dataModels, setDataModels] = useState<Record<number, DataModelJSON>>({});
   const [latestDataModel, setLatestDataModel] = useState<DataModelJSON | null>(null);
+  const [piiScans, setPiiScans] = useState<Record<number, PiiScanResult>>({});
+  const [latestPiiScan, setLatestPiiScan] = useState<PiiScanResult | null>(null);
 
   const [collapsedThreads, setCollapsedThreads] = useState<Set<number>>(new Set());
 
@@ -273,9 +289,18 @@ export default function ChatPage() {
     if (!activeConversation?.messages) return;
     const overrides: Record<number, string> = {};
     const modelMap: Record<number, DataModelJSON> = {};
+    const piiMap: Record<number, PiiScanResult> = {};
     let lastModel: DataModelJSON | null = null;
+    let lastPii: PiiScanResult | null = null;
     for (const msg of activeConversation.messages) {
       if (msg.role !== "assistant") continue;
+      const piiScan = detectPiiScanJSON(msg.content);
+      if (piiScan) {
+        piiMap[msg.id] = piiScan;
+        lastPii = piiScan;
+        overrides[msg.id] = generatePiiScanSummary(piiScan);
+        continue;
+      }
       const model = detectDataModelJSON(msg.content);
       if (model) {
         modelMap[msg.id] = model;
@@ -301,6 +326,10 @@ export default function ChatPage() {
       setDataModels(prev => ({ ...prev, ...modelMap }));
       setLatestDataModel(lastModel);
     }
+    if (Object.keys(piiMap).length > 0) {
+      setPiiScans(prev => ({ ...prev, ...piiMap }));
+      setLatestPiiScan(lastPii);
+    }
     if (Object.keys(overrides).length > 0) {
       setSummaryOverrides(prev => ({ ...prev, ...overrides }));
     }
@@ -314,9 +343,28 @@ export default function ChatPage() {
     setSummaryOverrides({});
     setDataModels({});
     setLatestDataModel(null);
+    setPiiScans({});
+    setLatestPiiScan(null);
   };
 
   const processAIResponse = (content: string, messageId?: number) => {
+    const piiScan = detectPiiScanJSON(content);
+    if (piiScan) {
+      setLatestPiiScan(piiScan);
+      if (messageId) {
+        setPiiScans(prev => ({ ...prev, [messageId]: piiScan }));
+      }
+      const summary = generatePiiScanSummary(piiScan);
+      if (messageId) {
+        setSummaryOverrides(prev => ({ ...prev, [messageId]: summary }));
+      }
+      toast({
+        title: "result.xlsx updated",
+        description: `PII scan complete — ${piiScan.scan_summary.pii_columns_found} PII columns found`,
+      });
+      return;
+    }
+
     const model = detectDataModelJSON(content);
     if (model) {
       setLatestDataModel(model);
@@ -457,9 +505,10 @@ export default function ChatPage() {
                   setIsStreaming(false);
                   setStreamingContent("");
 
+                  const detectedPii = detectPiiScanJSON(accumulated);
                   const detectedModel = detectDataModelJSON(accumulated);
                   const analysisResults = detectAndExtractAllAnalyses(accumulated);
-                  if (detectedModel || analysisResults.length > 0) {
+                  if (detectedPii || detectedModel || analysisResults.length > 0) {
                     processAIResponse(accumulated);
 
                     await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
@@ -469,7 +518,11 @@ export default function ChatPage() {
                     if (convData?.messages) {
                       const lastMsg = convData.messages[convData.messages.length - 1];
                       if (lastMsg?.role === "assistant") {
-                        if (detectedModel) {
+                        if (detectedPii) {
+                          setPiiScans(prev => ({ ...prev, [lastMsg.id]: detectedPii }));
+                          const summary = generatePiiScanSummary(detectedPii);
+                          setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: summary }));
+                        } else if (detectedModel) {
                           setDataModels(prev => ({ ...prev, [lastMsg.id]: detectedModel }));
                         } else {
                           const totalFields = new Set(
@@ -531,7 +584,7 @@ export default function ChatPage() {
       return;
     }
 
-    if (sessionFieldNames && sessionFieldNames.length > 0 && (resultRows.length > 0 || latestDataModel)) {
+    if (sessionFieldNames && sessionFieldNames.length > 0 && (resultRows.length > 0 || latestDataModel || latestPiiScan)) {
       setPendingFile(file);
       setShowResetDialog(true);
     } else {
@@ -566,8 +619,8 @@ export default function ChatPage() {
   };
 
   const handleDownloadResult = () => {
-    if (resultRows.length > 0 || latestDataModel) {
-      generateResultExcel(resultRows, includedAnalyses, latestDataModel || undefined);
+    if (resultRows.length > 0 || latestDataModel || latestPiiScan) {
+      generateResultExcel(resultRows, includedAnalyses, latestDataModel || undefined, latestPiiScan || undefined);
     }
   };
 
@@ -848,7 +901,7 @@ export default function ChatPage() {
                   </Button>
                 </div>
               )}
-              {(resultRows.length > 0 || latestDataModel) && (
+              {(resultRows.length > 0 || latestDataModel || latestPiiScan) && (
                 <Button
                   size="sm"
                   onClick={handleDownloadResult}
@@ -873,7 +926,7 @@ export default function ChatPage() {
                     <p className="text-muted-foreground text-center mb-8 max-w-md text-sm leading-relaxed">
                       Your AI assistant for data governance. Upload Excel files to classify data, generate definitions, or define quality rules.
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full max-w-3xl">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 w-full max-w-4xl">
                       {FEATURE_CARDS.map((card) => (
                         <button
                           key={card.title}
@@ -938,7 +991,7 @@ export default function ChatPage() {
                                 <MessageBubble
                                   message={thread.assistantMsg}
                                   summaryOverride={summaryOverrides[thread.assistantMsg.id]}
-                                  onDownloadResult={(resultRows.length > 0 || latestDataModel) ? handleDownloadResult : undefined}
+                                  onDownloadResult={(resultRows.length > 0 || latestDataModel || latestPiiScan) ? handleDownloadResult : undefined}
                                   dataModel={dataModels[thread.assistantMsg.id] || undefined}
                                 />
                               )}
@@ -975,7 +1028,7 @@ export default function ChatPage() {
               </div>
             </ScrollArea>
 
-            {(resultRows.length > 0 || latestDataModel) && (
+            {(resultRows.length > 0 || latestDataModel || latestPiiScan) && (
               <div className="border-t border-border bg-emerald-50/50 dark:bg-emerald-950/20 px-4 py-2.5 flex-shrink-0" data-testid="result-banner">
                 <div className="max-w-3xl mx-auto flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
@@ -989,7 +1042,7 @@ export default function ChatPage() {
                       )}
                     </p>
                     <p className="text-[10px] text-emerald-600/80 dark:text-emerald-400/60 truncate">
-                      {getIncludedAnalysisLabels(includedAnalyses)}{resultRows.length > 0 ? ` (${resultRows.length} fields)` : ""}{latestDataModel ? ` + Data Model: ${latestDataModel.model_name}` : ""}
+                      {getIncludedAnalysisLabels(includedAnalyses)}{resultRows.length > 0 ? ` (${resultRows.length} fields)` : ""}{latestDataModel ? ` + Data Model: ${latestDataModel.model_name}` : ""}{latestPiiScan ? ` + PII Scan (${latestPiiScan.scan_summary.pii_columns_found} PII columns)` : ""}
                     </p>
                   </div>
                   <Button

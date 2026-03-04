@@ -6,6 +6,31 @@ export type { DataModelJSON };
 
 export type AnalysisType = "business_definitions" | "data_classification" | "data_quality";
 
+export interface PiiScanColumn {
+  column_name: string;
+  detected_data_type: string;
+  is_pii: boolean;
+  is_sensitive: boolean;
+  pii_category: string;
+  pdpl_relevance: string;
+  risk_level: string;
+  recommendation: string;
+  suggested_control: string;
+}
+
+export interface PiiScanSummary {
+  total_columns_scanned: number;
+  pii_columns_found: number;
+  sensitive_columns_found: number;
+  clean_columns: number;
+  overall_risk_level: string;
+}
+
+export interface PiiScanResult {
+  scan_summary: PiiScanSummary;
+  columns: PiiScanColumn[];
+}
+
 export interface ResultRow {
   field_name: string;
   business_term?: string;
@@ -312,7 +337,67 @@ export function mergeDqResults(
   return [...nonDqRows, ...dqRows];
 }
 
-export function generateResultExcel(rows: ResultRow[], includedAnalyses: AnalysisType[], dataModel?: DataModelJSON): void {
+export function detectPiiScanJSON(content: string): PiiScanResult | null {
+  const allBlocks = content.matchAll(/```(?:json)?\s*([\s\S]*?)```/g);
+  for (const match of allBlocks) {
+    const candidate = match[1].trim();
+    if (!candidate) continue;
+    try {
+      const parsed = JSON.parse(candidate);
+      if (
+        parsed &&
+        parsed.scan_summary &&
+        Array.isArray(parsed.columns) &&
+        typeof parsed.scan_summary.total_columns_scanned === "number" &&
+        typeof parsed.scan_summary.pii_columns_found === "number" &&
+        typeof parsed.scan_summary.overall_risk_level === "string" &&
+        !parsed.fact_tables &&
+        !parsed.dimension_tables
+      ) {
+        return parsed as PiiScanResult;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+export function generatePiiScanSummary(scan: PiiScanResult): string {
+  const s = scan.scan_summary;
+  const riskEmoji = s.overall_risk_level === "High" ? "🔴" : s.overall_risk_level === "Medium" ? "🟡" : "🟢";
+  const lines: string[] = [];
+  lines.push(`🔍 PII & Sensitive Data Scan Complete`);
+  lines.push(`Scanned ${s.total_columns_scanned} columns — ${s.pii_columns_found} contain PII, ${s.sensitive_columns_found} contain sensitive data, ${s.clean_columns} are clean.`);
+  lines.push(`${riskEmoji} Overall Risk Level: ${s.overall_risk_level}`);
+  lines.push(`Results saved to result.xlsx — Sheet: pii_scan`);
+  return lines.join("\n");
+}
+
+function appendPiiScanSheet(wb: XLSX.WorkBook, scan: PiiScanResult): void {
+  const headers = ["Column Name", "Detected Data Type", "Is PII", "Is Sensitive", "PII Category", "PDPL Relevance", "Risk Level", "Recommendation", "Suggested Control"];
+  const wsData: string[][] = [headers];
+
+  for (const col of scan.columns) {
+    wsData.push([
+      col.column_name,
+      col.detected_data_type,
+      col.is_pii ? "YES" : "NO",
+      col.is_sensitive ? "YES" : "NO",
+      col.pii_category,
+      col.pdpl_relevance,
+      col.risk_level,
+      col.recommendation,
+      col.suggested_control,
+    ]);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  autoWidthSheet(ws, wsData);
+  ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
+  if (!ws["!rows"]) ws["!rows"] = [];
+  XLSX.utils.book_append_sheet(wb, ws, "pii_scan");
+}
+
+export function generateResultExcel(rows: ResultRow[], includedAnalyses: AnalysisType[], dataModel?: DataModelJSON, piiScan?: PiiScanResult): void {
   const orderedAnalyses = ANALYSIS_ORDER.filter((a) => includedAnalyses.includes(a));
 
   const wb = XLSX.utils.book_new();
@@ -367,7 +452,7 @@ export function generateResultExcel(rows: ResultRow[], includedAnalyses: Analysi
     XLSX.utils.book_append_sheet(wb, ws, ANALYSIS_SHEET_NAMES[analysis]);
   }
 
-  if (wb.SheetNames.length === 0 && (!dataModel)) {
+  if (wb.SheetNames.length === 0 && (!dataModel) && (!piiScan)) {
     const headers = ["Field Name"];
     const keys = ["field_name"];
     for (const analysis of orderedAnalyses) {
@@ -382,6 +467,10 @@ export function generateResultExcel(rows: ResultRow[], includedAnalyses: Analysi
 
   if (dataModel) {
     appendDataModelSheets(wb, dataModel);
+  }
+
+  if (piiScan) {
+    appendPiiScanSheet(wb, piiScan);
   }
 
   XLSX.writeFile(wb, "result.xlsx");

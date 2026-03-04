@@ -1,0 +1,86 @@
+Prompt for Replit:
+Add a new capability to the Data Owner Agent called "PII & Sensitive Data Detection".
+
+Trigger Detection
+Activate this feature when the user uploads an Excel file with actual data (columns AND rows, not just field names) and says anything like:
+
+"scan this for PII"
+"identify personal data"
+"check for sensitive information"
+"does this file have PII?"
+"PDPL check"
+"privacy scan"
+
+
+Step 1 — File Reading
+When the user uploads the Excel file:
+
+Read both the column headers and the actual row data (up to 100 rows for scanning purposes)
+Pass to Claude: the column names, their data types inferred from the values, and a sample of up to 5 rows of actual data per column
+Never display the raw data in the chat — treat it as sensitive from the moment it is uploaded
+
+
+Step 2 — Claude Analysis
+Send to Claude with a system prompt instructing it to act as a data privacy expert familiar with:
+
+Saudi PDPL (Personal Data Protection Law)
+SDAIA NDMO data classification standards
+General PII definitions (name, ID, contact, financial, health, behavioral, location data)
+
+Instruct Claude to analyze each column and return only this JSON structure:
+json{
+  "scan_summary": {
+    "total_columns_scanned": 0,
+    "pii_columns_found": 0,
+    "sensitive_columns_found": 0,
+    "clean_columns": 0,
+    "overall_risk_level": "High | Medium | Low"
+  },
+  "columns": [
+    {
+      "column_name": "...",
+      "detected_data_type": "...",
+      "is_pii": true,
+      "is_sensitive": true,
+      "pii_category": "Direct Identifier | Quasi Identifier | Sensitive | Financial | Health | Behavioral | Location | None",
+      "pdpl_relevance": "Subject to PDPL | Conditionally Subject | Not Subject",
+      "risk_level": "Critical | High | Medium | Low",
+      "recommendation": "...",
+      "suggested_control": "Mask | Encrypt | Tokenize | Restrict Access | Anonymize | No Action Required"
+    }
+  ]
+}
+
+Step 3 — Chat Response (Summary Only)
+Display only a short summary in the chat bubble, never the full results. Example:
+
+🔍 PII & Sensitive Data Scan Complete
+Scanned 24 columns — 8 contain PII, 3 contain sensitive data, 13 are clean.
+Overall Risk Level: High
+Results saved to result.xlsx — Sheet: pii_scan
+
+Then show the "Download result.xlsx" button in KPMG green (#00A3A1).
+Also render a compact risk badge in the chat summary:
+
+🔴 High Risk — if any Critical or High columns found
+🟡 Medium Risk — if only Medium columns found
+🟢 Low Risk — if all columns are clean or Low
+
+
+Step 4 — result.xlsx: Add New Sheet
+Add a sheet called pii_scan to the cumulative result.xlsx with the following columns:
+| column_name | detected_data_type | is_pii | is_sensitive | pii_category | pdpl_relevance | risk_level | recommendation | suggested_control |
+Formatting rules for this sheet:
+
+Header row: KPMG dark blue (#00338D) background, white bold text
+Risk level column color-coded:
+
+Critical — red fill (#FF0000) white text
+High — orange fill (#FF6600) white text
+Medium — yellow fill (#FFD700) dark text
+Low — green fill (#00A3A1) white text
+
+
+is_pii and is_sensitive columns show YES or NO in bold
+Auto-width all columns
+Freeze the header row

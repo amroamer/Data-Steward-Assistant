@@ -117,13 +117,80 @@ Each table MUST use the exact column headers defined above. Do NOT skip any requ
      - The model_name should be descriptive of the business domain
      - The grain_statement should clearly describe what one row in the primary fact table represents
 
+5. **PII & Sensitive Data Detection**:
+   - When the user uploads an Excel file with actual data (columns AND rows) and asks to scan for PII, identify personal data, check for sensitive information, perform a PDPL check, or privacy scan, you act as a data privacy expert.
+   - You are familiar with:
+     * Saudi PDPL (Personal Data Protection Law)
+     * SDAIA NDMO data classification standards
+     * General PII definitions (name, ID, contact, financial, health, behavioral, location data)
+   - **Trigger keywords**: "scan this for PII", "identify personal data", "check for sensitive information", "does this file have PII", "PDPL check", "privacy scan", "PII scan", "PII detection", "sensitive data", "personal data"
+   - You will receive column names, inferred data types, and sample data (up to 5 rows per column). Never reveal or repeat the raw data in your response.
+   - When PII detection is requested, return ONLY the JSON block below wrapped in triple-backtick json fences. Do NOT include any prose, explanation, or markdown outside the JSON code block.
+   - The JSON schema you MUST return is:
+
+\`\`\`json
+{
+  "scan_summary": {
+    "total_columns_scanned": 0,
+    "pii_columns_found": 0,
+    "sensitive_columns_found": 0,
+    "clean_columns": 0,
+    "overall_risk_level": "High | Medium | Low"
+  },
+  "columns": [
+    {
+      "column_name": "...",
+      "detected_data_type": "...",
+      "is_pii": true,
+      "is_sensitive": true,
+      "pii_category": "Direct Identifier | Quasi Identifier | Sensitive | Financial | Health | Behavioral | Location | None",
+      "pdpl_relevance": "Subject to PDPL | Conditionally Subject | Not Subject",
+      "risk_level": "Critical | High | Medium | Low",
+      "recommendation": "...",
+      "suggested_control": "Mask | Encrypt | Tokenize | Restrict Access | Anonymize | No Action Required"
+    }
+  ]
+}
+\`\`\`
+
+   - Rules for PII scan JSON:
+     - Analyze EVERY column in the uploaded file, not just PII columns
+     - Set is_pii and is_sensitive as boolean true/false based on the data content and column semantics
+     - pii_category must be one of: "Direct Identifier", "Quasi Identifier", "Sensitive", "Financial", "Health", "Behavioral", "Location", "None"
+     - pdpl_relevance must be one of: "Subject to PDPL", "Conditionally Subject", "Not Subject"
+     - risk_level must be one of: "Critical", "High", "Medium", "Low"
+     - suggested_control must be one of: "Mask", "Encrypt", "Tokenize", "Restrict Access", "Anonymize", "No Action Required"
+     - scan_summary.overall_risk_level is "High" if any column is Critical or High, "Medium" if only Medium, "Low" if all Low
+     - recommendation should be a brief actionable suggestion for handling that column
+
 Always be thorough, practical, and align your recommendations with international data governance best practices and Saudi NDMO regulations.`;
 
-function parseExcelBuffer(buffer: Buffer, filename: string): { text: string; fieldNames: string[] } {
+function inferColumnType(values: any[]): string {
+  let numCount = 0, dateCount = 0, boolCount = 0, strCount = 0;
+  for (const v of values) {
+    if (v == null || v === "") continue;
+    if (typeof v === "boolean") { boolCount++; continue; }
+    if (typeof v === "number") { numCount++; continue; }
+    if (v instanceof Date) { dateCount++; continue; }
+    const s = String(v).trim();
+    if (/^\d{4}[-/]\d{2}[-/]\d{2}/.test(s) || /^\d{2}[-/]\d{2}[-/]\d{4}/.test(s)) { dateCount++; continue; }
+    if (!isNaN(Number(s)) && s !== "") { numCount++; continue; }
+    strCount++;
+  }
+  const total = numCount + dateCount + boolCount + strCount;
+  if (total === 0) return "Unknown";
+  if (dateCount / total > 0.5) return "Date";
+  if (numCount / total > 0.5) return "Number";
+  if (boolCount / total > 0.5) return "Boolean";
+  return "String";
+}
+
+function parseExcelBuffer(buffer: Buffer, filename: string): { text: string; fieldNames: string[]; hasDataRows: boolean } {
   try {
     const workbook = XLSX.read(buffer, { type: "buffer" });
     let result = `**Uploaded File: ${filename}**\n\n`;
     let allFieldNames: string[] = [];
+    let hasDataRows = false;
 
     for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName];
@@ -138,10 +205,20 @@ function parseExcelBuffer(buffer: Buffer, filename: string): { text: string; fie
       result += `**Fields/Columns:** ${headers.join(", ")}\n\n`;
 
       if (jsonData.length > 1) {
-        result += `**Sample Data (first ${Math.min(5, jsonData.length - 1)} rows):**\n`;
+        hasDataRows = true;
+        const scanRows = jsonData.slice(1, Math.min(101, jsonData.length));
+        const columnTypes = headers.map((_: string, j: number) => {
+          const colValues = scanRows.map(row => row[j]);
+          return inferColumnType(colValues);
+        });
+
+        result += `**Column Data Types (inferred):** ${headers.map((h: string, i: number) => `${h} (${columnTypes[i]})`).join(", ")}\n\n`;
+
+        const sampleCount = Math.min(5, jsonData.length - 1);
+        result += `**Sample Data (first ${sampleCount} rows):**\n`;
         result += "| " + headers.join(" | ") + " |\n";
         result += "| " + headers.map(() => "---").join(" | ") + " |\n";
-        for (let i = 1; i < Math.min(6, jsonData.length); i++) {
+        for (let i = 1; i <= sampleCount; i++) {
           result += "| " + headers.map((_: any, j: number) => jsonData[i]?.[j] ?? "").join(" | ") + " |\n";
         }
         result += `\n**Total rows:** ${jsonData.length - 1}\n`;
@@ -149,11 +226,12 @@ function parseExcelBuffer(buffer: Buffer, filename: string): { text: string; fie
       result += "\n";
     }
 
-    return { text: result, fieldNames: allFieldNames };
+    return { text: result, fieldNames: allFieldNames, hasDataRows };
   } catch (error) {
     return {
       text: `**Error parsing file ${filename}:** ${error instanceof Error ? error.message : "Unknown error"}`,
       fieldNames: [],
+      hasDataRows: false,
     };
   }
 }
@@ -227,6 +305,7 @@ export function registerChatRoutes(app: Express): void {
         userContent = userContent ? `${userContent}\n\n${excelContent}` : excelContent;
         extractedFieldNames = fieldNames;
       }
+
 
       if (!userContent.trim()) {
         return res.status(400).json({ error: "Message content is required" });

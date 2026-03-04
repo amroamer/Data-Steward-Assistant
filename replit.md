@@ -52,6 +52,7 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 - Result banner appears above the input area when results exist, with KPMG green download button
 - Header bar also shows a compact download button when results exist
 - Analytical Data Model: when Claude returns a JSON block with fact_tables/dimension_tables/relationships, it's detected by `detectDataModelJSON()`, stored in `dataModel` state, and rendered as an interactive SVG diagram via `DataModelDiagram` component. Adds 3 sheets to result.xlsx: data_model_fields, data_model_relationships, data_model_ddl
+- PII & Sensitive Data Detection: when Claude returns a JSON block with scan_summary/columns, it's detected by `detectPiiScanJSON()`, stored in `piiScans` (per-message) and `latestPiiScan` state. Chat shows summary-only with risk badge (🔴/🟡/🟢). Adds `pii_scan` sheet to result.xlsx with columns: column_name, detected_data_type, is_pii, is_sensitive, pii_category, pdpl_relevance, risk_level, recommendation, suggested_control
 - `dataModelMessageIds` (Set) tracks which assistant messages contain data models so the diagram renders on re-visit
 - File-reset confirmation dialog (AlertDialog) appears when uploading a new file while results already exist
 - Session state (results, field names, file name, summaryOverrides) resets on: new chat, conversation switch, conversation delete, or confirmed file reset
