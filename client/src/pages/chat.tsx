@@ -38,6 +38,9 @@ import {
   Maximize2,
   Paperclip,
   Database,
+  PanelLeftClose,
+  PanelLeftOpen,
+  GripVertical,
 } from "lucide-react";
 import type { Conversation, Message } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
@@ -54,6 +57,11 @@ import {
   getAnalysisLabel,
 } from "@/lib/result-store";
 import DataModelDiagram from "@/components/DataModelDiagram";
+import {
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+} from "react-resizable-panels";
 
 const FEATURE_CARDS = [
   {
@@ -617,440 +625,469 @@ export default function ChatPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Sidebar */}
-      <div
-        className={`${sidebarCollapsed ? "w-0 overflow-hidden" : "w-72"} border-r border-border bg-sidebar flex flex-col transition-all duration-300`}
-        data-testid="sidebar"
-      >
-        <div className="p-4 pb-3">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#00338D" }}>
-              <Bot className="w-5 h-5 text-white" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-sm font-bold tracking-tight truncate">Data Owner Agent</h1>
-              <p className="text-[11px] text-muted-foreground truncate">KPMG Data Governance</p>
-            </div>
-          </div>
-          <Button
-            onClick={handleNewChat}
-            className="w-full justify-center gap-2 font-medium"
-            variant="default"
-            size="sm"
-            data-testid="button-new-chat"
-          >
-            <Plus className="w-4 h-4" />
-            New Chat
-          </Button>
-        </div>
-        <Separator />
-        <ScrollArea className="flex-1">
-          <div className="p-2 space-y-0.5">
-            {conversationsLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : conversations.length === 0 ? (
-              <div className="text-center py-10 px-4">
-                <MessageSquare className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground">
-                  No conversations yet
-                </p>
-              </div>
-            ) : (
-              conversations.map((conv) => (
-                <div
-                  key={conv.id}
-                  className={`rounded-md transition-all duration-150 ${
-                    fadingOutConvId === conv.id || fadingOutAll ? "opacity-0 scale-95" : "opacity-100"
-                  }`}
-                  data-testid={`conversation-item-${conv.id}`}
-                >
-                  {deletingConvId === conv.id ? (
-                    <div className="px-3 py-2.5 rounded-md bg-destructive/8 border border-destructive/15">
-                      <p className="text-[11px] text-destructive font-medium mb-2">Delete this session?</p>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="h-6 text-[11px] px-2.5"
-                          onClick={() => handleDeleteConversation(conv.id)}
-                          data-testid={`button-confirm-delete-${conv.id}`}
-                        >
-                          Yes, Delete
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 text-[11px] px-2.5"
-                          onClick={() => setDeletingConvId(null)}
-                          data-testid={`button-cancel-delete-${conv.id}`}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
+      <PanelGroup direction="horizontal" autoSaveId="chat-layout">
+        {!sidebarCollapsed && (
+          <>
+            <Panel
+              defaultSize={20}
+              minSize={15}
+              maxSize={35}
+              id="sidebar"
+              order={1}
+            >
+              <div
+                className="h-full border-r border-border bg-sidebar flex flex-col"
+                data-testid="sidebar"
+              >
+                <div className="p-4 pb-3">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#00338D" }}>
+                      <Bot className="w-5 h-5 text-white" />
                     </div>
-                  ) : (
-                    <div
-                      className={`group flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer text-sm transition-colors ${
-                        activeConversationId === conv.id
-                          ? "bg-accent text-accent-foreground font-medium"
-                          : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                      }`}
-                      onClick={() => setActiveConversationId(conv.id)}
-                    >
-                      <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
-                      <span className="truncate flex-1 text-[13px]">{conv.title}</span>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="opacity-0 group-hover:opacity-100 h-6 w-6 flex-shrink-0 hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeletingConvId(conv.id);
-                        }}
-                        data-testid={`button-delete-conversation-${conv.id}`}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                    <div className="min-w-0 flex-1">
+                      <h1 className="text-sm font-bold tracking-tight truncate">Data Owner Agent</h1>
                     </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </ScrollArea>
-        <Separator />
-        <div className="p-3 space-y-2">
-          {conversations.length > 0 && (
-            <>
-              {showClearAllConfirm ? (
-                <div className="px-2 py-2 rounded-md bg-destructive/8 border border-destructive/15">
-                  <p className="text-[11px] text-destructive font-medium mb-2">Delete all sessions?</p>
-                  <div className="flex gap-2">
                     <Button
-                      size="sm"
-                      variant="destructive"
-                      className="h-6 text-[11px] px-2.5"
-                      onClick={handleDeleteAllConversations}
-                      data-testid="button-confirm-clear-all"
-                    >
-                      Yes, Delete All
-                    </Button>
-                    <Button
-                      size="sm"
+                      size="icon"
                       variant="ghost"
-                      className="h-6 text-[11px] px-2.5"
-                      onClick={() => setShowClearAllConfirm(false)}
-                      data-testid="button-cancel-clear-all"
+                      onClick={() => setSidebarCollapsed(true)}
+                      className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
+                      data-testid="button-collapse-sidebar"
                     >
-                      Cancel
+                      <PanelLeftClose className="w-4 h-4" />
                     </Button>
                   </div>
+                  <Button
+                    onClick={handleNewChat}
+                    className="w-full justify-center gap-2 font-medium"
+                    variant="default"
+                    size="sm"
+                    data-testid="button-new-chat"
+                  >
+                    <Plus className="w-4 h-4" />
+                    New Chat
+                  </Button>
                 </div>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-center gap-1.5 text-[11px] text-destructive/70 hover:text-destructive hover:bg-destructive/8"
-                  onClick={() => setShowClearAllConfirm(true)}
-                  data-testid="button-clear-all-sessions"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  Clear All Sessions
-                </Button>
-              )}
-            </>
-          )}
-          <p className="text-[10px] text-muted-foreground/60 text-center">
-            Powered by Claude AI
-          </p>
-        </div>
-      </div>
-
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <div className="h-14 border-b border-border flex items-center gap-3 px-4 bg-background/95 backdrop-blur-sm flex-shrink-0">
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="h-8 w-8"
-            data-testid="button-toggle-sidebar"
-          >
-            <MessageSquare className="w-4.5 h-4.5" />
-          </Button>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-semibold truncate">
-              {activeConversation?.title || "Data Owner Agent"}
-            </h2>
-          </div>
-          {threads.length > 1 && (
-            <div className="flex gap-0.5">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 text-[11px] gap-1 px-2 text-muted-foreground hover:text-foreground"
-                onClick={() => collapseAll(threads)}
-                data-testid="button-collapse-all"
-              >
-                <Minimize2 className="w-3 h-3" />
-                Collapse
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 text-[11px] gap-1 px-2 text-muted-foreground hover:text-foreground"
-                onClick={expandAll}
-                data-testid="button-expand-all"
-              >
-                <Maximize2 className="w-3 h-3" />
-                Expand
-              </Button>
-            </div>
-          )}
-          {(resultRows.length > 0 || latestDataModel) && (
-            <Button
-              size="sm"
-              onClick={handleDownloadResult}
-              className="gap-1.5 text-[11px] flex-shrink-0 text-white font-medium h-8 px-3 rounded-md"
-              style={{ backgroundColor: "#00A3A1" }}
-              data-testid="button-header-download-result"
-            >
-              <Download className="w-3.5 h-3.5" />
-              result.xlsx
-            </Button>
-          )}
-        </div>
-
-        {/* Messages Area */}
-        <ScrollArea className="flex-1">
-          <div className="max-w-3xl mx-auto w-full px-4 py-6">
-            {!activeConversationId && messages.length === 0 && !isStreaming ? (
-              <div className="flex flex-col items-center justify-center min-h-[60vh]">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={{ backgroundColor: "#00338D" }}>
-                  <Bot className="w-9 h-9 text-white" />
-                </div>
-                <h2 className="text-2xl font-bold mb-2 tracking-tight">Data Owner Agent</h2>
-                <p className="text-muted-foreground text-center mb-8 max-w-md text-sm leading-relaxed">
-                  Your AI assistant for data governance. Upload Excel files to classify data, generate definitions, or define quality rules.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full max-w-3xl">
-                  {FEATURE_CARDS.map((card) => (
-                    <button
-                      key={card.title}
-                      onClick={() => handleFeatureCard(card.prompt)}
-                      className={`${card.bg} rounded-xl p-5 text-left transition-all border border-transparent hover:border-border hover:shadow-sm group`}
-                      data-testid={`card-feature-${card.title.toLowerCase().replace(/\s+/g, "-")}`}
-                    >
-                      <div className={`w-9 h-9 rounded-lg ${card.iconBg} flex items-center justify-center mb-3`}>
-                        <card.icon className={`w-4.5 h-4.5 ${card.color}`} />
+                <Separator />
+                <ScrollArea className="flex-1">
+                  <div className="p-2 space-y-0.5">
+                    {conversationsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                       </div>
-                      <h3 className="text-sm font-semibold mb-1">{card.title}</h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        {card.description}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {threads.map((thread, idx) => {
-                  const isCollapsed = collapsedThreads.has(idx);
-                  const tag = detectAnalysisTag(
-                    thread.userMsg.content,
-                    thread.assistantMsg?.content
-                  );
-                  const { displayText: previewText } = stripExcelContent(thread.userMsg.content);
-                  const preview = previewText.substring(0, 60) + (previewText.length > 60 ? "..." : "");
-                  const timestamp = formatTimestamp(thread.userMsg.createdAt);
-
-                  return (
-                    <div
-                      key={thread.userMsg.id}
-                      className="rounded-xl border border-border overflow-hidden bg-card/30"
-                      data-testid={`thread-block-${idx}`}
-                    >
-                      <button
-                        onClick={() => toggleThread(idx)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left bg-muted/40 hover:bg-muted/60 transition-colors"
-                        style={{ borderLeft: "3px solid #00338D" }}
-                        data-testid={`thread-header-${idx}`}
-                      >
-                        {isCollapsed ? (
-                          <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
-                        )}
-                        <span className="text-[12px] text-foreground truncate flex-1 font-medium">{preview}</span>
-                        {tag && (
-                          <Badge variant="secondary" className="text-[10px] h-5 px-2 flex-shrink-0 font-medium">
-                            {tag}
-                          </Badge>
-                        )}
-                        <span className="text-[10px] text-muted-foreground/70 flex-shrink-0 tabular-nums">{timestamp}</span>
-                      </button>
-                      {!isCollapsed && (
-                        <div className="px-4 py-4 space-y-4" data-testid={`thread-content-${idx}`}>
-                          <MessageBubble
-                            message={thread.userMsg}
-                          />
-                          {thread.assistantMsg && (
-                            <MessageBubble
-                              message={thread.assistantMsg}
-                              summaryOverride={summaryOverrides[thread.assistantMsg.id]}
-                              onDownloadResult={(resultRows.length > 0 || latestDataModel) ? handleDownloadResult : undefined}
-                              dataModel={dataModels[thread.assistantMsg.id] || undefined}
-                            />
+                    ) : conversations.length === 0 ? (
+                      <div className="text-center py-10 px-4">
+                        <MessageSquare className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+                        <p className="text-xs text-muted-foreground">
+                          No conversations yet
+                        </p>
+                      </div>
+                    ) : (
+                      conversations.map((conv) => (
+                        <div
+                          key={conv.id}
+                          className={`rounded-md transition-all duration-150 ${
+                            fadingOutConvId === conv.id || fadingOutAll ? "opacity-0 scale-95" : "opacity-100"
+                          }`}
+                          data-testid={`conversation-item-${conv.id}`}
+                        >
+                          {deletingConvId === conv.id ? (
+                            <div className="px-3 py-2.5 rounded-md bg-destructive/8 border border-destructive/15">
+                              <p className="text-[11px] text-destructive font-medium mb-2">Delete this session?</p>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-6 text-[11px] px-2.5"
+                                  onClick={() => handleDeleteConversation(conv.id)}
+                                  data-testid={`button-confirm-delete-${conv.id}`}
+                                >
+                                  Yes, Delete
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 text-[11px] px-2.5"
+                                  onClick={() => setDeletingConvId(null)}
+                                  data-testid={`button-cancel-delete-${conv.id}`}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              className={`group flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer text-sm transition-colors ${
+                                activeConversationId === conv.id
+                                  ? "bg-accent text-accent-foreground font-medium"
+                                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                              }`}
+                              onClick={() => setActiveConversationId(conv.id)}
+                            >
+                              <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
+                              <span className="truncate flex-1 text-[13px]">{conv.title}</span>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="opacity-0 group-hover:opacity-100 h-6 w-6 flex-shrink-0 hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingConvId(conv.id);
+                                }}
+                                data-testid={`button-delete-conversation-${conv.id}`}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {isStreaming && (
-                  <div className="rounded-xl border border-border overflow-hidden bg-card/30" data-testid="thread-streaming">
-                    <div
-                      className="flex items-center gap-3 px-4 py-2.5 bg-muted/40"
-                      style={{ borderLeft: "3px solid #00338D" }}
-                    >
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground flex-shrink-0" />
-                      <span className="text-[12px] text-foreground font-medium truncate flex-1">Processing...</span>
-                    </div>
-                    <div className="px-4 py-4">
-                      <div className="flex gap-3">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#00338D" }}>
-                          <Bot className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Analyzing your data...</span>
-                        </div>
-                      </div>
-                    </div>
+                      ))
+                    )}
                   </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-
-        {/* Result Banner */}
-        {(resultRows.length > 0 || latestDataModel) && (
-          <div className="border-t border-border bg-emerald-50/50 dark:bg-emerald-950/20 px-4 py-2.5 flex-shrink-0" data-testid="result-banner">
-            <div className="max-w-3xl mx-auto flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
-                <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
-                  result.xlsx ready
-                  {uploadedFileName && (
-                    <span className="font-normal text-emerald-600 dark:text-emerald-400"> — {uploadedFileName}</span>
+                </ScrollArea>
+                <Separator />
+                <div className="p-3 space-y-2">
+                  {conversations.length > 0 && (
+                    <>
+                      {showClearAllConfirm ? (
+                        <div className="px-2 py-2 rounded-md bg-destructive/8 border border-destructive/15">
+                          <p className="text-[11px] text-destructive font-medium mb-2">Delete all sessions?</p>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-6 text-[11px] px-2.5"
+                              onClick={handleDeleteAllConversations}
+                              data-testid="button-confirm-clear-all"
+                            >
+                              Yes, Delete All
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-[11px] px-2.5"
+                              onClick={() => setShowClearAllConfirm(false)}
+                              data-testid="button-cancel-clear-all"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-center gap-1.5 text-[11px] text-destructive/70 hover:text-destructive hover:bg-destructive/8"
+                          onClick={() => setShowClearAllConfirm(true)}
+                          data-testid="button-clear-all-sessions"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          Clear All Sessions
+                        </Button>
+                      )}
+                    </>
                   )}
-                </p>
-                <p className="text-[10px] text-emerald-600/80 dark:text-emerald-400/60 truncate">
-                  {getIncludedAnalysisLabels(includedAnalyses)}{resultRows.length > 0 ? ` (${resultRows.length} fields)` : ""}{latestDataModel ? ` + Data Model: ${latestDataModel.model_name}` : ""}
-                </p>
+                  <p className="text-[10px] text-muted-foreground/60 text-center">
+                    Powered by Claude AI
+                  </p>
+                </div>
               </div>
-              <Button
-                size="sm"
-                onClick={handleDownloadResult}
-                className="gap-1.5 text-[11px] flex-shrink-0 text-white font-medium h-8 px-3 rounded-md"
-                style={{ backgroundColor: "#00A3A1" }}
-                data-testid="button-download-result"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Download result.xlsx
-              </Button>
-            </div>
-          </div>
+            </Panel>
+
+            <PanelResizeHandle className="w-1.5 bg-transparent hover:bg-primary/10 active:bg-primary/20 transition-colors flex items-center justify-center group" data-testid="resize-handle-sidebar">
+              <div className="w-0.5 h-8 rounded-full bg-border group-hover:bg-primary/30 group-active:bg-primary/50 transition-colors" />
+            </PanelResizeHandle>
+          </>
         )}
 
-        {/* Input Area */}
-        <div className="border-t border-border bg-background p-4 flex-shrink-0">
-          <div className="max-w-3xl mx-auto">
-            {selectedFile && (
-              <div className="flex items-center gap-2 mb-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg px-3 py-2 border border-emerald-200 dark:border-emerald-800/40">
-                <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                <span className="text-sm truncate flex-1 text-emerald-800 dark:text-emerald-300 font-medium">{selectedFile.name}</span>
+        <Panel
+          defaultSize={sidebarCollapsed ? 100 : 80}
+          minSize={50}
+          id="main"
+          order={2}
+        >
+          <div className="h-full flex flex-col min-w-0">
+            <div className="h-14 border-b border-border flex items-center gap-3 px-4 bg-background/95 backdrop-blur-sm flex-shrink-0">
+              {sidebarCollapsed && (
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-6 w-6 flex-shrink-0 hover:text-destructive"
-                  onClick={() => {
-                    setSelectedFile(null);
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                  }}
-                  data-testid="button-remove-file"
+                  onClick={() => setSidebarCollapsed(false)}
+                  className="h-8 w-8"
+                  data-testid="button-expand-sidebar"
                 >
-                  <X className="w-3 h-3" />
+                  <PanelLeftOpen className="w-4 h-4" />
                 </Button>
+              )}
+              <div className="flex-1 min-w-0">
+                <h2 className="text-sm font-semibold truncate">
+                  {activeConversation?.title || "Data Owner Agent"}
+                </h2>
               </div>
-            )}
-            {sessionFieldNames && sessionFieldNames.length > 0 && !selectedFile && (
-              <div className="flex items-center gap-2 mb-2 text-[10px] text-muted-foreground/70">
-                <FileSpreadsheet className="w-3 h-3 flex-shrink-0" />
-                <span className="truncate">Session fields: {sessionFieldNames.slice(0, 6).join(", ")}{sessionFieldNames.length > 6 ? `, +${sessionFieldNames.length - 6} more` : ""}</span>
-              </div>
-            )}
-            <form onSubmit={handleSubmit} className="flex items-end gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileChange}
-                className="hidden"
-                data-testid="input-file"
-              />
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-9 w-9 flex-shrink-0"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isStreaming}
-                data-testid="button-upload-file"
-              >
-                <Paperclip className="w-4.5 h-4.5" />
-              </Button>
-              <Textarea
-                ref={textareaRef}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={
-                  sessionFieldNames
-                    ? "Ask for business definitions, data classification, or data quality rules..."
-                    : "Upload an Excel file and ask about data classification, quality rules, or business definitions..."
-                }
-                className="min-h-[44px] max-h-32 resize-none flex-1 rounded-xl text-sm"
-                disabled={isStreaming}
-                data-testid="input-message"
-              />
-              <Button
-                type="submit"
-                size="icon"
-                className="h-9 w-9 flex-shrink-0 rounded-xl"
-                disabled={isStreaming || (!inputValue.trim() && !selectedFile)}
-                data-testid="button-send-message"
-              >
-                {isStreaming ? (
-                  <Loader2 className="w-4.5 h-4.5 animate-spin" />
+              {threads.length > 1 && (
+                <div className="flex gap-0.5">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-[11px] gap-1 px-2 text-muted-foreground hover:text-foreground"
+                    onClick={() => collapseAll(threads)}
+                    data-testid="button-collapse-all"
+                  >
+                    <Minimize2 className="w-3 h-3" />
+                    Collapse
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-[11px] gap-1 px-2 text-muted-foreground hover:text-foreground"
+                    onClick={expandAll}
+                    data-testid="button-expand-all"
+                  >
+                    <Maximize2 className="w-3 h-3" />
+                    Expand
+                  </Button>
+                </div>
+              )}
+              {(resultRows.length > 0 || latestDataModel) && (
+                <Button
+                  size="sm"
+                  onClick={handleDownloadResult}
+                  className="gap-1.5 text-[11px] flex-shrink-0 text-white font-medium h-8 px-3 rounded-md"
+                  style={{ backgroundColor: "#00A3A1" }}
+                  data-testid="button-header-download-result"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  result.xlsx
+                </Button>
+              )}
+            </div>
+
+            <ScrollArea className="flex-1">
+              <div className="max-w-3xl mx-auto w-full px-4 py-6">
+                {!activeConversationId && messages.length === 0 && !isStreaming ? (
+                  <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={{ backgroundColor: "#00338D" }}>
+                      <Bot className="w-9 h-9 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2 tracking-tight">Data Owner Agent</h2>
+                    <p className="text-muted-foreground text-center mb-8 max-w-md text-sm leading-relaxed">
+                      Your AI assistant for data governance. Upload Excel files to classify data, generate definitions, or define quality rules.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full max-w-3xl">
+                      {FEATURE_CARDS.map((card) => (
+                        <button
+                          key={card.title}
+                          onClick={() => handleFeatureCard(card.prompt)}
+                          className={`${card.bg} rounded-xl p-5 text-left transition-all border border-transparent hover:border-border hover:shadow-sm group`}
+                          data-testid={`card-feature-${card.title.toLowerCase().replace(/\s+/g, "-")}`}
+                        >
+                          <div className={`w-9 h-9 rounded-lg ${card.iconBg} flex items-center justify-center mb-3`}>
+                            <card.icon className={`w-4.5 h-4.5 ${card.color}`} />
+                          </div>
+                          <h3 className="text-sm font-semibold mb-1">{card.title}</h3>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            {card.description}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ) : (
-                  <Send className="w-4.5 h-4.5" />
+                  <div className="space-y-3">
+                    {threads.map((thread, idx) => {
+                      const isCollapsed = collapsedThreads.has(idx);
+                      const tag = detectAnalysisTag(
+                        thread.userMsg.content,
+                        thread.assistantMsg?.content
+                      );
+                      const { displayText: previewText } = stripExcelContent(thread.userMsg.content);
+                      const preview = previewText.substring(0, 60) + (previewText.length > 60 ? "..." : "");
+                      const timestamp = formatTimestamp(thread.userMsg.createdAt);
+
+                      return (
+                        <div
+                          key={thread.userMsg.id}
+                          className="rounded-xl border border-border overflow-hidden bg-card/30"
+                          data-testid={`thread-block-${idx}`}
+                        >
+                          <button
+                            onClick={() => toggleThread(idx)}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-left bg-muted/40 hover:bg-muted/60 transition-colors"
+                            style={{ borderLeft: "3px solid #00338D" }}
+                            data-testid={`thread-header-${idx}`}
+                          >
+                            {isCollapsed ? (
+                              <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+                            )}
+                            <span className="text-[12px] text-foreground truncate flex-1 font-medium">{preview}</span>
+                            {tag && (
+                              <Badge variant="secondary" className="text-[10px] h-5 px-2 flex-shrink-0 font-medium">
+                                {tag}
+                              </Badge>
+                            )}
+                            <span className="text-[10px] text-muted-foreground/70 flex-shrink-0 tabular-nums">{timestamp}</span>
+                          </button>
+                          {!isCollapsed && (
+                            <div className="px-4 py-4 space-y-4" data-testid={`thread-content-${idx}`}>
+                              <MessageBubble
+                                message={thread.userMsg}
+                              />
+                              {thread.assistantMsg && (
+                                <MessageBubble
+                                  message={thread.assistantMsg}
+                                  summaryOverride={summaryOverrides[thread.assistantMsg.id]}
+                                  onDownloadResult={(resultRows.length > 0 || latestDataModel) ? handleDownloadResult : undefined}
+                                  dataModel={dataModels[thread.assistantMsg.id] || undefined}
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {isStreaming && (
+                      <div className="rounded-xl border border-border overflow-hidden bg-card/30" data-testid="thread-streaming">
+                        <div
+                          className="flex items-center gap-3 px-4 py-2.5 bg-muted/40"
+                          style={{ borderLeft: "3px solid #00338D" }}
+                        >
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground flex-shrink-0" />
+                          <span className="text-[12px] text-foreground font-medium truncate flex-1">Processing...</span>
+                        </div>
+                        <div className="px-4 py-4">
+                          <div className="flex gap-3">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#00338D" }}>
+                              <Bot className="w-4 h-4 text-white" />
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Analyzing your data...</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
                 )}
-              </Button>
-            </form>
-            <p className="text-[10px] text-muted-foreground/50 text-center mt-2">
-              Upload Excel files (.xlsx, .xls, .csv) with data fields for analysis
-            </p>
+              </div>
+            </ScrollArea>
+
+            {(resultRows.length > 0 || latestDataModel) && (
+              <div className="border-t border-border bg-emerald-50/50 dark:bg-emerald-950/20 px-4 py-2.5 flex-shrink-0" data-testid="result-banner">
+                <div className="max-w-3xl mx-auto flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                      result.xlsx ready
+                      {uploadedFileName && (
+                        <span className="font-normal text-emerald-600 dark:text-emerald-400"> — {uploadedFileName}</span>
+                      )}
+                    </p>
+                    <p className="text-[10px] text-emerald-600/80 dark:text-emerald-400/60 truncate">
+                      {getIncludedAnalysisLabels(includedAnalyses)}{resultRows.length > 0 ? ` (${resultRows.length} fields)` : ""}{latestDataModel ? ` + Data Model: ${latestDataModel.model_name}` : ""}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleDownloadResult}
+                    className="gap-1.5 text-[11px] flex-shrink-0 text-white font-medium h-8 px-3 rounded-md"
+                    style={{ backgroundColor: "#00A3A1" }}
+                    data-testid="button-download-result"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Download result.xlsx
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="border-t border-border bg-background p-4 flex-shrink-0">
+              <div className="max-w-3xl mx-auto">
+                {selectedFile && (
+                  <div className="flex items-center gap-2 mb-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg px-3 py-2 border border-emerald-200 dark:border-emerald-800/40">
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                    <span className="text-sm truncate flex-1 text-emerald-800 dark:text-emerald-300 font-medium">{selectedFile.name}</span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 flex-shrink-0 hover:text-destructive"
+                      onClick={() => {
+                        setSelectedFile(null);
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
+                      data-testid="button-remove-file"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
+                {sessionFieldNames && sessionFieldNames.length > 0 && !selectedFile && (
+                  <div className="flex items-center gap-2 mb-2 text-[10px] text-muted-foreground/70">
+                    <FileSpreadsheet className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">Session fields: {sessionFieldNames.slice(0, 6).join(", ")}{sessionFieldNames.length > 6 ? `, +${sessionFieldNames.length - 6} more` : ""}</span>
+                  </div>
+                )}
+                <form onSubmit={handleSubmit} className="flex items-end gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    data-testid="input-file"
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-9 w-9 flex-shrink-0"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isStreaming}
+                    data-testid="button-upload-file"
+                  >
+                    <Paperclip className="w-4.5 h-4.5" />
+                  </Button>
+                  <Textarea
+                    ref={textareaRef}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={
+                      sessionFieldNames
+                        ? "Ask for business definitions, data classification, or data quality rules..."
+                        : "Upload an Excel file and ask about data classification, quality rules, or business definitions..."
+                    }
+                    className="min-h-[44px] max-h-32 resize-none flex-1 rounded-xl text-sm"
+                    disabled={isStreaming}
+                    data-testid="input-message"
+                  />
+                  <Button
+                    type="submit"
+                    size="icon"
+                    className="h-9 w-9 flex-shrink-0 rounded-xl"
+                    disabled={isStreaming || (!inputValue.trim() && !selectedFile)}
+                    data-testid="button-send-message"
+                  >
+                    {isStreaming ? (
+                      <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                    ) : (
+                      <Send className="w-4.5 h-4.5" />
+                    )}
+                  </Button>
+                </form>
+                <p className="text-[10px] text-muted-foreground/50 text-center mt-2">
+                  Upload Excel files (.xlsx, .xls, .csv) with data fields for analysis
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </Panel>
+      </PanelGroup>
     </div>
   );
 }

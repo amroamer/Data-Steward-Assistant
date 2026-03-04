@@ -1,4 +1,4 @@
-# Data Owner Agent — KPMG Data Governance
+# Data Owner Agent
 
 ## Overview
 
@@ -33,6 +33,8 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 - Streaming thread is always expanded and shows a loading indicator
 
 ### Sidebar Session Management
+- Sidebar and chat pane are resizable using `react-resizable-panels` (PanelGroup with horizontal direction, autoSaveId="chat-layout")
+- Sidebar can be collapsed/expanded via PanelLeftClose/PanelLeftOpen toggle buttons; when collapsed, the sidebar Panel and resize handle are conditionally unmounted
 - Each conversation shows a trash icon on hover; clicking shows inline "Delete this session?" confirmation with "Yes, Delete" / "Cancel"
 - `deletingConvId` state tracks which conversation is showing confirmation; `fadingOutConvId` triggers 150ms fade-out animation before deletion
 - "Clear All Sessions" button at sidebar bottom (muted red) with inline confirmation ("This will delete all sessions. Are you sure?")
