@@ -738,13 +738,11 @@ export default function ChatPage() {
     for (const msg of activeConversation.messages) {
       if (msg.role !== "assistant") continue;
       const insights = detectInsightsJSON(msg.content);
+      const msgParts: string[] = [];
       if (insights) {
         insightsMap[msg.id] = insights;
-        overrides[msg.id] = t.insightsReportGenerated;
-        continue;
-      }
-      if (looksLikeInsightsJSON(msg.content)) {
-        overrides[msg.id] = t.insightsReportGenerated;
+        msgParts.push(t.insightsReportGenerated);
+      } else if (looksLikeInsightsJSON(msg.content)) {
         const fallbackReport: InsightsReport = {
           report_title: "Data Insights Report",
           dataset_summary: { total_rows: 0, total_columns: 0 },
@@ -752,42 +750,45 @@ export default function ChatPage() {
           recommendations: [],
         };
         insightsMap[msg.id] = fallbackReport;
-        continue;
+        msgParts.push(t.insightsReportGenerated);
       }
       const piiScan = detectPiiScanJSON(msg.content);
       if (piiScan) {
         piiMap[msg.id] = piiScan;
         lastPii = piiScan;
-        overrides[msg.id] = generatePiiScanSummary(piiScan);
-        continue;
+        msgParts.push(generatePiiScanSummary(piiScan));
       }
       const dqResult = detectDqAnalysisJSON(msg.content);
       if (dqResult) {
         dqMap[msg.id] = dqResult;
         lastDq = dqResult;
-        overrides[msg.id] = generateDqAnalysisSummary(dqResult);
-        continue;
+        msgParts.push(generateDqAnalysisSummary(dqResult));
       }
-      const model = detectDataModelJSON(msg.content);
-      if (model) {
-        modelMap[msg.id] = model;
-        lastModel = model;
-        const factCount = model.fact_tables.length;
-        const dimCount = model.dimension_tables.length;
-        const relCount = model.relationships.length;
-        const totalFields = [...model.fact_tables, ...model.dimension_tables].reduce((acc, t) => acc + t.fields.length, 0);
-        overrides[msg.id] = `✅ Analytical data model "${model.model_name}" generated — ${factCount} fact table${factCount !== 1 ? "s" : ""}, ${dimCount} dimension table${dimCount !== 1 ? "s" : ""}, ${relCount} relationship${relCount !== 1 ? "s" : ""}, ${totalFields} total fields.\n\nSheets added to result.xlsx: data_model_fields, data_model_relationships, data_model_ddl`;
-        continue;
+      const msgModel = detectDataModelJSON(msg.content);
+      if (msgModel) {
+        modelMap[msg.id] = msgModel;
+        lastModel = msgModel;
+        const factCount = msgModel.fact_tables.length;
+        const dimCount = msgModel.dimension_tables.length;
+        const relCount = msgModel.relationships.length;
+        const tf = [...msgModel.fact_tables, ...msgModel.dimension_tables].reduce((acc, tbl) => acc + tbl.fields.length, 0);
+        msgParts.push(`✅ Analytical data model "${msgModel.model_name}" generated — ${factCount} fact table${factCount !== 1 ? "s" : ""}, ${dimCount} dimension table${dimCount !== 1 ? "s" : ""}, ${relCount} relationship${relCount !== 1 ? "s" : ""}, ${tf} total fields.\n\nSheets added to result.xlsx: data_model_fields, data_model_relationships, data_model_ddl`);
       }
-      const results = detectAndExtractAllAnalyses(msg.content);
-      if (results.length === 0) continue;
-      const totalFields = new Set(
-        results.flatMap(r => [
-          ...Object.keys(r.fieldData),
-          ...(r.dqMultiRows?.map(dr => dr.fieldName) || [])
-        ])
-      ).size;
-      overrides[msg.id] = generateAnalysisSummary(results, totalFields);
+      const rawResults = detectAndExtractAllAnalyses(msg.content);
+      const results = dqResult
+        ? rawResults.filter(r => r.analysisType !== "data_quality")
+        : rawResults;
+      if (results.length > 0) {
+        const totalFields = new Set(
+          results.flatMap(r => [
+            ...Object.keys(r.fieldData),
+            ...(r.dqMultiRows?.map(dr => dr.fieldName) || [])
+          ])
+        ).size;
+        msgParts.push(generateAnalysisSummary(results, totalFields));
+      }
+      if (msgParts.length === 0) continue;
+      overrides[msg.id] = msgParts.join("\n\n");
     }
     if (Object.keys(modelMap).length > 0) {
       setDataModels(prev => ({ ...prev, ...modelMap }));
@@ -836,6 +837,9 @@ export default function ChatPage() {
   };
 
   const processAIResponse = (content: string, messageId?: number) => {
+    const summaryParts: string[] = [];
+    const toastParts: string[] = [];
+
     const insightsReport = detectInsightsJSON(content);
     if (insightsReport) {
       const now = new Date();
@@ -848,14 +852,8 @@ export default function ChatPage() {
       if (messageId) {
         setInsightsForMessage(prev => ({ ...prev, [messageId]: insightsReport }));
       }
-      if (messageId) {
-        setSummaryOverrides(prev => ({ ...prev, [messageId]: t.insightsReportGenerated }));
-      }
-      toast({
-        title: t.insightsReportGenerated,
-        description: t.insightsToast(insightsReport.report_title),
-      });
-      return;
+      summaryParts.push(t.insightsReportGenerated);
+      toastParts.push(t.insightsToast(insightsReport.report_title));
     }
 
     const piiScan = detectPiiScanJSON(content);
@@ -864,15 +862,8 @@ export default function ChatPage() {
       if (messageId) {
         setPiiScans(prev => ({ ...prev, [messageId]: piiScan }));
       }
-      const summary = generatePiiScanSummary(piiScan);
-      if (messageId) {
-        setSummaryOverrides(prev => ({ ...prev, [messageId]: summary }));
-      }
-      toast({
-        title: t.toastUpdated,
-        description: t.piiScanToast(piiScan.scan_summary.pii_columns_found),
-      });
-      return;
+      summaryParts.push(generatePiiScanSummary(piiScan));
+      toastParts.push(t.piiScanToast(piiScan.scan_summary.pii_columns_found));
     }
 
     const dqResult = detectDqAnalysisJSON(content);
@@ -886,15 +877,8 @@ export default function ChatPage() {
       if (messageId) {
         setDqAnalyses(prev => ({ ...prev, [messageId]: dqResult }));
       }
-      const summary = generateDqAnalysisSummary(dqResult);
-      if (messageId) {
-        setSummaryOverrides(prev => ({ ...prev, [messageId]: summary }));
-      }
-      toast({
-        title: t.toastUpdated,
-        description: `${dqResult.analysis_summary.total_rules_generated} DQ rules generated across ${dqResult.analysis_summary.total_fields_analyzed} fields`,
-      });
-      return;
+      summaryParts.push(generateDqAnalysisSummary(dqResult));
+      toastParts.push(`${dqResult.analysis_summary.total_rules_generated} DQ rules generated across ${dqResult.analysis_summary.total_fields_analyzed} fields`);
     }
 
     const model = detectDataModelJSON(content);
@@ -907,60 +891,56 @@ export default function ChatPage() {
       const dimCount = model.dimension_tables.length;
       const relCount = model.relationships.length;
       const totalFields = [...model.fact_tables, ...model.dimension_tables].reduce((acc, tbl) => acc + tbl.fields.length, 0);
-      const summary = `✅ Analytical data model "${model.model_name}" generated — ${factCount} fact table${factCount !== 1 ? "s" : ""}, ${dimCount} dimension table${dimCount !== 1 ? "s" : ""}, ${relCount} relationship${relCount !== 1 ? "s" : ""}, ${totalFields} total fields.\n\nSheets added to result.xlsx: data_model_fields, data_model_relationships, data_model_ddl`;
-      if (messageId) {
-        setSummaryOverrides(prev => ({ ...prev, [messageId]: summary }));
-      }
-      setIncludedAnalyses(prev => {
-        if (!prev.includes("data_quality" as any)) return prev;
-        return prev;
-      });
-      toast({
-        title: t.toastUpdated,
-        description: t.dataModelToast(model.model_name),
-      });
-      return;
+      summaryParts.push(`✅ Analytical data model "${model.model_name}" generated — ${factCount} fact table${factCount !== 1 ? "s" : ""}, ${dimCount} dimension table${dimCount !== 1 ? "s" : ""}, ${relCount} relationship${relCount !== 1 ? "s" : ""}, ${totalFields} total fields.\n\nSheets added to result.xlsx: data_model_fields, data_model_relationships, data_model_ddl`);
+      toastParts.push(t.dataModelToast(model.model_name));
     }
 
-    const analysisResults = detectAndExtractAllAnalyses(content);
-    if (analysisResults.length === 0) return;
+    const rawAnalysisResults = detectAndExtractAllAnalyses(content);
+    const analysisResults = dqResult
+      ? rawAnalysisResults.filter(r => r.analysisType !== "data_quality")
+      : rawAnalysisResults;
+    if (analysisResults.length > 0) {
+      const newTypes: AnalysisType[] = [];
 
-    const newTypes: AnalysisType[] = [];
-
-    for (const result of analysisResults) {
-      if (result.analysisType === "data_quality" && result.dqMultiRows && result.dqMultiRows.length > 0) {
-        setResultRows((prev) => mergeDqResults(prev, result.dqMultiRows!));
-      } else if (Object.keys(result.fieldData).length > 0) {
-        setResultRows((prev) => mergeResults(prev, [result]));
+      for (const result of analysisResults) {
+        if (result.analysisType === "data_quality" && result.dqMultiRows && result.dqMultiRows.length > 0) {
+          setResultRows((prev) => mergeDqResults(prev, result.dqMultiRows!));
+        } else if (Object.keys(result.fieldData).length > 0) {
+          setResultRows((prev) => mergeResults(prev, [result]));
+        }
+        newTypes.push(result.analysisType);
       }
-      newTypes.push(result.analysisType);
+
+      setIncludedAnalyses((prev) => {
+        const updated = [...prev];
+        for (const typ of newTypes) {
+          if (!updated.includes(typ)) updated.push(typ);
+        }
+        return updated;
+      });
+
+      const totalFields = new Set(
+        analysisResults.flatMap(r => [
+          ...Object.keys(r.fieldData),
+          ...(r.dqMultiRows?.map(dr => dr.fieldName) || [])
+        ])
+      ).size;
+
+      summaryParts.push(generateAnalysisSummary(analysisResults, totalFields));
+      const labels = newTypes.map((typ) => getAnalysisLabel(typ)).join(", ");
+      toastParts.push(t.analysisToast(labels));
     }
 
-    setIncludedAnalyses((prev) => {
-      const updated = [...prev];
-      for (const t of newTypes) {
-        if (!updated.includes(t)) updated.push(t);
-      }
-      return updated;
-    });
+    if (summaryParts.length === 0) return;
 
-    const totalFields = new Set(
-      analysisResults.flatMap(r => [
-        ...Object.keys(r.fieldData),
-        ...(r.dqMultiRows?.map(dr => dr.fieldName) || [])
-      ])
-    ).size;
-
-    const summary = generateAnalysisSummary(analysisResults, totalFields);
-
+    const combinedSummary = summaryParts.join("\n\n");
     if (messageId) {
-      setSummaryOverrides(prev => ({ ...prev, [messageId]: summary }));
+      setSummaryOverrides(prev => ({ ...prev, [messageId]: combinedSummary }));
     }
 
-    const labels = newTypes.map((typ) => getAnalysisLabel(typ)).join(", ");
     toast({
       title: t.toastUpdated,
-      description: t.analysisToast(labels),
+      description: toastParts.join(" | "),
     });
   };
 
@@ -1058,11 +1038,12 @@ export default function ChatPage() {
                   setIsInsightsMode(false);
 
                   const detectedInsights = detectInsightsJSON(accumulated);
-                  const detectedPii = !detectedInsights ? detectPiiScanJSON(accumulated) : null;
-                  const detectedDq = !detectedInsights && !detectedPii ? detectDqAnalysisJSON(accumulated) : null;
-                  const detectedModel = !detectedInsights && !detectedPii && !detectedDq ? detectDataModelJSON(accumulated) : null;
-                  const analysisResults = !detectedInsights && !detectedPii && !detectedDq && !detectedModel ? detectAndExtractAllAnalyses(accumulated) : [];
-                  if (detectedInsights || detectedPii || detectedDq || detectedModel || analysisResults.length > 0) {
+                  const detectedPii = detectPiiScanJSON(accumulated);
+                  const detectedDq = detectDqAnalysisJSON(accumulated);
+                  const detectedModel = detectDataModelJSON(accumulated);
+                  const analysisResults = detectAndExtractAllAnalyses(accumulated);
+                  const hasAnyDetection = detectedInsights || detectedPii || detectedDq || detectedModel || analysisResults.length > 0;
+                  if (hasAnyDetection) {
                     processAIResponse(accumulated);
 
                     await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
@@ -1072,28 +1053,34 @@ export default function ChatPage() {
                     if (convData?.messages) {
                       const lastMsg = convData.messages[convData.messages.length - 1];
                       if (lastMsg?.role === "assistant") {
+                        const msgSummaryParts: string[] = [];
                         if (detectedInsights) {
                           setInsightsForMessage(prev => ({ ...prev, [lastMsg.id]: detectedInsights }));
-                          setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: t.insightsReportGenerated }));
-                        } else if (detectedPii) {
+                          msgSummaryParts.push(t.insightsReportGenerated);
+                        }
+                        if (detectedPii) {
                           setPiiScans(prev => ({ ...prev, [lastMsg.id]: detectedPii }));
-                          const summary = generatePiiScanSummary(detectedPii);
-                          setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: summary }));
-                        } else if (detectedDq) {
+                          msgSummaryParts.push(generatePiiScanSummary(detectedPii));
+                        }
+                        if (detectedDq) {
                           setDqAnalyses(prev => ({ ...prev, [lastMsg.id]: detectedDq }));
-                          const summary = generateDqAnalysisSummary(detectedDq);
-                          setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: summary }));
-                        } else if (detectedModel) {
+                          msgSummaryParts.push(generateDqAnalysisSummary(detectedDq));
+                        }
+                        if (detectedModel) {
                           setDataModels(prev => ({ ...prev, [lastMsg.id]: detectedModel }));
-                        } else {
+                        }
+                        if (analysisResults.length > 0) {
                           const totalFields = new Set(
                             analysisResults.flatMap((r: any) => [
                               ...Object.keys(r.fieldData),
                               ...(r.dqMultiRows?.map((dr: any) => dr.fieldName) || [])
                             ])
                           ).size;
-                          const summary = generateAnalysisSummary(analysisResults, totalFields);
-                          setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: summary }));
+                          msgSummaryParts.push(generateAnalysisSummary(analysisResults, totalFields));
+                        }
+                        if (msgSummaryParts.length > 0) {
+                          const combined = msgSummaryParts.join("\n\n");
+                          setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: combined }));
                         }
                       }
                     }
@@ -1189,7 +1176,7 @@ export default function ChatPage() {
   };
 
   const handleFeatureCard = (prompt: string) => {
-    sendMessage(prompt);
+    sendMessage(prompt, selectedFile);
   };
 
   const handleNewChat = () => {
@@ -1776,6 +1763,53 @@ function MessageBubble({
               lang={lang}
             />
           </div>
+        ) : hasDqAnalysis && dqAnalysis ? (
+          <div className={isRtl ? "text-right" : "text-left"}>
+            {shouldShowSummary && (
+              <div className={`inline-block ${isRtl ? "text-right" : "text-left"} rounded-xl px-4 py-3 text-sm max-w-full bg-card border border-card-border mb-3`}>
+                <div className="whitespace-pre-wrap break-words leading-relaxed">{summaryOverride}</div>
+              </div>
+            )}
+            <div className="space-y-2" data-testid={`dq-scorecard-${message.id}`}>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: lang === "ar" ? "إجمالي القواعد" : "Total Rules", value: dqAnalysis.analysis_summary.total_rules_generated, color: "#1A4B8C" },
+                  { label: lang === "ar" ? "قواعد تقنية" : "Technical", value: dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Technical").length, 0), color: "#0094D3" },
+                  { label: lang === "ar" ? "قواعد منطقية" : "Logical", value: dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Logical").length, 0), color: "#51BAB4" },
+                  { label: lang === "ar" ? "قواعد أعمال" : "Business", value: dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Business").length, 0), color: "#774896" },
+                  { label: lang === "ar" ? "قواعد عبر الحقول" : "Cross-Field", value: dqAnalysis.cross_field_rules.length, color: "#067647" },
+                  { label: lang === "ar" ? "تحذيرات" : "Warnings", value: dqAnalysis.business_logic_warnings.length, color: "#D97706" },
+                ].map((tile, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg border p-2 text-center"
+                    style={{ borderColor: tile.color + "40", backgroundColor: tile.color + "08" }}
+                    data-testid={`dq-tile-${i}`}
+                  >
+                    <div className="text-lg font-bold" style={{ color: tile.color }}>{tile.value}</div>
+                    <div className="text-[10px] text-muted-foreground leading-tight">{tile.label}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {lang === "ar"
+                  ? `تم تحليل ${dqAnalysis.analysis_summary.total_fields_analyzed} حقل — ${dqAnalysis.analysis_summary.total_rules_generated} قاعدة جودة`
+                  : `${dqAnalysis.analysis_summary.total_fields_analyzed} fields analyzed — ${dqAnalysis.analysis_summary.total_rules_generated} quality rules generated`}
+              </div>
+              {onDownloadResult && (
+                <Button
+                  size="sm"
+                  onClick={onDownloadResult}
+                  className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md"
+                  style={{ backgroundColor: "#2E7D32" }}
+                  data-testid={`button-download-dq-${message.id}`}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  {tr.downloadResultXlsx}
+                </Button>
+              )}
+            </div>
+          </div>
         ) : (
           <>
             <div
@@ -1824,47 +1858,6 @@ function MessageBubble({
                 </div>
               )}
             </div>
-            {hasDqAnalysis && dqAnalysis && (
-              <div className="mt-3 space-y-2" data-testid={`dq-scorecard-${message.id}`}>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: lang === "ar" ? "إجمالي القواعد" : "Total Rules", value: dqAnalysis.analysis_summary.total_rules_generated, color: "#1A4B8C" },
-                    { label: lang === "ar" ? "قواعد تقنية" : "Technical", value: dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Technical").length, 0), color: "#0094D3" },
-                    { label: lang === "ar" ? "قواعد منطقية" : "Logical", value: dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Logical").length, 0), color: "#51BAB4" },
-                    { label: lang === "ar" ? "قواعد أعمال" : "Business", value: dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Business").length, 0), color: "#774896" },
-                    { label: lang === "ar" ? "قواعد عبر الحقول" : "Cross-Field", value: dqAnalysis.cross_field_rules.length, color: "#067647" },
-                    { label: lang === "ar" ? "تحذيرات" : "Warnings", value: dqAnalysis.business_logic_warnings.length, color: "#D97706" },
-                  ].map((tile, i) => (
-                    <div
-                      key={i}
-                      className="rounded-lg border p-2 text-center"
-                      style={{ borderColor: tile.color + "40", backgroundColor: tile.color + "08" }}
-                      data-testid={`dq-tile-${i}`}
-                    >
-                      <div className="text-lg font-bold" style={{ color: tile.color }}>{tile.value}</div>
-                      <div className="text-[10px] text-muted-foreground leading-tight">{tile.label}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  {lang === "ar"
-                    ? `تم تحليل ${dqAnalysis.analysis_summary.total_fields_analyzed} حقل — ${dqAnalysis.analysis_summary.total_rules_generated} قاعدة جودة`
-                    : `${dqAnalysis.analysis_summary.total_fields_analyzed} fields analyzed — ${dqAnalysis.analysis_summary.total_rules_generated} quality rules generated`}
-                </div>
-                {onDownloadResult && (
-                  <Button
-                    size="sm"
-                    onClick={onDownloadResult}
-                    className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md"
-                    style={{ backgroundColor: "#2E7D32" }}
-                    data-testid={`button-download-dq-${message.id}`}
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    {tr.downloadResultXlsx}
-                  </Button>
-                )}
-              </div>
-            )}
             {hasInsights && (
                 <div className="mt-2 space-y-2" data-testid={`insights-card-${message.id}`}>
                   <Button

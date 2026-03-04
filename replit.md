@@ -21,7 +21,8 @@ Preferred communication style: Simple, everyday language.
     - **Cumulative Result Handling**: Processes and merges AI analysis results across multiple interactions into an in-memory structure, generating a `result.xlsx` with separate, deduplicated sheets for classifications, definitions, and quality rules.
     - **4-Layer DQ Rules**: Claude returns structured JSON with `field_rules[]` (Technical/Logical/Business per field), `cross_field_rules[]`, and `business_logic_warnings[]`. Detected by `detectDqAnalysisJSON()`, rendered as a 6-tile scorecard in chat (Total Rules, Technical, Logical, Business, Cross-Field, Warnings), and exported to 3 Excel sheets (`dq_rules_by_field`, `cross_field_rules`, `business_warnings`) via `appendDqSheets()`.
     - **Standalone Insights Report**: Generates comprehensive, styled Excel reports with executive summaries, key insights, column profiles, recommendations, and data quality flags when prompted with data-rich files.
-    - **Chat Interface**: Displays conversation summaries with downloadable results, features collapsible message threads, and supports multi-analysis requests within a single AI response.
+    - **Chat Interface**: Displays conversation summaries with downloadable results, features collapsible message threads, and supports multi-analysis requests within a single AI response. When Claude returns multiple analyses (e.g., classification + PII + DQ) in one response, all are detected and a combined summary is shown.
+    - **Feature Cards**: Auto-attach the uploaded file when clicked, sending both the prompt and file to Claude.
 - **ZATCA Branding**: Primary palette — green `#067647`, teal `#51BAB4`, blue `#0094D3`, purple `#774896`, dark blue `#1A4B8C`, gray `#575756`. Download buttons use `#2E7D32`.
 
 ### Backend
