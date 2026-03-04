@@ -100,7 +100,7 @@ type Lang = "en" | "ar";
 
 const translations = {
   en: {
-    newChat: "New Chat",
+    newChat: "New Data Owner Agent",
     noConversations: "No conversations yet",
     deleteSession: "Delete this session?",
     yesDelete: "Yes, Delete",
@@ -207,7 +207,7 @@ const translations = {
     noActivityYet: "No activity yet",
   },
   ar: {
-    newChat: "محادثة جديدة",
+    newChat: "وكيل مالك بيانات جديد",
     noConversations: "لا توجد محادثات بعد",
     deleteSession: "حذف هذه الجلسة؟",
     yesDelete: "نعم، حذف",
@@ -1197,7 +1197,6 @@ export default function ChatPage() {
                   setIsInsightsMode(false);
                   setThinkingSteps(prev => prev.map(s => ({ ...s, status: "done" as const })));
                   setAgentStatus("done");
-                  setTimeout(() => setAgentStatus("idle"), 3000);
 
                   const detectedInsights = detectInsightsJSON(accumulated);
                   const detectedPii = detectPiiScanJSON(accumulated);
@@ -1272,7 +1271,6 @@ export default function ChatPage() {
     } catch (error) {
       toast({ title: t.toastError, description: t.toastErrorDesc, variant: "destructive" });
       setAgentStatus("idle");
-      setThinkingSteps([]);
     } finally {
       setIsStreaming(false);
       setStreamingContent("");
@@ -1551,6 +1549,16 @@ export default function ChatPage() {
               </Button>
             </div>
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 px-2.5 gap-1.5 text-[11px] font-medium flex-shrink-0"
+            onClick={() => setLang(lang === "en" ? "ar" : "en")}
+            data-testid="button-lang-toggle"
+          >
+            <Globe className="w-3.5 h-3.5" />
+            {lang === "en" ? "EN" : "AR"}
+          </Button>
           {isMobile && (
             <Button
               size="icon"
@@ -1658,7 +1666,7 @@ export default function ChatPage() {
                       </div>
                     );
                   })}
-                  {isStreaming && (
+                  {thinkingSteps.length > 0 && (
                     <>
                       <ThinkingProgressCard steps={thinkingSteps} t={t} isRtl={isRtl} />
                       {streamingContent && (
@@ -1779,16 +1787,6 @@ export default function ChatPage() {
                       <Camera className="w-4 h-4" />
                     </Button>
                   )}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 px-2 gap-1 text-[10px] font-medium text-white/50 hover:text-white hover:bg-white/10"
-                    onClick={() => setLang(lang === "en" ? "ar" : "en")}
-                    data-testid="button-lang-toggle"
-                  >
-                    <Globe className="w-3.5 h-3.5" />
-                    {lang === "en" ? "EN" : "AR"}
-                  </Button>
                 </div>
                 <Textarea
                   ref={textareaRef}
