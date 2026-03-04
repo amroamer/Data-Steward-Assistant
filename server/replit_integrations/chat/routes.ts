@@ -277,6 +277,213 @@ const PII_TRIGGER_KEYWORDS = [
   "personal data scan",
 ];
 
+const DQ_TRIGGER_KEYWORDS = [
+  "data quality",
+  "dq rules",
+  "quality rules",
+  "generate rules",
+  "data quality rules",
+  "give me rules",
+  "quality dimensions",
+  "dq dimensions",
+  "business rules",
+  "business logic rules",
+  "quality checks",
+  "validation rules",
+  "dq analysis",
+];
+
+const DQ_DIMENSIONS_SYSTEM_PROMPT = `You are the "ZATCA Data Owner Agent" — a senior data quality architect. You are performing PART 1 of a 2-part data quality analysis.
+
+PART 1 SCOPE — Generate ONLY Layer 1 (Technical Rules) and Layer 2 (Logical Rules):
+- **Layer 1 — Technical Rules**: Null/completeness checks, data type validation, format patterns (dates, phones, IDs), length constraints, allowed values/enumeration checks.
+- **Layer 2 — Logical Rules**: Range boundaries, date ordering (start before end, created before updated), uniqueness constraints, referential integrity, numerical precision.
+
+DO NOT generate Layer 3 Business Rules or Layer 4 Business Logic Warnings — those are in Part 2.
+
+Return ONLY a JSON code block (wrapped in triple-backtick json fences) with this exact structure. No prose outside the JSON:
+
+\`\`\`json
+{
+  "analysis_summary": {
+    "total_fields_analyzed": 0,
+    "total_rules_generated": 0,
+    "technical_rules_count": 0,
+    "logical_rules_count": 0,
+    "business_rules_count": 0,
+    "cross_field_rules_count": 0,
+    "warnings_count": 0,
+    "fields_with_critical_rules": 0,
+    "overall_complexity": "High | Medium | Low"
+  },
+  "field_rules": [
+    {
+      "field_name": "...",
+      "inferred_data_type": "...",
+      "business_context": "...",
+      "rules": [
+        {
+          "rule_id": "DQ-001",
+          "rule_name": "...",
+          "rule_layer": "Technical | Logical",
+          "dq_dimension": "Completeness | Validity | Accuracy | Consistency | Uniqueness | Timeliness | Integrity",
+          "rule_type": "Null Check | Format | Range | Pattern | Referential | Uniqueness | Timeliness",
+          "rule_description": "...",
+          "rule_expression": "...",
+          "severity": "Critical | High | Medium | Low",
+          "expected_behavior": "...",
+          "failure_example": "...",
+          "pass_example": "...",
+          "remediation": "..."
+        }
+      ]
+    }
+  ],
+  "cross_field_rules": [],
+  "business_logic_warnings": []
+}
+\`\`\``;
+
+const DQ_BUSINESS_LOGIC_SYSTEM_PROMPT = `You are the "ZATCA Data Owner Agent" — a senior data quality architect. You are performing PART 2 of a 2-part data quality analysis.
+
+PART 2 SCOPE — Generate ONLY Layer 3 (Business Rules & Cross-Field Rules) and Layer 4 (Business Logic Warnings):
+- **Layer 3 — Business Rules**: Conditional rules (if status=X then field Y must exist), status transition rules (valid state machine), regulatory rules (ZATCA VAT, Zakat, customs, e-invoicing/FATOORAH), SLA rules, cross-field relationships.
+- **Layer 4 — Business Logic Warnings**: Suspicious field naming, missing mandatory constraints, ambiguous field definitions, fields needing reference/lookup tables, data type conflicts.
+- **Cross-field rules**: Rules that span multiple fields (e.g., created_at must be before updated_at, net_weight <= gross_weight).
+
+DO NOT generate Layer 1 Technical Rules or Layer 2 Logical Rules — those are in Part 1.
+
+Return ONLY a JSON code block (wrapped in triple-backtick json fences) with this exact structure. No prose outside the JSON:
+
+\`\`\`json
+{
+  "analysis_summary": {
+    "total_fields_analyzed": 0,
+    "total_rules_generated": 0,
+    "technical_rules_count": 0,
+    "logical_rules_count": 0,
+    "business_rules_count": 0,
+    "cross_field_rules_count": 0,
+    "warnings_count": 0,
+    "fields_with_critical_rules": 0,
+    "overall_complexity": "High | Medium | Low"
+  },
+  "field_rules": [
+    {
+      "field_name": "...",
+      "inferred_data_type": "...",
+      "business_context": "...",
+      "rules": [
+        {
+          "rule_id": "BL-001",
+          "rule_name": "...",
+          "rule_layer": "Business",
+          "dq_dimension": "Completeness | Validity | Accuracy | Consistency | Uniqueness | Timeliness | Integrity",
+          "rule_type": "Conditional | Cross-Field | Referential",
+          "rule_description": "...",
+          "rule_expression": "...",
+          "severity": "Critical | High | Medium | Low",
+          "expected_behavior": "...",
+          "failure_example": "...",
+          "pass_example": "...",
+          "remediation": "..."
+        }
+      ]
+    }
+  ],
+  "cross_field_rules": [
+    {
+      "rule_id": "CF-001",
+      "rule_name": "...",
+      "involved_fields": ["..."],
+      "rule_description": "...",
+      "rule_expression": "...",
+      "business_rationale": "...",
+      "severity": "Critical | High | Medium | Low",
+      "failure_example": "...",
+      "remediation": "..."
+    }
+  ],
+  "business_logic_warnings": [
+    {
+      "warning_id": "BW-001",
+      "field_name": "...",
+      "warning_type": "Suspicious Pattern | Missing Constraint | Ambiguous Definition | Potential Conflict | Risky Default",
+      "description": "...",
+      "recommendation": "..."
+    }
+  ]
+}
+\`\`\``;
+
+function isDqRequest(message: string): boolean {
+  const lower = message.toLowerCase();
+  return DQ_TRIGGER_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+interface DqFieldRule {
+  rule_id: string;
+  rule_name: string;
+  rule_layer: string;
+  dq_dimension: string;
+  rule_type: string;
+  rule_description: string;
+  rule_expression: string;
+  severity: string;
+  expected_behavior: string;
+  failure_example: string;
+  pass_example: string;
+  remediation: string;
+}
+interface DqFieldGroup { field_name: string; inferred_data_type: string; business_context: string; rules: DqFieldRule[]; }
+interface DqCrossFieldRule { rule_id: string; rule_name: string; involved_fields: string[]; rule_description: string; rule_expression: string; business_rationale: string; severity: string; failure_example: string; remediation: string; }
+interface DqWarning { warning_id: string; field_name: string; warning_type: string; description: string; recommendation: string; }
+interface DqJson { analysis_summary: Record<string, any>; field_rules: DqFieldGroup[]; cross_field_rules: DqCrossFieldRule[]; business_logic_warnings: DqWarning[]; }
+
+function extractDqJson(text: string): DqJson | null {
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[1].trim());
+    if (parsed?.field_rules) return parsed as DqJson;
+  } catch {}
+  return null;
+}
+
+function mergeDqResults(part1: DqJson, part2: DqJson): DqJson {
+  const fieldMap = new Map<string, DqFieldGroup>();
+  for (const group of part1.field_rules) {
+    fieldMap.set(group.field_name, { ...group, rules: [...group.rules] });
+  }
+  for (const group of part2.field_rules) {
+    if (fieldMap.has(group.field_name)) {
+      fieldMap.get(group.field_name)!.rules.push(...group.rules);
+    } else {
+      fieldMap.set(group.field_name, { ...group, rules: [...group.rules] });
+    }
+  }
+  const mergedFields = Array.from(fieldMap.values());
+  const allRules = mergedFields.flatMap(f => f.rules);
+  const crossFieldRules = [...(part1.cross_field_rules || []), ...(part2.cross_field_rules || [])];
+  const warnings = [...(part1.business_logic_warnings || []), ...(part2.business_logic_warnings || [])];
+  return {
+    analysis_summary: {
+      total_fields_analyzed: mergedFields.length,
+      total_rules_generated: allRules.length,
+      technical_rules_count: allRules.filter(r => r.rule_layer === "Technical").length,
+      logical_rules_count: allRules.filter(r => r.rule_layer === "Logical").length,
+      business_rules_count: allRules.filter(r => r.rule_layer === "Business").length,
+      cross_field_rules_count: crossFieldRules.length,
+      warnings_count: warnings.length,
+      fields_with_critical_rules: mergedFields.filter(f => f.rules.some(r => r.severity === "Critical")).length,
+      overall_complexity: allRules.length > 100 ? "High" : allRules.length > 50 ? "Medium" : "Low",
+    },
+    field_rules: mergedFields,
+    cross_field_rules: crossFieldRules,
+    business_logic_warnings: warnings,
+  };
+}
+
 const INSIGHTS_SYSTEM_PROMPT = `You are a senior data analyst. The user has uploaded a dataset and wants a comprehensive insights report. You will receive pre-computed column-level statistics and a sample of up to 10 rows.
 
 Your task is to analyze the profiled statistics and sample data, then return ONLY a JSON object (wrapped in triple-backtick json fences) with the following schema. Do NOT include any prose, explanation, or markdown outside the JSON code block.
@@ -1179,6 +1386,25 @@ export function registerChatRoutes(app: Express): void {
         }
       }
 
+      let dqFieldNames: string[] = [];
+      if (!insightsMode && !req.file && isDqRequest(originalUserMessage)) {
+        const { fieldNames: historyFields, fileInfo } = extractFieldNamesFromHistory(
+          chatMessages.slice(0, -1).map(m => ({ role: m.role, content: m.content }))
+        );
+        if (historyFields.length > 0) {
+          const lastMsg = chatMessages[chatMessages.length - 1];
+          if (lastMsg) {
+            lastMsg.content = `${originalUserMessage}\n\n[SYSTEM NOTE: ${fileInfo}. The following columns are available for DQ analysis: ${historyFields.join(", ")}]`;
+          }
+          dqFieldNames = historyFields;
+          if (extractedFieldNames.length === 0) extractedFieldNames = historyFields;
+          console.log(`[dq] Injected ${historyFields.length} field names from conversation history for DQ analysis`);
+        }
+      }
+
+      const dqSplitMode = !insightsMode && !imageContent && isDqRequest(originalUserMessage) &&
+        (req.file != null || extractedFieldNames.length > 0 || dqFieldNames.length > 0);
+
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
@@ -1194,43 +1420,95 @@ export function registerChatRoutes(app: Express): void {
         res.write(`data: ${JSON.stringify({ fieldNames: extractedFieldNames })}\n\n`);
       }
 
-      const systemPrompt = insightsMode ? INSIGHTS_SYSTEM_PROMPT : SYSTEM_PROMPT;
-
-      if (imageContent) {
-        const lastMsg = chatMessages[chatMessages.length - 1];
-        if (lastMsg && lastMsg.role === "user") {
-          (lastMsg as any).content = [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: imageContent.mediaType,
-                data: imageContent.base64,
-              },
-            },
-            {
-              type: "text",
-              text: originalUserMessage || "Please extract and analyze all data from this image. If it contains a table, extract the table data with headers and rows. Then apply data governance analysis as requested.",
-            },
-          ];
-        }
-      }
-
-      const stream = anthropic.messages.stream({
-        model: "claude-sonnet-4-6",
-        max_tokens: 16000,
-        system: systemPrompt,
-        messages: chatMessages,
-      });
-
       let fullResponse = "";
 
-      for await (const event of stream) {
-        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-          const content = event.delta.text;
-          if (content) {
-            fullResponse += content;
-            res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      if (dqSplitMode) {
+        console.log(`[dq] Split mode: running 2-part DQ analysis`);
+
+        const step1Chunk = "**Analyzing Technical & Logical DQ rules (Part 1/2)...**\n\n";
+        res.write(`data: ${JSON.stringify({ content: step1Chunk })}\n\n`);
+        fullResponse += step1Chunk;
+
+        const part1Resp = await anthropic.messages.create({
+          model: "claude-sonnet-4-6",
+          max_tokens: 16000,
+          system: DQ_DIMENSIONS_SYSTEM_PROMPT,
+          messages: chatMessages,
+        });
+        const part1Text = part1Resp.content[0]?.type === "text" ? (part1Resp.content[0] as any).text as string : "";
+        const part1Json = extractDqJson(part1Text);
+        console.log(`[dq] Part 1 done — ${part1Json ? part1Json.field_rules.length + " fields parsed" : "parse failed"}`);
+
+        const step2Chunk = "**Analyzing Business Logic rules (Part 2/2)...**\n\n";
+        res.write(`data: ${JSON.stringify({ content: step2Chunk })}\n\n`);
+        fullResponse += step2Chunk;
+
+        const part2Resp = await anthropic.messages.create({
+          model: "claude-sonnet-4-6",
+          max_tokens: 16000,
+          system: DQ_BUSINESS_LOGIC_SYSTEM_PROMPT,
+          messages: chatMessages,
+        });
+        const part2Text = part2Resp.content[0]?.type === "text" ? (part2Resp.content[0] as any).text as string : "";
+        const part2Json = extractDqJson(part2Text);
+        console.log(`[dq] Part 2 done — ${part2Json ? part2Json.field_rules.length + " fields, " + (part2Json.cross_field_rules?.length || 0) + " cross-field, " + (part2Json.business_logic_warnings?.length || 0) + " warnings" : "parse failed"}`);
+
+        let mergedContent: string;
+        if (part1Json && part2Json) {
+          const merged = mergeDqResults(part1Json, part2Json);
+          mergedContent = "```json\n" + JSON.stringify(merged, null, 2) + "\n```";
+          console.log(`[dq] Merged: ${merged.field_rules.length} fields, ${merged.analysis_summary.total_rules_generated} total rules`);
+        } else if (part1Json) {
+          mergedContent = "```json\n" + JSON.stringify(part1Json, null, 2) + "\n```";
+        } else if (part2Json) {
+          mergedContent = "```json\n" + JSON.stringify(part2Json, null, 2) + "\n```";
+        } else {
+          mergedContent = part1Text + "\n\n" + part2Text;
+        }
+
+        const chunkSize = 512;
+        for (let i = 0; i < mergedContent.length; i += chunkSize) {
+          const chunk = mergedContent.slice(i, i + chunkSize);
+          res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
+          fullResponse += chunk;
+        }
+      } else {
+        const systemPrompt = insightsMode ? INSIGHTS_SYSTEM_PROMPT : SYSTEM_PROMPT;
+
+        if (imageContent) {
+          const lastMsg = chatMessages[chatMessages.length - 1];
+          if (lastMsg && lastMsg.role === "user") {
+            (lastMsg as any).content = [
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: imageContent.mediaType,
+                  data: imageContent.base64,
+                },
+              },
+              {
+                type: "text",
+                text: originalUserMessage || "Please extract and analyze all data from this image. If it contains a table, extract the table data with headers and rows. Then apply data governance analysis as requested.",
+              },
+            ];
+          }
+        }
+
+        const stream = anthropic.messages.stream({
+          model: "claude-sonnet-4-6",
+          max_tokens: 16000,
+          system: systemPrompt,
+          messages: chatMessages,
+        });
+
+        for await (const event of stream) {
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            const content = event.delta.text;
+            if (content) {
+              fullResponse += content;
+              res.write(`data: ${JSON.stringify({ content })}\n\n`);
+            }
           }
         }
       }
