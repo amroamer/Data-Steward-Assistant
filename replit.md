@@ -99,6 +99,7 @@ Preferred communication style: Simple, everyday language.
 - **Markdown Rendering**: `react-markdown` for non-analysis responses only
 - **Table Utilities**: `client/src/lib/table-utils.ts` — parses markdown tables for data extraction
 - **Excel Export**: `xlsx` (SheetJS) library for client-side `.xlsx` file generation
+- **Insights Architecture**: Claude returns only `report_title`, `dataset_summary`, `key_insights[]`, `recommendations[]` (no column_profiles or data_quality_flags — those are computed server-side via `profileExcelData()` and sent to frontend via SSE `profiledColumns` event). Excel generation uses backend-profiled column stats for column_profiles and auto-derives quality flags.
 - **Font**: Open Sans (primary), Fira Code (mono)
 
 ### Backend (Express + Node.js)

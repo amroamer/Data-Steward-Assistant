@@ -57,13 +57,30 @@ export interface DataQualityFlag {
   suggested_fix: string;
 }
 
+export interface BackendColumnProfile {
+  column_name: string;
+  data_type: string;
+  null_count: number;
+  null_pct: number;
+  unique_values: number;
+  min?: number | string | null;
+  max?: number | string | null;
+  mean?: number | null;
+  median?: number | null;
+  std_dev?: number | null;
+  top_values?: { value: string; count: number }[] | null;
+  earliest?: string | null;
+  latest?: string | null;
+  date_range_days?: number | null;
+}
+
 export interface InsightsReport {
   report_title: string;
   dataset_summary: DatasetSummary;
   key_insights: KeyInsight[];
-  column_profiles: ColumnProfile[];
+  column_profiles?: ColumnProfile[];
   recommendations: Recommendation[];
-  data_quality_flags: DataQualityFlag[];
+  data_quality_flags?: DataQualityFlag[];
 }
 
 function tryParseInsights(text: string): InsightsReport | null {
@@ -75,10 +92,16 @@ function tryParseInsights(text: string): InsightsReport | null {
       parsed.dataset_summary &&
       typeof parsed.dataset_summary.total_rows === "number" &&
       typeof parsed.dataset_summary.total_columns === "number" &&
-      Array.isArray(parsed.key_insights) &&
-      Array.isArray(parsed.column_profiles)
+      Array.isArray(parsed.key_insights)
     ) {
-      return parsed as InsightsReport;
+      return {
+        report_title: parsed.report_title,
+        dataset_summary: parsed.dataset_summary,
+        key_insights: parsed.key_insights,
+        column_profiles: Array.isArray(parsed.column_profiles) ? parsed.column_profiles : [],
+        recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
+        data_quality_flags: Array.isArray(parsed.data_quality_flags) ? parsed.data_quality_flags : [],
+      };
     }
   } catch {}
   return null;
@@ -86,21 +109,39 @@ function tryParseInsights(text: string): InsightsReport | null {
 
 function repairAndParse(raw: string): InsightsReport | null {
   try {
-    let braceCount = 0;
     let inString = false;
     let escaped = false;
+    const stack: string[] = [];
     for (let i = 0; i < raw.length; i++) {
       const ch = raw[i];
       if (escaped) { escaped = false; continue; }
       if (ch === "\\") { escaped = true; continue; }
       if (ch === '"') { inString = !inString; continue; }
       if (!inString) {
-        if (ch === "{" || ch === "[") braceCount++;
-        if (ch === "}" || ch === "]") braceCount--;
+        if (ch === "{") stack.push("}");
+        else if (ch === "[") stack.push("]");
+        else if (ch === "}" || ch === "]") stack.pop();
       }
     }
+
     let repaired = raw;
-    while (braceCount > 0) { repaired += braceCount > 1 ? "]}" : "}"; braceCount--; }
+    if (inString) {
+      repaired += '"';
+    }
+
+    repaired = repaired.replace(/,\s*$/, "");
+
+    const lastSignificant = repaired.trimEnd();
+    if (lastSignificant.endsWith(":")) {
+      repaired = repaired.trimEnd() + " null";
+    } else if (lastSignificant.endsWith(",")) {
+      repaired = repaired.trimEnd().slice(0, -1);
+    }
+
+    while (stack.length > 0) {
+      repaired += stack.pop();
+    }
+
     const parsed = JSON.parse(repaired);
     if (parsed.report_title && parsed.dataset_summary) {
       return {
@@ -384,29 +425,32 @@ function buildKeyInsightsSheet(wb: XLSX.WorkBook, report: InsightsReport): void 
   XLSX.utils.book_append_sheet(wb, ws, "key_insights");
 }
 
-function buildColumnProfilesSheet(wb: XLSX.WorkBook, report: InsightsReport): void {
+function formatTopValues(tv: { value: string; count: number }[] | null | undefined): string {
+  if (!tv) return "";
+  return tv.map(v => `${v.value} (${v.count})`).join(", ");
+}
+
+function buildColumnProfilesSheet(wb: XLSX.WorkBook, backendColumns: BackendColumnProfile[]): void {
   const headers = [
     "Column Name", "Data Type", "Null Count", "Null %", "Unique Values",
     "Min", "Max", "Mean", "Median", "Std Dev", "Top Values",
-    "Anomaly Flag", "Anomaly Description",
   ];
   const data: string[][] = [headers];
 
-  for (const col of report.column_profiles) {
+  for (const col of backendColumns) {
+    const isHighNull = col.null_pct > 20;
     data.push([
       col.column_name,
       col.data_type || "",
       String(col.null_count ?? 0),
       `${(col.null_pct ?? 0).toFixed(1)}%`,
       String(col.unique_values ?? 0),
-      col.min ?? "",
-      col.max ?? "",
-      col.mean ?? "",
-      col.median ?? "",
-      col.std_dev ?? "",
-      typeof col.top_values === "string" ? col.top_values : (Array.isArray(col.top_values) ? col.top_values.map((v: any) => typeof v === "object" ? `${v.value || v} (${v.count || ""})` : String(v)).join(", ") : (col.top_values != null ? JSON.stringify(col.top_values) : "")),
-      col.anomaly_flag ? "YES" : "NO",
-      col.anomaly_description ?? col.anomaly_detail ?? "",
+      String(col.min ?? col.earliest ?? ""),
+      String(col.max ?? col.latest ?? ""),
+      col.mean != null ? String(col.mean) : "",
+      col.median != null ? String(col.median) : "",
+      col.std_dev != null ? String(col.std_dev) : "",
+      formatTopValues(col.top_values),
     ]);
   }
 
@@ -416,8 +460,8 @@ function buildColumnProfilesSheet(wb: XLSX.WorkBook, report: InsightsReport): vo
   applyHeaderStyles(ws, headers.length);
 
   for (let r = 1; r < data.length; r++) {
-    const colProfile = report.column_profiles[r - 1];
-    const isAnomaly = colProfile?.anomaly_flag;
+    const col = backendColumns[r - 1];
+    const isHighNull = col && col.null_pct > 20;
 
     for (let c = 0; c < headers.length; c++) {
       const addr = XLSX.utils.encode_cell({ r, c });
@@ -425,18 +469,10 @@ function buildColumnProfilesSheet(wb: XLSX.WorkBook, report: InsightsReport): vo
 
       const base = altRowStyle(r - 1);
 
-      if (isAnomaly) {
+      if (isHighNull) {
         ws[addr].s = { ...base, fill: { fgColor: { rgb: RED_BG.replace("#", "") } } };
       } else {
         ws[addr].s = base;
-      }
-
-      if (c === 11) {
-        const flagColor = colProfile?.anomaly_flag ? RED_TEXT : GREEN_TEXT;
-        ws[addr].s = {
-          ...(ws[addr].s || {}),
-          font: { bold: true, color: { rgb: flagColor } },
-        };
       }
     }
   }
@@ -485,10 +521,46 @@ function buildRecommendationsSheet(wb: XLSX.WorkBook, report: InsightsReport): v
   XLSX.utils.book_append_sheet(wb, ws, "recommendations");
 }
 
-function buildDataQualityFlagsSheet(wb: XLSX.WorkBook, report: InsightsReport): void {
+function deriveQualityFlags(backendColumns: BackendColumnProfile[]): DataQualityFlag[] {
+  const flags: DataQualityFlag[] = [];
+  let flagNo = 1;
+  for (const col of backendColumns) {
+    if (col.null_pct > 50) {
+      flags.push({ flag_no: flagNo++, column_name: col.column_name, issue: "Very high null rate", severity: "High", suggested_fix: "Investigate data source for missing values or consider removing column" });
+    } else if (col.null_pct > 20) {
+      flags.push({ flag_no: flagNo++, column_name: col.column_name, issue: "High null rate", severity: "Medium", suggested_fix: "Review data collection process and apply imputation if appropriate" });
+    }
+    if (col.data_type === "Number" && col.std_dev != null && col.mean != null && col.mean !== 0) {
+      const cv = Math.abs(col.std_dev / col.mean);
+      if (cv > 3) {
+        flags.push({ flag_no: flagNo++, column_name: col.column_name, issue: "Extreme variance — possible outliers", severity: "Medium", suggested_fix: "Review outlier values and consider applying caps or filters" });
+      }
+    }
+    if (col.unique_values === 1 && col.null_count === 0) {
+      flags.push({ flag_no: flagNo++, column_name: col.column_name, issue: "Single constant value — no variability", severity: "Low", suggested_fix: "Consider removing column if it provides no analytical value" });
+    }
+  }
+  return flags;
+}
+
+function buildDataQualityFlagsSheet(wb: XLSX.WorkBook, backendColumns: BackendColumnProfile[], reportFlags?: DataQualityFlag[]): void {
   const headers = ["#", "Column Name", "Issue", "Severity", "Details", "Suggested Fix"];
 
-  const sortedFlags = [...(report.data_quality_flags || [])].sort(
+  const derivedFlags = deriveQualityFlags(backendColumns);
+  const allFlags = [...(reportFlags || []), ...derivedFlags];
+
+  const seen = new Set<string>();
+  const deduped = allFlags.filter(f => {
+    const key = `${f.column_name}:${f.issue}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  let flagNo = 1;
+  deduped.forEach(f => { f.flag_no = flagNo++; });
+
+  const sortedFlags = deduped.sort(
     (a, b) => severityOrder(a.severity) - severityOrder(b.severity)
   );
 
@@ -528,14 +600,22 @@ function buildDataQualityFlagsSheet(wb: XLSX.WorkBook, report: InsightsReport): 
   XLSX.utils.book_append_sheet(wb, ws, "data_quality_flags");
 }
 
-export function generateInsightsExcel(report: InsightsReport, sourceFileName: string): string {
+export function generateInsightsExcel(report: InsightsReport, sourceFileName: string, backendColumns?: BackendColumnProfile[]): string {
   const wb = XLSX.utils.book_new();
 
   buildExecutiveSummarySheet(wb, report, sourceFileName);
   buildKeyInsightsSheet(wb, report);
-  buildColumnProfilesSheet(wb, report);
+
+  const cols = backendColumns && backendColumns.length > 0 ? backendColumns : [];
+  if (cols.length > 0) {
+    buildColumnProfilesSheet(wb, cols);
+  }
+
   buildRecommendationsSheet(wb, report);
-  buildDataQualityFlagsSheet(wb, report);
+
+  if (cols.length > 0) {
+    buildDataQualityFlagsSheet(wb, cols, report.data_quality_flags);
+  }
 
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -552,15 +632,10 @@ export function getInsightsScorecard(report: InsightsReport): { totalInsights: n
   const highImpact = report.key_insights.filter(
     (i) => i.business_impact?.toLowerCase() === "high" || i.business_impact?.toLowerCase() === "critical"
   ).length;
-  const anomalies = report.column_profiles.filter((c) => c.anomaly_flag).length;
+  const anomalies = (report.column_profiles || []).filter((c) => c.anomaly_flag).length;
   const completeness = report.dataset_summary.overall_completeness_pct != null
     ? Math.round(report.dataset_summary.overall_completeness_pct)
-    : (() => {
-        const totalCols = report.column_profiles.length;
-        if (totalCols === 0) return 100;
-        const avgNullPct = report.column_profiles.reduce((s, c) => s + (c.null_pct ?? 0), 0) / totalCols;
-        return Math.round(100 - avgNullPct);
-      })();
+    : 100;
   return { totalInsights, highImpact, anomalies, completeness };
 }
 
@@ -581,15 +656,10 @@ export function generateInsightsSummary(report: InsightsReport): string {
   const highImpact = report.key_insights.filter(
     (i) => i.business_impact?.toLowerCase() === "high" || i.business_impact?.toLowerCase() === "critical"
   ).length;
-  const anomalies = report.column_profiles.filter((c) => c.anomaly_flag).length;
+  const anomalies = (report.column_profiles || []).filter((c) => c.anomaly_flag).length;
   const completeness = report.dataset_summary.overall_completeness_pct != null
     ? Math.round(report.dataset_summary.overall_completeness_pct)
-    : (() => {
-        const totalCols = report.column_profiles.length;
-        if (totalCols === 0) return 100;
-        const avgNullPct = report.column_profiles.reduce((s, c) => s + (c.null_pct ?? 0), 0) / totalCols;
-        return Math.round(100 - avgNullPct);
-      })();
+    : 100;
 
   lines.push(`Total Insights: ${totalInsights} | High Impact: ${highImpact} | Anomalies: ${anomalies} | Completeness: ${completeness}%`);
   lines.push("");

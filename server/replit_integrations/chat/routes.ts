@@ -202,57 +202,31 @@ Your task is to analyze the profiled statistics and sample data, then return ONL
       "insight_no": 1,
       "category": "Distribution | Correlation | Anomaly | Trend | Quality | Pattern",
       "title": "Short insight title",
-      "description": "Detailed description of the insight",
+      "description": "1-2 sentence description of the insight",
       "affected_columns": ["col1", "col2"],
       "business_impact": "High | Medium | Low",
       "confidence": "High | Medium | Low"
-    }
-  ],
-  "column_profiles": [
-    {
-      "column_name": "...",
-      "data_type": "Numeric | Text | Date | Boolean | Mixed",
-      "null_count": 0,
-      "null_pct": 0.0,
-      "unique_values": 0,
-      "min": null,
-      "max": null,
-      "mean": null,
-      "median": null,
-      "std_dev": null,
-      "top_values": null,
-      "anomaly_flag": false,
-      "anomaly_detail": null
     }
   ],
   "recommendations": [
     {
       "recommendation_no": 1,
       "title": "Short recommendation title",
-      "description": "Detailed recommendation",
+      "description": "1-2 sentence recommendation",
       "priority": "High | Medium | Low",
       "effort": "High | Medium | Low",
       "affected_columns": ["col1"]
-    }
-  ],
-  "data_quality_flags": [
-    {
-      "flag_no": 1,
-      "column_name": "...",
-      "issue": "Description of the quality issue",
-      "severity": "Critical | High | Medium | Low",
-      "suggested_fix": "How to fix it"
     }
   ]
 }
 \`\`\`
 
 Rules:
-- Provide at least 5 key_insights if the data supports it, up to 15
-- Include a column_profiles entry for EVERY column
-- Provide at least 3 recommendations
-- Flag any data quality issues you detect (nulls > 20%, low cardinality, outlier patterns, type mismatches, etc.)
-- base your analysis on the profiled statistics provided, not assumptions
+- Provide at least 5 key_insights if the data supports it, up to 10
+- Provide at least 3 recommendations, up to 8
+- Keep each description concise (1-2 sentences max)
+- Do NOT include column_profiles or data_quality_flags — those are handled separately
+- Base your analysis on the profiled statistics provided, not assumptions
 - confidence should reflect how certain you are given the stats and sample size
 - Return ONLY the JSON block, no other text`;
 
@@ -536,6 +510,7 @@ export function registerChatRoutes(app: Express): void {
       let extractedFieldNames: string[] = [];
       let insightsMode = false;
       let profiledDataText = "";
+      let profiledColumns: ColumnProfile[] = [];
 
       const originalUserMessage = userContent;
 
@@ -549,6 +524,7 @@ export function registerChatRoutes(app: Express): void {
           const profiledData = profileExcelData(req.file.buffer, req.file.originalname);
           if (profiledData) {
             profiledDataText = formatProfiledDataForPrompt(profiledData, req.file.originalname);
+            profiledColumns = profiledData.columns;
           }
         }
       }
@@ -579,6 +555,9 @@ export function registerChatRoutes(app: Express): void {
 
       if (insightsMode) {
         res.write(`data: ${JSON.stringify({ insightsMode: true })}\n\n`);
+        if (profiledColumns.length > 0) {
+          res.write(`data: ${JSON.stringify({ profiledColumns })}\n\n`);
+        }
       }
 
       if (extractedFieldNames.length > 0) {

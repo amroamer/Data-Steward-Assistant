@@ -65,6 +65,7 @@ import {
 import DataModelDiagram from "@/components/DataModelDiagram";
 import {
   type InsightsReport,
+  type BackendColumnProfile,
   detectInsightsJSON,
   looksLikeInsightsJSON,
   generateInsightsExcel,
@@ -390,9 +391,11 @@ export default function ChatPage() {
   const [piiScans, setPiiScans] = useState<Record<number, PiiScanResult>>({});
   const [latestPiiScan, setLatestPiiScan] = useState<PiiScanResult | null>(null);
 
-  const [insightsReports, setInsightsReports] = useState<{ report: InsightsReport; fileName: string; timestamp: string; excelFileName: string }[]>([]);
+  const [insightsReports, setInsightsReports] = useState<{ report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[]>([]);
   const [insightsForMessage, setInsightsForMessage] = useState<Record<number, InsightsReport>>({});
   const [isInsightsMode, setIsInsightsMode] = useState(false);
+  const [profiledColumns, setProfiledColumns] = useState<BackendColumnProfile[]>([]);
+  const profiledColumnsRef = useRef<BackendColumnProfile[]>([]);
 
   const [collapsedThreads, setCollapsedThreads] = useState<Set<number>>(new Set());
 
@@ -489,6 +492,13 @@ export default function ChatPage() {
       }
       if (looksLikeInsightsJSON(msg.content)) {
         overrides[msg.id] = t.insightsReportGenerated;
+        const fallbackReport: InsightsReport = {
+          report_title: "Data Insights Report",
+          dataset_summary: { total_rows: 0, total_columns: 0 },
+          key_insights: [],
+          recommendations: [],
+        };
+        insightsMap[msg.id] = fallbackReport;
         continue;
       }
       const piiScan = detectPiiScanJSON(msg.content);
@@ -533,7 +543,7 @@ export default function ChatPage() {
         const pad = (n: number) => String(n).padStart(2, "0");
         const now = new Date();
         const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-        return { report, fileName: uploadedFileName || "data.xlsx", timestamp: ts, excelFileName: `insights_report_${ts}.xlsx` };
+        return { report, fileName: uploadedFileName || "data.xlsx", timestamp: ts, excelFileName: `insights_report_${ts}.xlsx`, columns: [] as BackendColumnProfile[] };
       });
       setInsightsReports(rehydrated);
     }
@@ -555,6 +565,8 @@ export default function ChatPage() {
     setInsightsReports([]);
     setInsightsForMessage({});
     setIsInsightsMode(false);
+    setProfiledColumns([]);
+    profiledColumnsRef.current = [];
   };
 
   const processAIResponse = (content: string, messageId?: number) => {
@@ -564,8 +576,9 @@ export default function ChatPage() {
       const pad = (n: number) => String(n).padStart(2, "0");
       const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
       const srcFile = uploadedFileName || "data.xlsx";
-      const excelFileName = generateInsightsExcel(insightsReport, srcFile);
-      setInsightsReports(prev => [...prev, { report: insightsReport, fileName: srcFile, timestamp: ts, excelFileName }]);
+      const cols = profiledColumnsRef.current;
+      const excelFileName = generateInsightsExcel(insightsReport, srcFile, cols);
+      setInsightsReports(prev => [...prev, { report: insightsReport, fileName: srcFile, timestamp: ts, excelFileName, columns: cols }]);
       if (messageId) {
         setInsightsForMessage(prev => ({ ...prev, [messageId]: insightsReport }));
       }
@@ -727,6 +740,10 @@ export default function ChatPage() {
                 if (data.insightsMode) {
                   setIsInsightsMode(true);
                 }
+                if (data.profiledColumns) {
+                  setProfiledColumns(data.profiledColumns);
+                  profiledColumnsRef.current = data.profiledColumns;
+                }
                 if (data.fieldNames) {
                   setSessionFieldNames(data.fieldNames);
                   if (file) setUploadedFileName(file.name);
@@ -756,8 +773,7 @@ export default function ChatPage() {
                       if (lastMsg?.role === "assistant") {
                         if (detectedInsights) {
                           setInsightsForMessage(prev => ({ ...prev, [lastMsg.id]: detectedInsights }));
-                          const summary = generateInsightsSummary(detectedInsights);
-                          setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: summary }));
+                          setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: t.insightsReportGenerated }));
                         } else if (detectedPii) {
                           setPiiScans(prev => ({ ...prev, [lastMsg.id]: detectedPii }));
                           const summary = generatePiiScanSummary(detectedPii);
@@ -1241,6 +1257,7 @@ export default function ChatPage() {
                                   dataModel={dataModels[thread.assistantMsg.id] || undefined}
                                   insightsReport={insightsForMessage[thread.assistantMsg.id] || undefined}
                                   allInsightsReports={insightsReports}
+                                  profiledColumns={profiledColumns}
                                   lang={lang}
                                   t={t}
                                 />
@@ -1403,6 +1420,7 @@ function MessageBubble({
   dataModel,
   insightsReport,
   allInsightsReports,
+  profiledColumns = [],
   lang = "en",
   t,
 }: {
@@ -1412,7 +1430,8 @@ function MessageBubble({
   onDownloadResult?: () => void;
   dataModel?: DataModelJSON | null;
   insightsReport?: InsightsReport | null;
-  allInsightsReports?: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string }[];
+  allInsightsReports?: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
+  profiledColumns?: BackendColumnProfile[];
   lang?: Lang;
   t?: Translation;
 }) {
@@ -1425,8 +1444,8 @@ function MessageBubble({
 
   const { displayText, fileName } = isUser ? stripExcelContent(message.content) : { displayText: message.content, fileName: null };
 
-  const handleDownloadInsights = (report: InsightsReport, srcFile?: string) => {
-    generateInsightsExcel(report, srcFile || "data.xlsx");
+  const handleDownloadInsights = (report: InsightsReport, srcFile?: string, cols?: BackendColumnProfile[]) => {
+    generateInsightsExcel(report, srcFile || "data.xlsx", cols || profiledColumns);
   };
 
   return (
@@ -1512,7 +1531,7 @@ function MessageBubble({
                             size="sm"
                             variant="ghost"
                             className="h-5 px-1.5 text-[9px]"
-                            onClick={() => handleDownloadInsights(rpt.report, rpt.fileName)}
+                            onClick={() => handleDownloadInsights(rpt.report, rpt.fileName, rpt.columns)}
                             data-testid={`button-download-prev-insights-${i}`}
                           >
                             <Download className="w-2.5 h-2.5" />
