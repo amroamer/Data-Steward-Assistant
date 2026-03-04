@@ -1,8 +1,8 @@
-# Data Owner Agent
+# ZATCA Data Owner Agent
 
 ## Overview
 
-This is an AI-powered data governance assistant called the **Data Owner Agent**. It helps data owners, data stewards, and data governance professionals with:
+This is an AI-powered data governance assistant called the **ZATCA Data Owner Agent**. It helps data owners, data stewards, and data governance professionals with:
 
 - **Data Classification** — Classify data fields per Saudi SDAIA NDMO standards (Top Secret, Secret, Confidential, Restricted, Public)
 - **Business Definitions** — Generate clear definitions for data fields/elements
@@ -17,7 +17,7 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 - All actual results (tables, field lists, definitions, classifications, rules) go exclusively into result.xlsx as properly formatted sheets
 - Chat bubbles never render markdown tables, long lists, or raw data output for analysis results
 - Non-analysis conversational responses render normally with markdown
-- A KPMG green (#00A3A1) "Download result.xlsx" button appears below each summary message
+- A ZATCA blue (#0094D3) "Download result.xlsx" button appears below each summary message
 - summaryOverrides state tracks which message IDs should show summaries vs full content
 - When switching conversations, existing messages are re-scanned to populate summaryOverrides
 - User messages strip Excel file content via `stripExcelContent()` — only the user's prompt text and a file attachment indicator are shown; raw parsed Excel data is never displayed in the UI
@@ -25,7 +25,7 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 
 ### Collapsible Thread Blocks
 - Messages are grouped into user+assistant pairs ("threads") via `groupMessagesIntoThreads()`
-- Each thread has a styled header bar with: KPMG dark blue (#00338D) left border, light grey background, chevron icon, 60-char message preview, timestamp, and analysis type badge
+- Each thread has a styled header bar with: ZATCA green (#067647) left border, light grey background, chevron icon, 60-char message preview, timestamp, and analysis type badge
 - Threads are expanded by default; clicking the header toggles collapse (conditional rendering)
 - `collapsedThreads` state (Set of indices) tracks collapsed threads
 - Global "Collapse All" / "Expand All" buttons appear in the header when there are 2+ threads
@@ -49,7 +49,7 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 - Data Quality rules support multi-row per field (multiple DQ dimensions/rules per field preserved)
 - Generates separate sheets per analysis type: business_definitions, data_classification, data_quality_rules
 - Non-DQ sheets (business_definitions, data_classification) are deduplicated by field_name in `generateResultExcel()` to prevent duplicate rows caused by DQ multi-row merging
-- Result banner appears above the input area when results exist, with KPMG green download button
+- Result banner appears above the input area when results exist, with ZATCA blue download button
 - Header bar also shows a compact download button when results exist
 - Analytical Data Model: when Claude returns a JSON block with fact_tables/dimension_tables/relationships, it's detected by `detectDataModelJSON()`, stored in `dataModel` state, and rendered as an interactive SVG diagram via `DataModelDiagram` component. Adds 3 sheets to result.xlsx: data_model_fields, data_model_relationships, data_model_ddl
 - PII & Sensitive Data Detection: when Claude returns a JSON block with scan_summary/columns, it's detected by `detectPiiScanJSON()`, stored in `piiScans` (per-message) and `latestPiiScan` state. Chat shows summary-only with risk badge (🔴/🟡/🟢). Adds `pii_scan` sheet to result.xlsx with columns: column_name, detected_data_type, is_pii, is_sensitive, pii_category, pdpl_relevance, risk_level, recommendation, suggested_control

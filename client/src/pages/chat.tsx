@@ -61,6 +61,7 @@ import {
   generatePiiScanSummary,
 } from "@/lib/result-store";
 import DataModelDiagram from "@/components/DataModelDiagram";
+import zatcaLogoPath from "@assets/zatca-logo.svg";
 import {
   Panel,
   PanelGroup,
@@ -73,45 +74,45 @@ const FEATURE_CARDS = [
     title: "Data Classification",
     description: "Classify data fields per Saudi SDAIA NDMO standards",
     prompt: "I'd like to classify some data fields according to the Saudi SDAIA NDMO data classification framework. Please help me understand the classification levels and what I need to provide.",
-    color: "text-blue-600 dark:text-blue-400",
-    bg: "bg-blue-50 dark:bg-blue-950/30",
-    iconBg: "bg-blue-100 dark:bg-blue-900/30",
+    color: "text-[#067647]",
+    bg: "bg-[#067647]/5",
+    iconBg: "bg-[#067647]/10",
   },
   {
     icon: BookOpen,
     title: "Business Definitions",
     description: "Generate comprehensive business definitions for data fields",
     prompt: "I need help generating business definitions for my data fields. Can you explain what a good business definition includes and guide me through the process?",
-    color: "text-emerald-600 dark:text-emerald-400",
-    bg: "bg-emerald-50 dark:bg-emerald-950/30",
-    iconBg: "bg-emerald-100 dark:bg-emerald-900/30",
+    color: "text-[#51BAB4]",
+    bg: "bg-[#51BAB4]/5",
+    iconBg: "bg-[#51BAB4]/10",
   },
   {
     icon: CheckCircle,
     title: "Data Quality Rules",
     description: "Suggest quality rules and dimensions for data elements",
     prompt: "I want to define data quality rules for my data elements. Can you help me understand the key data quality dimensions and what rules I should apply?",
-    color: "text-purple-600 dark:text-purple-400",
-    bg: "bg-purple-50 dark:bg-purple-950/30",
-    iconBg: "bg-purple-100 dark:bg-purple-900/30",
+    color: "text-[#774896]",
+    bg: "bg-[#774896]/5",
+    iconBg: "bg-[#774896]/10",
   },
   {
     icon: Database,
     title: "Analytical Data Model",
     description: "Design a star schema with fact & dimension tables",
     prompt: "I want to build an analytical data model (star schema) for my data. Please help me understand what I need to provide and how the model will be structured.",
-    color: "text-orange-600 dark:text-orange-400",
-    bg: "bg-orange-50 dark:bg-orange-950/30",
-    iconBg: "bg-orange-100 dark:bg-orange-900/30",
+    color: "text-[#0094D3]",
+    bg: "bg-[#0094D3]/5",
+    iconBg: "bg-[#0094D3]/10",
   },
   {
     icon: ScanEye,
     title: "PII Detection",
     description: "Scan data for personal & sensitive information per PDPL",
     prompt: "I want to scan my data for PII and sensitive information. Please help me understand what you can detect and how the privacy scan works.",
-    color: "text-red-600 dark:text-red-400",
-    bg: "bg-red-50 dark:bg-red-950/30",
-    iconBg: "bg-red-100 dark:bg-red-900/30",
+    color: "text-red-600",
+    bg: "bg-red-50",
+    iconBg: "bg-red-100",
   },
 ];
 
@@ -694,11 +695,9 @@ export default function ChatPage() {
               >
                 <div className="p-4 pb-3">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#00338D" }}>
-                      <Bot className="w-5 h-5 text-white" />
-                    </div>
+                    <img src={zatcaLogoPath} alt="ZATCA" className="h-7 flex-shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <h1 className="text-sm font-bold tracking-tight truncate">Data Owner Agent</h1>
+                      <h1 className="text-xs font-bold tracking-tight truncate">Data Owner Agent</h1>
                     </div>
                     <Button
                       size="icon"
@@ -874,7 +873,7 @@ export default function ChatPage() {
               )}
               <div className="flex-1 min-w-0">
                 <h2 className="text-sm font-semibold truncate">
-                  {activeConversation?.title || "Data Owner Agent"}
+                  {activeConversation?.title || "ZATCA Data Owner Agent"}
                 </h2>
               </div>
               {threads.length > 1 && (
@@ -906,7 +905,7 @@ export default function ChatPage() {
                   size="sm"
                   onClick={handleDownloadResult}
                   className="gap-1.5 text-[11px] flex-shrink-0 text-white font-medium h-8 px-3 rounded-md"
-                  style={{ backgroundColor: "#00A3A1" }}
+                  style={{ backgroundColor: "#0094D3" }}
                   data-testid="button-header-download-result"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -919,9 +918,7 @@ export default function ChatPage() {
               <div className="max-w-3xl mx-auto w-full px-4 py-6">
                 {!activeConversationId && messages.length === 0 && !isStreaming ? (
                   <div className="flex flex-col items-center justify-center min-h-[60vh]">
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={{ backgroundColor: "#00338D" }}>
-                      <Bot className="w-9 h-9 text-white" />
-                    </div>
+                    <img src={zatcaLogoPath} alt="ZATCA" className="h-12 mb-6" />
                     <h2 className="text-2xl font-bold mb-2 tracking-tight">Data Owner Agent</h2>
                     <p className="text-muted-foreground text-center mb-8 max-w-md text-sm leading-relaxed">
                       Your AI assistant for data governance. Upload Excel files to classify data, generate definitions, or define quality rules.
@@ -966,7 +963,7 @@ export default function ChatPage() {
                           <button
                             onClick={() => toggleThread(idx)}
                             className="w-full flex items-center gap-3 px-4 py-2.5 text-left bg-muted/40 hover:bg-muted/60 transition-colors"
-                            style={{ borderLeft: "3px solid #00338D" }}
+                            style={{ borderLeft: "3px solid #067647" }}
                             data-testid={`thread-header-${idx}`}
                           >
                             {isCollapsed ? (
@@ -1004,14 +1001,14 @@ export default function ChatPage() {
                       <div className="rounded-xl border border-border overflow-hidden bg-card/30" data-testid="thread-streaming">
                         <div
                           className="flex items-center gap-3 px-4 py-2.5 bg-muted/40"
-                          style={{ borderLeft: "3px solid #00338D" }}
+                          style={{ borderLeft: "3px solid #067647" }}
                         >
                           <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground flex-shrink-0" />
                           <span className="text-[12px] text-foreground font-medium truncate flex-1">Processing...</span>
                         </div>
                         <div className="px-4 py-4">
                           <div className="flex gap-3">
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#00338D" }}>
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#067647" }}>
                               <Bot className="w-4 h-4 text-white" />
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -1029,19 +1026,19 @@ export default function ChatPage() {
             </ScrollArea>
 
             {(resultRows.length > 0 || latestDataModel || latestPiiScan) && (
-              <div className="border-t border-border bg-emerald-50/50 dark:bg-emerald-950/20 px-4 py-2.5 flex-shrink-0" data-testid="result-banner">
+              <div className="border-t border-border bg-emerald-50/50 px-4 py-2.5 flex-shrink-0" data-testid="result-banner">
                 <div className="max-w-3xl mx-auto flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
-                    <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                    <p className="text-xs font-semibold text-emerald-800">
                       result.xlsx ready
                       {uploadedFileName && (
-                        <span className="font-normal text-emerald-600 dark:text-emerald-400"> — {uploadedFileName}</span>
+                        <span className="font-normal text-emerald-600"> — {uploadedFileName}</span>
                       )}
                     </p>
-                    <p className="text-[10px] text-emerald-600/80 dark:text-emerald-400/60 truncate">
+                    <p className="text-[10px] text-emerald-600/80 truncate">
                       {getIncludedAnalysisLabels(includedAnalyses)}{resultRows.length > 0 ? ` (${resultRows.length} fields)` : ""}{latestDataModel ? ` + Data Model: ${latestDataModel.model_name}` : ""}{latestPiiScan ? ` + PII Scan (${latestPiiScan.scan_summary.pii_columns_found} PII columns)` : ""}
                     </p>
                   </div>
@@ -1049,7 +1046,7 @@ export default function ChatPage() {
                     size="sm"
                     onClick={handleDownloadResult}
                     className="gap-1.5 text-[11px] flex-shrink-0 text-white font-medium h-8 px-3 rounded-md"
-                    style={{ backgroundColor: "#00A3A1" }}
+                    style={{ backgroundColor: "#0094D3" }}
                     data-testid="button-download-result"
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -1062,9 +1059,9 @@ export default function ChatPage() {
             <div className="border-t border-border bg-background p-4 flex-shrink-0">
               <div className="max-w-3xl mx-auto">
                 {selectedFile && (
-                  <div className="flex items-center gap-2 mb-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg px-3 py-2 border border-emerald-200 dark:border-emerald-800/40">
-                    <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                    <span className="text-sm truncate flex-1 text-emerald-800 dark:text-emerald-300 font-medium">{selectedFile.name}</span>
+                  <div className="flex items-center gap-2 mb-3 bg-emerald-50 rounded-lg px-3 py-2 border border-emerald-200">
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span className="text-sm truncate flex-1 text-emerald-800 font-medium">{selectedFile.name}</span>
                     <Button
                       size="icon"
                       variant="ghost"
@@ -1170,7 +1167,7 @@ function MessageBubble({
         className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
           isUser ? "bg-secondary" : ""
         }`}
-        style={!isUser ? { backgroundColor: "#00338D" } : undefined}
+        style={!isUser ? { backgroundColor: "#067647" } : undefined}
       >
         {isUser ? (
           <User className="w-4 h-4 text-secondary-foreground" />
@@ -1215,7 +1212,7 @@ function MessageBubble({
               ) : shouldShowSummary ? (
                 <div className="whitespace-pre-wrap break-words leading-relaxed">{summaryOverride}</div>
               ) : (
-                <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+                <div className="prose prose-sm max-w-none break-words">
                   <ReactMarkdown>{message.content}</ReactMarkdown>
                   {isStreaming && (
                     <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />
@@ -1229,7 +1226,7 @@ function MessageBubble({
                   size="sm"
                   onClick={onDownloadResult}
                   className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md"
-                  style={{ backgroundColor: "#00A3A1" }}
+                  style={{ backgroundColor: "#0094D3" }}
                   data-testid={`button-download-result-${message.id}`}
                 >
                   <Download className="w-3.5 h-3.5" />

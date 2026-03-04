@@ -11,7 +11,7 @@ const anthropic = new Anthropic({
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-const SYSTEM_PROMPT = `You are the "Data Owner Agent", an expert AI assistant specialized in data governance, data management, and data strategy. You help data owners, data stewards, and data governance professionals with their daily tasks.
+const SYSTEM_PROMPT = `You are the "ZATCA Data Owner Agent", an expert AI assistant specialized in data governance, data management, and data strategy for ZATCA (Zakat, Tax and Customs Authority). You help data owners, data stewards, and data governance professionals with their daily tasks.
 
 You have deep expertise in:
 

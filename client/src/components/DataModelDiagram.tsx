@@ -42,8 +42,8 @@ interface TablePosition {
   y: number;
 }
 
-const FACT_COLOR = "#00338D";
-const DIM_COLOR = "#005EB8";
+const FACT_COLOR = "#067647";
+const DIM_COLOR = "#51BAB4";
 const TABLE_WIDTH = 220;
 const HEADER_HEIGHT = 36;
 const FIELD_HEIGHT = 24;
@@ -548,7 +548,7 @@ const DataModelDiagram = forwardRef<DataModelDiagramHandle, DataModelDiagramProp
               size="sm"
               onClick={onDownloadExcel}
               className="gap-1.5 text-[11px] text-white font-medium"
-              style={{ backgroundColor: "#00A3A1" }}
+              style={{ backgroundColor: "#0094D3" }}
               data-testid="button-download-excel-model"
             >
               <Download className="w-3.5 h-3.5" />
