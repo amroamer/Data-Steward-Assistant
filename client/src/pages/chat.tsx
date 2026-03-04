@@ -429,12 +429,13 @@ const STATUS_COLORS: Record<AgentStatus, { bg: string; text: string; pulse: bool
 function detectAnalysisTag(userContent: string, assistantContent?: string, t?: Translation): string | null {
   const tr = t || translations.en;
   const combined = `${userContent} ${assistantContent || ""}`.toLowerCase();
+  const userOnly = userContent.toLowerCase();
   if (combined.includes("report_title") && combined.includes("key_insights")) return tr.tagInsights;
   if (combined.includes("insights report") || combined.includes("give me insights") || combined.includes("analyze this data") || combined.includes("explore this dataset") || combined.includes("key findings")) return tr.tagInsights;
-  if (combined.includes("pii") || combined.includes("personal data") || combined.includes("sensitive data") || combined.includes("privacy scan") || combined.includes("pdpl") || combined.includes("scan_summary")) return tr.tagPiiScan;
+  if (combined.includes("classification") || combined.includes("classify")) return tr.tagDataClassification;
+  if (combined.includes("scan_summary") || userOnly.includes("pii") || userOnly.includes("pdpl") || userOnly.includes("privacy scan") || userOnly.includes("personal data") || userOnly.includes("sensitive data")) return tr.tagPiiScan;
   if (combined.includes("data model") || combined.includes("star schema") || combined.includes("dimensional model") || combined.includes("analytical model") || combined.includes("fact_tables")) return tr.tagDataModel;
   if (combined.includes("business definition") || combined.includes("business def")) return tr.tagBusinessDefs;
-  if (combined.includes("classification") || combined.includes("classify")) return tr.tagDataClassification;
   if (combined.includes("quality") || combined.includes("dq rule")) return tr.tagDataQuality;
   return null;
 }
