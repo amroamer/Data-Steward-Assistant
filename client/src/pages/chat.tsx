@@ -193,6 +193,7 @@ const translations = {
     agentExecuting: "Executing",
     agentDone: "Done",
     agentWorking: "Agent Working...",
+    agentCompleted: "Agent Completed Task",
     stepReadingFile: "Reading uploaded file",
     stepProfilingData: "Profiling data structure",
     stepGenerating: "Generating analysis",
@@ -299,6 +300,7 @@ const translations = {
     agentExecuting: "ينفذ",
     agentDone: "تم",
     agentWorking: "الوكيل يعمل...",
+    agentCompleted: "أكمل الوكيل المهمة",
     stepReadingFile: "قراءة الملف المحمل",
     stepProfilingData: "تحليل هيكل البيانات",
     stepGenerating: "إنشاء التحليل",
@@ -1665,7 +1667,7 @@ export default function ChatPage() {
                   })}
                   {thinkingSteps.length > 0 && (
                     <>
-                      <ThinkingProgressCard steps={thinkingSteps} t={t} isRtl={isRtl} />
+                      <ThinkingProgressCard steps={thinkingSteps} t={t} isRtl={isRtl} isDone={agentStatus === "done"} />
                       {streamingContent && (
                         <div
                           className="rounded-xl bg-white shadow-sm p-4 animate-slide-up"
@@ -2190,12 +2192,16 @@ function AgentResponseCard({
   );
 }
 
-function ThinkingProgressCard({ steps, t, isRtl }: { steps: ThinkingStep[]; t: Translation; isRtl: boolean }) {
+function ThinkingProgressCard({ steps, t, isRtl, isDone }: { steps: ThinkingStep[]; t: Translation; isRtl: boolean; isDone?: boolean }) {
   return (
-    <div className="rounded-xl bg-white shadow-sm p-4 animate-slide-up" style={{ borderLeft: isRtl ? "none" : "3px solid #E65100", borderRight: isRtl ? "3px solid #E65100" : "none" }} data-testid="thinking-progress">
+    <div className="rounded-xl bg-white shadow-sm p-4 animate-slide-up" style={{ borderLeft: isRtl ? "none" : `3px solid ${isDone ? "#2E7D32" : "#E65100"}`, borderRight: isRtl ? `3px solid ${isDone ? "#2E7D32" : "#E65100"}` : "none" }} data-testid="thinking-progress">
       <div className="flex items-center gap-2 mb-3">
-        <Loader2 className="w-4 h-4 animate-spin" style={{ color: "#E65100" }} />
-        <span className="text-sm font-semibold" style={{ color: "#1A1A2E" }}>{t.agentWorking}</span>
+        {isDone ? (
+          <CheckCircle2 className="w-4 h-4" style={{ color: "#2E7D32" }} />
+        ) : (
+          <Loader2 className="w-4 h-4 animate-spin" style={{ color: "#E65100" }} />
+        )}
+        <span className="text-sm font-semibold" style={{ color: "#1A1A2E" }}>{isDone ? t.agentCompleted : t.agentWorking}</span>
       </div>
       <div className="border-t" style={{ borderColor: "#E5E7EB" }} />
       <div className="mt-3 space-y-2">
