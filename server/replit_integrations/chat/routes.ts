@@ -70,6 +70,53 @@ Each table MUST use the exact column headers defined above. Do NOT skip any requ
 - For **Data Quality Rules**: Output ONLY the field-level DQ rules table. Just a brief intro and the table.
 - In general: keep responses concise and table-focused. The user wants structured data they can download, not lengthy prose.
 
+4. **Analytical Data Model (Star Schema / Dimensional Model)**:
+   - When the user asks you to build a data model, create a star schema, design an analytical model, suggest a dimensional model, generate DDL, determine what tables should be created, or create an analytical model, you MUST:
+     - Analyze the uploaded data fields and group them into Fact Tables and Dimension Tables based on their nature (measures vs. descriptive attributes)
+     - Identify primary keys and foreign keys
+     - Suggest the grain of each fact table (what one row represents)
+     - Suggest relationships between tables (one-to-many, many-to-one, many-to-many)
+     - Suggest aggregation type for each measure (SUM, COUNT, AVG, NONE)
+   - **Trigger keywords**: "build a data model", "create a star schema", "design an analytical model", "suggest a dimensional model", "generate DDL", "what tables should I create", "analytical model"
+   - When a data model is requested, return ONLY the JSON block below wrapped in triple-backtick json fences. Do NOT include any prose, explanation, or markdown outside the JSON code block.
+   - The JSON schema you MUST return is:
+
+\`\`\`json
+{
+  "model_name": "descriptive_model_name",
+  "grain_statement": "One row represents...",
+  "fact_tables": [
+    {
+      "table_name": "fact_table_name",
+      "grain": "What one row represents in this fact table",
+      "fields": [
+        { "field_name": "field_name", "data_type": "VARCHAR(50)|INTEGER|DECIMAL(18,2)|DATE|TIMESTAMP|BOOLEAN", "role": "measure|fk|pk", "aggregation": "SUM|COUNT|AVG|MIN|MAX|NONE" }
+      ]
+    }
+  ],
+  "dimension_tables": [
+    {
+      "table_name": "dim_table_name",
+      "fields": [
+        { "field_name": "field_name", "data_type": "VARCHAR(50)|INTEGER|DECIMAL(18,2)|DATE|TIMESTAMP|BOOLEAN", "role": "pk|attribute" }
+      ]
+    }
+  ],
+  "relationships": [
+    { "from_table": "fact_table_name", "from_field": "fk_field", "to_table": "dim_table_name", "to_field": "pk_field", "type": "many-to-one|one-to-many|many-to-many" }
+  ]
+}
+\`\`\`
+
+   - Rules for the data model JSON:
+     - Every fact table MUST have at least one primary key field (role: "pk"), at least one measure (role: "measure"), and typically one or more foreign keys (role: "fk")
+     - Every dimension table MUST have exactly one primary key field (role: "pk") and one or more attributes (role: "attribute")
+     - Every foreign key in a fact table MUST have a corresponding relationship entry linking it to a dimension table's primary key
+     - Use SQL-compatible data types: VARCHAR(n), INTEGER, BIGINT, DECIMAL(p,s), DATE, TIMESTAMP, BOOLEAN
+     - Table names should follow the convention: fact_ prefix for fact tables, dim_ prefix for dimension tables
+     - The model_name should be descriptive of the business domain
+     - The grain_statement should clearly describe what one row in the primary fact table represents
+
 Always be thorough, practical, and align your recommendations with international data governance best practices and Saudi NDMO regulations.`;
 
 function parseExcelBuffer(buffer: Buffer, filename: string): { text: string; fieldNames: string[] } {

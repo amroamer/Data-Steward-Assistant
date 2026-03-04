@@ -1,5 +1,8 @@
 import * as XLSX from "xlsx";
 import { extractTablesFromMarkdown, type ParsedTable } from "./table-utils";
+import type { DataModelJSON } from "@/components/DataModelDiagram";
+
+export type { DataModelJSON };
 
 export type AnalysisType = "business_definitions" | "data_classification" | "data_quality";
 
@@ -309,7 +312,7 @@ export function mergeDqResults(
   return [...nonDqRows, ...dqRows];
 }
 
-export function generateResultExcel(rows: ResultRow[], includedAnalyses: AnalysisType[]): void {
+export function generateResultExcel(rows: ResultRow[], includedAnalyses: AnalysisType[], dataModel?: DataModelJSON): void {
   const orderedAnalyses = ANALYSIS_ORDER.filter((a) => includedAnalyses.includes(a));
 
   const wb = XLSX.utils.book_new();
@@ -364,7 +367,7 @@ export function generateResultExcel(rows: ResultRow[], includedAnalyses: Analysi
     XLSX.utils.book_append_sheet(wb, ws, ANALYSIS_SHEET_NAMES[analysis]);
   }
 
-  if (wb.SheetNames.length === 0) {
+  if (wb.SheetNames.length === 0 && (!dataModel)) {
     const headers = ["Field Name"];
     const keys = ["field_name"];
     for (const analysis of orderedAnalyses) {
@@ -377,7 +380,116 @@ export function generateResultExcel(rows: ResultRow[], includedAnalyses: Analysi
     XLSX.utils.book_append_sheet(wb, ws, "Analysis Results");
   }
 
+  if (dataModel) {
+    appendDataModelSheets(wb, dataModel);
+  }
+
   XLSX.writeFile(wb, "result.xlsx");
+}
+
+function autoWidthSheet(ws: XLSX.WorkSheet, data: string[][]): void {
+  const colWidths = data[0].map((_h, i) => {
+    let max = 0;
+    for (const row of data) {
+      const len = (row[i] || "").length;
+      if (len > max) max = len;
+    }
+    return { wch: Math.min(Math.max(max + 2, 12), 60) };
+  });
+  ws["!cols"] = colWidths;
+}
+
+function generateTableDDL(tableName: string, fields: { field_name: string; data_type: string; role: string; aggregation?: string }[], relationships: DataModelJSON["relationships"]): string {
+  const lines: string[] = [];
+  lines.push(`CREATE TABLE ${tableName} (`);
+  const fieldLines: string[] = [];
+  const pks = fields.filter(f => f.role === "pk");
+
+  for (const field of fields) {
+    let sqlType = field.data_type.toUpperCase();
+    if (!sqlType.includes("(") && sqlType === "VARCHAR") sqlType = "VARCHAR(255)";
+    let comment = "";
+    if (field.role === "pk") comment = "-- Primary Key";
+    else if (field.role === "fk") comment = "-- Foreign Key";
+    else if (field.role === "measure" && field.aggregation) comment = `-- Measure (${field.aggregation})`;
+    const notNull = field.role === "pk" ? " NOT NULL" : "";
+    fieldLines.push(`  ${field.field_name.padEnd(25)} ${(sqlType + notNull).padEnd(20)}${comment ? "  " + comment : ""}`);
+  }
+
+  if (pks.length > 0) {
+    fieldLines.push(`  CONSTRAINT pk_${tableName} PRIMARY KEY (${pks.map(f => f.field_name).join(", ")})`);
+  }
+
+  const rels = relationships.filter(r => r.from_table === tableName);
+  for (const rel of rels) {
+    fieldLines.push(`  CONSTRAINT fk_${tableName}_${rel.from_field} FOREIGN KEY (${rel.from_field}) REFERENCES ${rel.to_table}(${rel.to_field})`);
+  }
+
+  lines.push(fieldLines.join(",\n"));
+  lines.push(");");
+  return lines.join("\n");
+}
+
+function appendDataModelSheets(wb: XLSX.WorkBook, model: DataModelJSON): void {
+  const fieldsHeaders = ["Table Name", "Field Name", "Table Type", "Role", "Data Type", "Aggregation", "Is PK", "Is FK"];
+  const fieldsData: string[][] = [fieldsHeaders];
+
+  for (const ft of model.fact_tables) {
+    for (const field of ft.fields) {
+      fieldsData.push([
+        ft.table_name,
+        field.field_name,
+        "fact",
+        field.role,
+        field.data_type,
+        field.aggregation || "",
+        field.role === "pk" ? "Yes" : "No",
+        field.role === "fk" ? "Yes" : "No",
+      ]);
+    }
+  }
+  for (const dt of model.dimension_tables) {
+    for (const field of dt.fields) {
+      fieldsData.push([
+        dt.table_name,
+        field.field_name,
+        "dimension",
+        field.role,
+        field.data_type,
+        "",
+        field.role === "pk" ? "Yes" : "No",
+        "No",
+      ]);
+    }
+  }
+
+  const fieldsWs = XLSX.utils.aoa_to_sheet(fieldsData);
+  autoWidthSheet(fieldsWs, fieldsData);
+  XLSX.utils.book_append_sheet(wb, fieldsWs, "data_model_fields");
+
+  const relHeaders = ["From Table", "From Field", "To Table", "To Field", "Relationship Type"];
+  const relData: string[][] = [relHeaders];
+  for (const rel of model.relationships) {
+    relData.push([rel.from_table, rel.from_field, rel.to_table, rel.to_field, rel.type]);
+  }
+
+  const relWs = XLSX.utils.aoa_to_sheet(relData);
+  autoWidthSheet(relWs, relData);
+  XLSX.utils.book_append_sheet(wb, relWs, "data_model_relationships");
+
+  const ddlHeaders = ["Table Name", "DDL Script"];
+  const ddlData: string[][] = [ddlHeaders];
+
+  for (const dt of model.dimension_tables) {
+    ddlData.push([dt.table_name, generateTableDDL(dt.table_name, dt.fields, model.relationships)]);
+  }
+  for (const ft of model.fact_tables) {
+    ddlData.push([ft.table_name, generateTableDDL(ft.table_name, ft.fields, model.relationships)]);
+  }
+
+  const ddlWs = XLSX.utils.aoa_to_sheet(ddlData);
+  autoWidthSheet(ddlWs, ddlData);
+  XLSX.utils.book_append_sheet(wb, ddlWs, "data_model_ddl");
 }
 
 export function generateAnalysisSummary(

@@ -37,12 +37,14 @@ import {
   Minimize2,
   Maximize2,
   Paperclip,
+  Database,
 } from "lucide-react";
 import type { Conversation, Message } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
 import {
   type AnalysisType,
   type ResultRow,
+  type DataModelJSON,
   detectAndExtractAllAnalyses,
   mergeResults,
   mergeDqResults,
@@ -51,6 +53,7 @@ import {
   getIncludedAnalysisLabels,
   getAnalysisLabel,
 } from "@/lib/result-store";
+import DataModelDiagram from "@/components/DataModelDiagram";
 
 const FEATURE_CARDS = [
   {
@@ -80,6 +83,15 @@ const FEATURE_CARDS = [
     bg: "bg-purple-50 dark:bg-purple-950/30",
     iconBg: "bg-purple-100 dark:bg-purple-900/30",
   },
+  {
+    icon: Database,
+    title: "Analytical Data Model",
+    description: "Design a star schema with fact & dimension tables",
+    prompt: "I want to build an analytical data model (star schema) for my data. Please help me understand what I need to provide and how the model will be structured.",
+    color: "text-orange-600 dark:text-orange-400",
+    bg: "bg-orange-50 dark:bg-orange-950/30",
+    iconBg: "bg-orange-100 dark:bg-orange-900/30",
+  },
 ];
 
 interface ThreadPair {
@@ -89,9 +101,23 @@ interface ThreadPair {
 
 function detectAnalysisTag(userContent: string, assistantContent?: string): string | null {
   const combined = `${userContent} ${assistantContent || ""}`.toLowerCase();
+  if (combined.includes("data model") || combined.includes("star schema") || combined.includes("dimensional model") || combined.includes("analytical model") || combined.includes("fact_tables")) return "Data Model";
   if (combined.includes("business definition") || combined.includes("business def")) return "Business Definitions";
   if (combined.includes("classification") || combined.includes("classify")) return "Data Classification";
   if (combined.includes("quality") || combined.includes("dq rule")) return "Data Quality Rules";
+  return null;
+}
+
+function detectDataModelJSON(content: string): DataModelJSON | null {
+  const fencedMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const candidate = fencedMatch ? fencedMatch[1].trim() : null;
+  if (!candidate) return null;
+  try {
+    const parsed = JSON.parse(candidate);
+    if (parsed && Array.isArray(parsed.fact_tables) && Array.isArray(parsed.dimension_tables) && Array.isArray(parsed.relationships)) {
+      return parsed as DataModelJSON;
+    }
+  } catch {}
   return null;
 }
 
@@ -155,6 +181,8 @@ export default function ChatPage() {
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [summaryOverrides, setSummaryOverrides] = useState<Record<number, string>>({});
+  const [dataModels, setDataModels] = useState<Record<number, DataModelJSON>>({});
+  const [latestDataModel, setLatestDataModel] = useState<DataModelJSON | null>(null);
 
   const [collapsedThreads, setCollapsedThreads] = useState<Set<number>>(new Set());
 
@@ -236,8 +264,21 @@ export default function ChatPage() {
   useEffect(() => {
     if (!activeConversation?.messages) return;
     const overrides: Record<number, string> = {};
+    const modelMap: Record<number, DataModelJSON> = {};
+    let lastModel: DataModelJSON | null = null;
     for (const msg of activeConversation.messages) {
       if (msg.role !== "assistant") continue;
+      const model = detectDataModelJSON(msg.content);
+      if (model) {
+        modelMap[msg.id] = model;
+        lastModel = model;
+        const factCount = model.fact_tables.length;
+        const dimCount = model.dimension_tables.length;
+        const relCount = model.relationships.length;
+        const totalFields = [...model.fact_tables, ...model.dimension_tables].reduce((acc, t) => acc + t.fields.length, 0);
+        overrides[msg.id] = `✅ Analytical data model "${model.model_name}" generated — ${factCount} fact table${factCount !== 1 ? "s" : ""}, ${dimCount} dimension table${dimCount !== 1 ? "s" : ""}, ${relCount} relationship${relCount !== 1 ? "s" : ""}, ${totalFields} total fields.\n\nSheets added to result.xlsx: data_model_fields, data_model_relationships, data_model_ddl`;
+        continue;
+      }
       const results = detectAndExtractAllAnalyses(msg.content);
       if (results.length === 0) continue;
       const totalFields = new Set(
@@ -247,6 +288,10 @@ export default function ChatPage() {
         ])
       ).size;
       overrides[msg.id] = generateAnalysisSummary(results, totalFields);
+    }
+    if (Object.keys(modelMap).length > 0) {
+      setDataModels(prev => ({ ...prev, ...modelMap }));
+      setLatestDataModel(lastModel);
     }
     if (Object.keys(overrides).length > 0) {
       setSummaryOverrides(prev => ({ ...prev, ...overrides }));
@@ -259,9 +304,36 @@ export default function ChatPage() {
     setSessionFieldNames(null);
     setUploadedFileName(null);
     setSummaryOverrides({});
+    setDataModels({});
+    setLatestDataModel(null);
   };
 
   const processAIResponse = (content: string, messageId?: number) => {
+    const model = detectDataModelJSON(content);
+    if (model) {
+      setLatestDataModel(model);
+      if (messageId) {
+        setDataModels(prev => ({ ...prev, [messageId]: model }));
+      }
+      const factCount = model.fact_tables.length;
+      const dimCount = model.dimension_tables.length;
+      const relCount = model.relationships.length;
+      const totalFields = [...model.fact_tables, ...model.dimension_tables].reduce((acc, t) => acc + t.fields.length, 0);
+      const summary = `✅ Analytical data model "${model.model_name}" generated — ${factCount} fact table${factCount !== 1 ? "s" : ""}, ${dimCount} dimension table${dimCount !== 1 ? "s" : ""}, ${relCount} relationship${relCount !== 1 ? "s" : ""}, ${totalFields} total fields.\n\nSheets added to result.xlsx: data_model_fields, data_model_relationships, data_model_ddl`;
+      if (messageId) {
+        setSummaryOverrides(prev => ({ ...prev, [messageId]: summary }));
+      }
+      setIncludedAnalyses(prev => {
+        if (!prev.includes("data_quality" as any)) return prev;
+        return prev;
+      });
+      toast({
+        title: "result.xlsx updated",
+        description: `Data model "${model.model_name}" added with DDL scripts`,
+      });
+      return;
+    }
+
     const analysisResults = detectAndExtractAllAnalyses(content);
     if (analysisResults.length === 0) return;
 
@@ -377,8 +449,9 @@ export default function ChatPage() {
                   setIsStreaming(false);
                   setStreamingContent("");
 
+                  const detectedModel = detectDataModelJSON(accumulated);
                   const analysisResults = detectAndExtractAllAnalyses(accumulated);
-                  if (analysisResults.length > 0) {
+                  if (detectedModel || analysisResults.length > 0) {
                     processAIResponse(accumulated);
 
                     await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
@@ -388,14 +461,18 @@ export default function ChatPage() {
                     if (convData?.messages) {
                       const lastMsg = convData.messages[convData.messages.length - 1];
                       if (lastMsg?.role === "assistant") {
-                        const totalFields = new Set(
-                          analysisResults.flatMap((r: any) => [
-                            ...Object.keys(r.fieldData),
-                            ...(r.dqMultiRows?.map((dr: any) => dr.fieldName) || [])
-                          ])
-                        ).size;
-                        const summary = generateAnalysisSummary(analysisResults, totalFields);
-                        setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: summary }));
+                        if (detectedModel) {
+                          setDataModels(prev => ({ ...prev, [lastMsg.id]: detectedModel }));
+                        } else {
+                          const totalFields = new Set(
+                            analysisResults.flatMap((r: any) => [
+                              ...Object.keys(r.fieldData),
+                              ...(r.dqMultiRows?.map((dr: any) => dr.fieldName) || [])
+                            ])
+                          ).size;
+                          const summary = generateAnalysisSummary(analysisResults, totalFields);
+                          setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: summary }));
+                        }
                       }
                     }
                   } else {
@@ -446,7 +523,7 @@ export default function ChatPage() {
       return;
     }
 
-    if (sessionFieldNames && sessionFieldNames.length > 0 && resultRows.length > 0) {
+    if (sessionFieldNames && sessionFieldNames.length > 0 && (resultRows.length > 0 || latestDataModel)) {
       setPendingFile(file);
       setShowResetDialog(true);
     } else {
@@ -481,8 +558,8 @@ export default function ChatPage() {
   };
 
   const handleDownloadResult = () => {
-    if (resultRows.length > 0) {
-      generateResultExcel(resultRows, includedAnalyses);
+    if (resultRows.length > 0 || latestDataModel) {
+      generateResultExcel(resultRows, includedAnalyses, latestDataModel || undefined);
     }
   };
 
@@ -733,7 +810,7 @@ export default function ChatPage() {
               </Button>
             </div>
           )}
-          {resultRows.length > 0 && (
+          {(resultRows.length > 0 || latestDataModel) && (
             <Button
               size="sm"
               onClick={handleDownloadResult}
@@ -759,7 +836,7 @@ export default function ChatPage() {
                 <p className="text-muted-foreground text-center mb-8 max-w-md text-sm leading-relaxed">
                   Your AI assistant for data governance. Upload Excel files to classify data, generate definitions, or define quality rules.
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-2xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full max-w-3xl">
                   {FEATURE_CARDS.map((card) => (
                     <button
                       key={card.title}
@@ -824,7 +901,8 @@ export default function ChatPage() {
                             <MessageBubble
                               message={thread.assistantMsg}
                               summaryOverride={summaryOverrides[thread.assistantMsg.id]}
-                              onDownloadResult={resultRows.length > 0 ? handleDownloadResult : undefined}
+                              onDownloadResult={(resultRows.length > 0 || latestDataModel) ? handleDownloadResult : undefined}
+                              dataModel={dataModels[thread.assistantMsg.id] || undefined}
                             />
                           )}
                         </div>
@@ -861,7 +939,7 @@ export default function ChatPage() {
         </ScrollArea>
 
         {/* Result Banner */}
-        {resultRows.length > 0 && (
+        {(resultRows.length > 0 || latestDataModel) && (
           <div className="border-t border-border bg-emerald-50/50 dark:bg-emerald-950/20 px-4 py-2.5 flex-shrink-0" data-testid="result-banner">
             <div className="max-w-3xl mx-auto flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
@@ -875,7 +953,7 @@ export default function ChatPage() {
                   )}
                 </p>
                 <p className="text-[10px] text-emerald-600/80 dark:text-emerald-400/60 truncate">
-                  {getIncludedAnalysisLabels(includedAnalyses)} ({resultRows.length} fields)
+                  {getIncludedAnalysisLabels(includedAnalyses)}{resultRows.length > 0 ? ` (${resultRows.length} fields)` : ""}{latestDataModel ? ` + Data Model: ${latestDataModel.model_name}` : ""}
                 </p>
               </div>
               <Button
@@ -982,14 +1060,17 @@ function MessageBubble({
   isStreaming = false,
   summaryOverride,
   onDownloadResult,
+  dataModel,
 }: {
   message: Message;
   isStreaming?: boolean;
   summaryOverride?: string;
   onDownloadResult?: () => void;
+  dataModel?: DataModelJSON | null;
 }) {
   const isUser = message.role === "user";
   const shouldShowSummary = !isUser && !isStreaming && summaryOverride;
+  const hasDataModel = !isUser && !isStreaming && dataModel;
 
   const { displayText, fileName } = isUser ? stripExcelContent(message.content) : { displayText: message.content, fileName: null };
 
@@ -1010,47 +1091,63 @@ function MessageBubble({
       <div
         className={`flex-1 min-w-0 ${isUser ? "text-right" : ""}`}
       >
-        <div
-          className={`inline-block text-left rounded-xl px-4 py-3 text-sm max-w-full ${
-            isUser
-              ? "bg-primary text-primary-foreground"
-              : "bg-card border border-card-border"
-          }`}
-        >
-          {isUser ? (
-            <div>
-              {displayText && <div className="whitespace-pre-wrap break-words">{displayText}</div>}
-              {fileName && (
-                <div className={`flex items-center gap-1.5 ${displayText ? "mt-2 pt-2 border-t border-white/20" : ""}`}>
-                  <Paperclip className="w-3 h-3 opacity-70" />
-                  <span className="text-xs opacity-80">{fileName}</span>
+        {hasDataModel ? (
+          <div className="text-left">
+            {shouldShowSummary && (
+              <div className="inline-block text-left rounded-xl px-4 py-3 text-sm max-w-full bg-card border border-card-border mb-3">
+                <div className="whitespace-pre-wrap break-words leading-relaxed">{summaryOverride}</div>
+              </div>
+            )}
+            <DataModelDiagram
+              model={dataModel!}
+              onDownloadExcel={onDownloadResult}
+            />
+          </div>
+        ) : (
+          <>
+            <div
+              className={`inline-block text-left rounded-xl px-4 py-3 text-sm max-w-full ${
+                isUser
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card border border-card-border"
+              }`}
+            >
+              {isUser ? (
+                <div>
+                  {displayText && <div className="whitespace-pre-wrap break-words">{displayText}</div>}
+                  {fileName && (
+                    <div className={`flex items-center gap-1.5 ${displayText ? "mt-2 pt-2 border-t border-white/20" : ""}`}>
+                      <Paperclip className="w-3 h-3 opacity-70" />
+                      <span className="text-xs opacity-80">{fileName}</span>
+                    </div>
+                  )}
+                </div>
+              ) : shouldShowSummary ? (
+                <div className="whitespace-pre-wrap break-words leading-relaxed">{summaryOverride}</div>
+              ) : (
+                <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                  {isStreaming && (
+                    <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />
+                  )}
                 </div>
               )}
             </div>
-          ) : shouldShowSummary ? (
-            <div className="whitespace-pre-wrap break-words leading-relaxed">{summaryOverride}</div>
-          ) : (
-            <div className="prose prose-sm dark:prose-invert max-w-none break-words">
-              <ReactMarkdown>{message.content}</ReactMarkdown>
-              {isStreaming && (
-                <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />
-              )}
-            </div>
-          )}
-        </div>
-        {shouldShowSummary && onDownloadResult && (
-          <div className="mt-2">
-            <Button
-              size="sm"
-              onClick={onDownloadResult}
-              className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md"
-              style={{ backgroundColor: "#00A3A1" }}
-              data-testid={`button-download-result-${message.id}`}
-            >
-              <Download className="w-3.5 h-3.5" />
-              Download result.xlsx
-            </Button>
-          </div>
+            {shouldShowSummary && onDownloadResult && !hasDataModel && (
+              <div className="mt-2">
+                <Button
+                  size="sm"
+                  onClick={onDownloadResult}
+                  className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md"
+                  style={{ backgroundColor: "#00A3A1" }}
+                  data-testid={`button-download-result-${message.id}`}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download result.xlsx
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

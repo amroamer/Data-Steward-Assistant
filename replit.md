@@ -7,6 +7,7 @@ This is an AI-powered data governance assistant called the **Data Owner Agent**,
 - **Data Classification** — Classify data fields per Saudi SDAIA NDMO standards (Top Secret, Secret, Confidential, Restricted, Public)
 - **Business Definitions** — Generate clear definitions for data fields/elements
 - **Data Quality Rules** — Suggest quality rules across dimensions (completeness, accuracy, consistency, etc.)
+- **Analytical Data Model** — Design star schema / dimensional models with interactive SVG diagram, PNG export, and DDL generation
 
 Users interact through a chat interface. They can type prompts or upload Excel files containing data fields, and the AI returns structured, formatted analysis.
 
@@ -28,7 +29,7 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 - Threads are expanded by default; clicking the header toggles collapse (conditional rendering)
 - `collapsedThreads` state (Set of indices) tracks collapsed threads
 - Global "Collapse All" / "Expand All" buttons appear in the header when there are 2+ threads
-- Analysis type detected from keywords: "business definition" → Business Definitions, "classification" → Data Classification, "quality" → Data Quality Rules
+- Analysis type detected from keywords: "business definition" → Business Definitions, "classification" → Data Classification, "quality" → Data Quality Rules, "data model"/"star schema" → Data Model
 - Streaming thread is always expanded and shows a loading indicator
 
 ### Sidebar Session Management
@@ -48,6 +49,8 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 - Non-DQ sheets (business_definitions, data_classification) are deduplicated by field_name in `generateResultExcel()` to prevent duplicate rows caused by DQ multi-row merging
 - Result banner appears above the input area when results exist, with KPMG green download button
 - Header bar also shows a compact download button when results exist
+- Analytical Data Model: when Claude returns a JSON block with fact_tables/dimension_tables/relationships, it's detected by `detectDataModelJSON()`, stored in `dataModel` state, and rendered as an interactive SVG diagram via `DataModelDiagram` component. Adds 3 sheets to result.xlsx: data_model_fields, data_model_relationships, data_model_ddl
+- `dataModelMessageIds` (Set) tracks which assistant messages contain data models so the diagram renders on re-visit
 - File-reset confirmation dialog (AlertDialog) appears when uploading a new file while results already exist
 - Session state (results, field names, file name, summaryOverrides) resets on: new chat, conversation switch, conversation delete, or confirmed file reset
 - Server sends `fieldNames` SSE event when an Excel file is uploaded, allowing the frontend to track session fields
@@ -95,6 +98,7 @@ Preferred communication style: Simple, everyday language.
 |---|---|
 | `client/src/pages/chat.tsx` | Main chat page with sidebar, messages, input area, summary display |
 | `client/src/lib/result-store.ts` | Cumulative result.xlsx logic: detection, extraction, merge, Excel generation, summary generation |
+| `client/src/components/DataModelDiagram.tsx` | Interactive SVG star schema diagram with draggable tables, PNG export, DDL download |
 | `client/src/lib/table-utils.ts` | Markdown table parsing utilities |
 | `server/replit_integrations/chat/routes.ts` | Chat API with file upload and Claude streaming |
 | `shared/models/chat.ts` | Database schema for conversations and messages |

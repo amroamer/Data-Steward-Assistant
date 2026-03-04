@@ -1,0 +1,169 @@
+Add a new capability to the Data Owner Agent called "Analytical Data Model".
+What it does:
+When the user uploads an Excel sheet with data fields and asks for an analytical data model, the app should use Claude to analyze the fields and automatically design a star schema / dimensional model, then render it visually inside the chat as an interactive diagram.
+
+Detailed Behavior:
+1. Claude Analysis
+Send the fields to Claude with a prompt that instructs it to:
+
+Group fields into Fact Tables and Dimension Tables based on their nature (measures vs. descriptive attributes)
+Identify primary keys and foreign keys
+Suggest grain of each fact table (what one row represents)
+Suggest relationships between tables (one-to-many, many-to-many)
+Suggest aggregation type for each measure (SUM, COUNT, AVG, etc.)
+Return the result as structured JSON only — no prose
+
+The JSON schema should look like:
+json{
+  "model_name": "...",
+  "grain_statement": "...",
+  "fact_tables": [
+    {
+      "table_name": "...",
+      "grain": "...",
+      "fields": [
+        { "field_name": "...", "data_type": "...", "role": "measure|fk|pk", "aggregation": "..." }
+      ]
+    }
+  ],
+  "dimension_tables": [
+    {
+      "table_name": "...",
+      "fields": [
+        { "field_name": "...", "data_type": "...", "role": "pk|attribute" }
+      ]
+    }
+  ],
+  "relationships": [
+    { "from_table": "...", "from_field": "...", "to_table": "...", "to_field": "...", "type": "many-to-one" }
+  ]
+}
+
+2. Visual Rendering
+Render the data model visually inside the chat using a canvas or SVG-based diagram (use React state + SVG, or integrate reactflow if available):
+
+Fact tables rendered as center nodes in dark KPMG blue with a bold header
+Dimension tables rendered as surrounding nodes in KPMG light blue/grey
+Relationship lines drawn between tables with crow's foot notation or simple labeled arrows showing cardinality
+Each table node shows: table name as header, then a list of fields with a small icon indicating PK 🔑, FK 🔗, or measure 📊
+Tables should be draggable so the user can rearrange the layout
+The diagram should fit inside the chat bubble with a scrollable/zoomable container
+
+
+3. Export Options
+Add two export buttons below the diagram:
+
+"Download as PNG" — exports the diagram as an image
+"Download DDL Script" — generates and downloads a .sql file with CREATE TABLE statements, primary keys, foreign keys, and comments for each table based on the model
+
+
+4. result.xlsx Integration
+Also merge the data model output into the cumulative result.xlsx:
+
+Add a new sheet called data_model (not a new column in the main sheet)
+This sheet should have rows for each field showing: table_name, field_name, table_type (fact/dimension), role (pk/fk/measure/attribute), data_type, aggregation
+
+
+5. Trigger Detection
+The app should trigger this feature when the user says anything like:
+
+"build a data model"
+"create a star schema"
+"design an analytical model"
+"suggest a dimensional model"
+"what tables should I create"
+ok regenerate the prombt , and let the app , create sheets for the new data model, with the sql , and allow the use to download the excel and the generated png as well4:43 AMPrompt for Replit:
+Add a new capability to the Data Owner Agent called "Analytical Data Model".
+
+What it does:
+When the user uploads an Excel sheet with data fields and asks for an analytical data model, the app uses Claude to design a star schema / dimensional model, renders it visually in the chat, generates SQL DDL scripts, and exports everything into the cumulative result.xlsx plus a downloadable PNG.
+
+Step 1 — Claude Analysis
+Send the fields to Claude instructing it to return only this JSON structure, no prose:
+json{
+  "model_name": "...",
+  "grain_statement": "...",
+  "fact_tables": [
+    {
+      "table_name": "...",
+      "grain": "...",
+      "fields": [
+        { "field_name": "...", "data_type": "...", "role": "measure|fk|pk", "aggregation": "SUM|COUNT|AVG|NONE" }
+      ]
+    }
+  ],
+  "dimension_tables": [
+    {
+      "table_name": "...",
+      "fields": [
+        { "field_name": "...", "data_type": "...", "role": "pk|attribute" }
+      ]
+    }
+  ],
+  "relationships": [
+    { "from_table": "...", "from_field": "...", "to_table": "...", "to_field": "...", "type": "many-to-one" }
+  ]
+}
+
+Step 2 — Visual Diagram
+Render the data model as an SVG/canvas diagram inside the chat:
+
+Fact tables — center nodes, KPMG dark blue background (#00338D), white text, bold header
+Dimension tables — surrounding nodes, KPMG medium blue (#005EB8), white text
+Each table node shows: table name as header, then fields listed with role icons — 🔑 PK, 🔗 FK, 📊 Measure, • Attribute
+Relationship lines drawn between tables with labeled arrows showing cardinality (1, N)
+Tables must be draggable — user can reposition them freely
+Diagram container is scrollable and zoomable inside the chat bubble
+Use a ref on the diagram container so it can be captured as PNG
+
+
+Step 3 — Export Buttons
+Render these two buttons directly below the diagram:
+"Download Diagram as PNG"
+
+Use html2canvas or dom-to-image library to capture the diagram container div as a PNG
+Trigger a browser download of the image file named data_model_diagram.png
+
+"Download result.xlsx"
+
+This button downloads the full cumulative result.xlsx which now includes the new data model sheets (see Step 4)
+Label it clearly: "Download result.xlsx (includes data model)"
+
+
+Step 4 — result.xlsx: Add New Sheets
+Do NOT add columns to the existing main sheet. Instead, add these three new sheets to the cumulative result.xlsx workbook:
+Sheet: data_model_fields
+table_namefield_nametable_typeroledata_typeaggregationis_pkis_fk
+One row per field across all tables.
+Sheet: data_model_relationships
+from_tablefrom_fieldto_tableto_fieldrelationship_type
+One row per relationship.
+Sheet: data_model_ddl
+table_nameddl_script
+One row per table. The ddl_script column contains the full CREATE TABLE SQL statement for that table including PK, FK constraints, and inline comments. Format each DDL like this:
+sqlCREATE TABLE dim_customer (
+  customer_id       VARCHAR(50)   NOT NULL,  -- Primary Key
+  customer_name     VARCHAR(255),
+  country_code      VARCHAR(10),
+  CONSTRAINT pk_dim_customer PRIMARY KEY (customer_id)
+);
+Apply column auto-width formatting to all three sheets. Use KPMG dark blue (#00338D) for header rows with white bold text.
+
+Step 5 — Session State Update
+After generating the model:
+
+Store the parsed JSON model in React session state so it persists for the session
+Show a status banner in the chat message: "result.xlsx updated — now includes: [existing tabs] + data_model_fields, data_model_relationships, data_model_ddl"
+If the user later asks to regenerate or update the model, replace the three data model sheets rather than duplicating them
+
+
+Step 6 — Trigger Detection
+Trigger this feature when the user types anything like:
+
+"build a data model"
+"create a star schema"
+"design an analytical model"
+"suggest a dimensional model"
+"generate DDL"
+"what tables should I create"
+"analytical model"
