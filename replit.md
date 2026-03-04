@@ -20,6 +20,23 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 - summaryOverrides state tracks which message IDs should show summaries vs full content
 - When switching conversations, existing messages are re-scanned to populate summaryOverrides
 
+### Collapsible Thread Blocks
+- Messages are grouped into user+assistant pairs ("threads") via `groupMessagesIntoThreads()`
+- Each thread has a styled header bar with: KPMG dark blue (#00338D) left border, light grey background, chevron icon, 60-char message preview, timestamp, and analysis type badge
+- Threads are expanded by default; clicking the header toggles collapse (conditional rendering)
+- `collapsedThreads` state (Set of indices) tracks collapsed threads
+- Global "Collapse All" / "Expand All" buttons appear in the header when there are 2+ threads
+- Analysis type detected from keywords: "business definition" → Business Definitions, "classification" → Data Classification, "quality" → Data Quality Rules
+- Streaming thread is always expanded and shows a loading indicator
+
+### Sidebar Session Management
+- Each conversation shows a trash icon on hover; clicking shows inline "Delete this session?" confirmation with "Yes, Delete" / "Cancel"
+- `deletingConvId` state tracks which conversation is showing confirmation; `fadingOutConvId` triggers 150ms fade-out animation before deletion
+- "Clear All Sessions" button at sidebar bottom (muted red) with inline confirmation ("This will delete all sessions. Are you sure?")
+- `DELETE /api/conversations/all` endpoint deletes all messages then all conversations
+- If the active conversation is deleted, auto-navigates to new empty session
+- Both delete mutations use `onSettled` to always reset UI state on success or failure
+
 ### Cumulative result.xlsx Feature
 - Maintains an in-memory cumulative data structure (`ResultRow[]`) keyed by `field_name` across multiple AI analyses
 - After each AI response, `detectAndExtractAllAnalyses()` scans all markdown tables for analysis-specific headers and extracts field data

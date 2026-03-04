@@ -137,6 +137,16 @@ export function registerChatRoutes(app: Express): void {
     }
   });
 
+  app.delete("/api/conversations/all", async (_req: Request, res: Response) => {
+    try {
+      await chatStorage.deleteAllConversations();
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting all conversations:", error);
+      res.status(500).json({ error: "Failed to delete all conversations" });
+    }
+  });
+
   app.delete("/api/conversations/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);

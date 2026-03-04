@@ -32,6 +32,11 @@ import {
   CheckCircle,
   Loader2,
   Download,
+  ChevronDown,
+  ChevronRight,
+  ChevronsUpDown,
+  Minimize2,
+  Maximize2,
 } from "lucide-react";
 import type { Conversation, Message } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
@@ -74,6 +79,45 @@ const FEATURE_CARDS = [
   },
 ];
 
+interface ThreadPair {
+  userMsg: Message;
+  assistantMsg?: Message;
+}
+
+function detectAnalysisTag(userContent: string, assistantContent?: string): string | null {
+  const combined = `${userContent} ${assistantContent || ""}`.toLowerCase();
+  if (combined.includes("business definition") || combined.includes("business def")) return "Business Definitions";
+  if (combined.includes("classification") || combined.includes("classify")) return "Data Classification";
+  if (combined.includes("quality") || combined.includes("dq rule")) return "Data Quality Rules";
+  return null;
+}
+
+function groupMessagesIntoThreads(messages: Message[]): ThreadPair[] {
+  const threads: ThreadPair[] = [];
+  let i = 0;
+  while (i < messages.length) {
+    if (messages[i].role === "user") {
+      const pair: ThreadPair = { userMsg: messages[i] };
+      if (i + 1 < messages.length && messages[i + 1].role === "assistant") {
+        pair.assistantMsg = messages[i + 1];
+        i += 2;
+      } else {
+        i += 1;
+      }
+      threads.push(pair);
+    } else {
+      threads.push({ userMsg: messages[i], assistantMsg: undefined });
+      i += 1;
+    }
+  }
+  return threads;
+}
+
+function formatTimestamp(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function ChatPage() {
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [inputValue, setInputValue] = useState("");
@@ -89,6 +133,13 @@ export default function ChatPage() {
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [summaryOverrides, setSummaryOverrides] = useState<Record<number, string>>({});
+
+  const [collapsedThreads, setCollapsedThreads] = useState<Set<number>>(new Set());
+
+  const [deletingConvId, setDeletingConvId] = useState<number | null>(null);
+  const [fadingOutConvId, setFadingOutConvId] = useState<number | null>(null);
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
+  const [fadingOutAll, setFadingOutAll] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -126,6 +177,25 @@ export default function ChatPage() {
         resetResultState();
       }
     },
+    onSettled: () => {
+      setFadingOutConvId(null);
+      setDeletingConvId(null);
+    },
+  });
+
+  const deleteAllConversations = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/conversations/all");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      setActiveConversationId(null);
+      resetResultState();
+    },
+    onSettled: () => {
+      setShowClearAllConfirm(false);
+      setFadingOutAll(false);
+    },
   });
 
   const scrollToBottom = useCallback(() => {
@@ -138,6 +208,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     resetResultState();
+    setCollapsedThreads(new Set());
   }, [activeConversationId]);
 
   useEffect(() => {
@@ -384,6 +455,7 @@ export default function ChatPage() {
     setSelectedFile(null);
     setStreamingContent("");
     resetResultState();
+    setCollapsedThreads(new Set());
   };
 
   const handleDownloadResult = () => {
@@ -392,7 +464,45 @@ export default function ChatPage() {
     }
   };
 
+  const handleDeleteConversation = (id: number) => {
+    setFadingOutConvId(id);
+    setTimeout(() => {
+      deleteConversation.mutate(id);
+      setFadingOutConvId(null);
+      setDeletingConvId(null);
+    }, 150);
+  };
+
+  const handleDeleteAllConversations = () => {
+    setFadingOutAll(true);
+    setTimeout(() => {
+      deleteAllConversations.mutate();
+    }, 150);
+  };
+
+  const toggleThread = (index: number) => {
+    setCollapsedThreads(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
+  const collapseAll = (threads: ThreadPair[]) => {
+    const allIndices = new Set(threads.map((_, i) => i));
+    setCollapsedThreads(allIndices);
+  };
+
+  const expandAll = () => {
+    setCollapsedThreads(new Set());
+  };
+
   const messages = activeConversation?.messages || [];
+  const threads = groupMessagesIntoThreads(messages);
 
   return (
     <div className="flex h-screen bg-background" data-testid="chat-page">
@@ -454,35 +564,107 @@ export default function ChatPage() {
               conversations.map((conv) => (
                 <div
                   key={conv.id}
-                  className={`group flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer text-sm transition-colors ${
-                    activeConversationId === conv.id
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground"
+                  className={`rounded-md transition-all duration-150 ${
+                    fadingOutConvId === conv.id || fadingOutAll ? "opacity-0 scale-95" : "opacity-100"
                   }`}
-                  onClick={() => setActiveConversationId(conv.id)}
                   data-testid={`conversation-item-${conv.id}`}
                 >
-                  <MessageSquare className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate flex-1">{conv.title}</span>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="opacity-0 group-hover:opacity-100 h-6 w-6 flex-shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteConversation.mutate(conv.id);
-                    }}
-                    data-testid={`button-delete-conversation-${conv.id}`}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
+                  {deletingConvId === conv.id ? (
+                    <div className="px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20">
+                      <p className="text-xs text-destructive font-medium mb-2">Delete this session?</p>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-6 text-xs px-2"
+                          onClick={() => handleDeleteConversation(conv.id)}
+                          data-testid={`button-confirm-delete-${conv.id}`}
+                        >
+                          Yes, Delete
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 text-xs px-2"
+                          onClick={() => setDeletingConvId(null)}
+                          data-testid={`button-cancel-delete-${conv.id}`}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className={`group flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer text-sm transition-colors ${
+                        activeConversationId === conv.id
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground hover:bg-accent/50"
+                      }`}
+                      onClick={() => setActiveConversationId(conv.id)}
+                    >
+                      <MessageSquare className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate flex-1">{conv.title}</span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="opacity-0 group-hover:opacity-100 h-6 w-6 flex-shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletingConvId(conv.id);
+                        }}
+                        data-testid={`button-delete-conversation-${conv.id}`}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
           </div>
         </ScrollArea>
         <Separator />
-        <div className="p-3">
+        <div className="p-3 space-y-2">
+          {conversations.length > 0 && (
+            <>
+              {showClearAllConfirm ? (
+                <div className="px-2 py-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <p className="text-xs text-destructive font-medium mb-2">This will delete all sessions. Are you sure?</p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="h-6 text-xs px-2"
+                      onClick={handleDeleteAllConversations}
+                      data-testid="button-confirm-clear-all"
+                    >
+                      Yes, Delete All
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs px-2"
+                      onClick={() => setShowClearAllConfirm(false)}
+                      data-testid="button-cancel-clear-all"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-center gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => setShowClearAllConfirm(true)}
+                  data-testid="button-clear-all-sessions"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Clear All Sessions
+                </Button>
+              )}
+            </>
+          )}
           <p className="text-[10px] text-muted-foreground text-center">
             Powered by Claude AI
           </p>
@@ -506,6 +688,30 @@ export default function ChatPage() {
               {activeConversation?.title || "Data Owner Agent"}
             </h2>
           </div>
+          {threads.length > 1 && (
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs gap-1 px-2"
+                onClick={() => collapseAll(threads)}
+                data-testid="button-collapse-all"
+              >
+                <Minimize2 className="w-3.5 h-3.5" />
+                Collapse All
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs gap-1 px-2"
+                onClick={expandAll}
+                data-testid="button-expand-all"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+                Expand All
+              </Button>
+            </div>
+          )}
           {resultRows.length > 0 && (
             <Button
               size="sm"
@@ -555,38 +761,93 @@ export default function ChatPage() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-6">
-                {messages.map((msg) => (
-                  <MessageBubble
-                    key={msg.id}
-                    message={msg}
-                    summaryOverride={summaryOverrides[msg.id]}
-                    onDownloadResult={resultRows.length > 0 ? handleDownloadResult : undefined}
-                  />
-                ))}
-                {isStreaming && streamingContent && (
-                  <div className="flex gap-3" data-testid="message-streaming">
-                    <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
-                      <Bot className="w-4 h-4 text-primary-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="inline-block text-left rounded-lg px-4 py-3 text-sm max-w-full bg-card border border-card-border">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Analyzing your data...</span>
+              <div className="space-y-3">
+                {threads.map((thread, idx) => {
+                  const isCollapsed = collapsedThreads.has(idx);
+                  const tag = detectAnalysisTag(
+                    thread.userMsg.content,
+                    thread.assistantMsg?.content
+                  );
+                  const preview = thread.userMsg.content.substring(0, 60) + (thread.userMsg.content.length > 60 ? "..." : "");
+                  const timestamp = formatTimestamp(thread.userMsg.createdAt);
+
+                  return (
+                    <div
+                      key={thread.userMsg.id}
+                      className="rounded-lg border border-border overflow-hidden"
+                      data-testid={`thread-block-${idx}`}
+                    >
+                      <button
+                        onClick={() => toggleThread(idx)}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-left bg-muted/50 hover:bg-muted/80 transition-colors"
+                        style={{ borderLeft: "3px solid #00338D" }}
+                        data-testid={`thread-header-${idx}`}
+                      >
+                        {isCollapsed ? (
+                          <ChevronRight className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+                        )}
+                        <span className="text-xs text-foreground truncate flex-1">{preview}</span>
+                        {tag && (
+                          <Badge variant="secondary" className="text-[10px] h-5 px-1.5 flex-shrink-0">
+                            {tag}
+                          </Badge>
+                        )}
+                        <span className="text-[10px] text-muted-foreground flex-shrink-0">{timestamp}</span>
+                      </button>
+                      {!isCollapsed && (
+                        <div className="p-4 space-y-4" data-testid={`thread-content-${idx}`}>
+                          <MessageBubble
+                            message={thread.userMsg}
+                          />
+                          {thread.assistantMsg && (
+                            <MessageBubble
+                              message={thread.assistantMsg}
+                              summaryOverride={summaryOverrides[thread.assistantMsg.id]}
+                              onDownloadResult={resultRows.length > 0 ? handleDownloadResult : undefined}
+                            />
+                          )}
                         </div>
-                      </div>
+                      )}
                     </div>
-                  </div>
-                )}
-                {isStreaming && !streamingContent && (
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
-                      <Bot className="w-4 h-4 text-primary-foreground" />
+                  );
+                })}
+                {isStreaming && (
+                  <div className="rounded-lg border border-border overflow-hidden" data-testid="thread-streaming">
+                    <div
+                      className="flex items-center gap-3 px-3 py-2 bg-muted/50"
+                      style={{ borderLeft: "3px solid #00338D" }}
+                    >
+                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground flex-shrink-0" />
+                      <span className="text-xs text-foreground truncate flex-1">Processing...</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Analyzing...
+                    <div className="p-4 space-y-4">
+                      {streamingContent ? (
+                        <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
+                            <Bot className="w-4 h-4 text-primary-foreground" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="inline-block text-left rounded-lg px-4 py-3 text-sm max-w-full bg-card border border-card-border">
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Analyzing your data...</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
+                            <Bot className="w-4 h-4 text-primary-foreground" />
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Analyzing...
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
