@@ -1,0 +1,166 @@
+Prompt for Replit:
+Redesign the entire UI of the Data Owner Agent app to look and feel like a professional AI agent command center, not a chat interface. Do not change any existing functionality, API calls, Claude integration, Excel generation logic, or session state — only the visual layout, component structure, and UX patterns change. Everything that works today must continue to work exactly the same way.
+
+New Layout Architecture
+Replace the current full-width chat layout with a three-panel command center:
+┌─────────────┬──────────────────────────┬─────────────────┐
+│  LEFT       │  CENTER                  │  RIGHT          │
+│  SIDEBAR    │  AGENT ACTIVITY CENTER   │  OUTPUTS PANEL  │
+│  240px      │  flex-grow               │  300px          │
+└─────────────┴──────────────────────────┴─────────────────┘
+Left Sidebar (240px, fixed)
+
+ZATCA logo / app name at top: "Data Owner Agent" in white bold, subtitle "Powered by Claude" in smaller muted text
+Agent status pill below the title showing live state: Idle / Thinking / Executing / Done — color coded: Idle → grey, Thinking → blue pulsing, Executing → orange pulsing, Done → green
+Session history list below the status — same sessions as before but restyled as a clean list with session name, date, and a hover-reveal trash icon
+"New Session" button at the bottom of the sidebar styled as a full-width ZATCA blue button
+Sidebar background: dark navy (#0D2E5C), white text, selected session highlighted with a lighter navy (#1A4B8C)
+
+Center Panel (flex-grow)
+
+Top bar spanning the center panel showing:
+
+Current file loaded: "📁 shipment_data.xlsx — 1,240 rows, 18 columns" or "No file loaded" if empty
+result.xlsx status: "📊 result.xlsx — 3 sheets" updating live as sheets are added
+"Collapse All" / "Expand All" buttons on the right
+
+
+Agent activity feed below the top bar — this replaces the chat bubble list
+Each agent interaction is rendered as a structured Agent Activity Card (see below) not a chat bubble
+Command console at the bottom — replaces the chat input bar (see below)
+Background: light grey (#F4F6F9) with a subtle grid dot pattern
+
+Right Panel (300px, fixed)
+
+Header: "Outputs & Activity" in ZATCA blue bold
+Live Outputs section: shows all generated files as download cards — each card shows filename, file type icon, sheet count or row count, timestamp, and a download button. Updates in real time as new files are generated
+result.xlsx Sheet Tracker: shows a live tag list of all sheets currently in result.xlsx — each tag appears with an animation when a new sheet is added. Tags are color coded by type: business definitions → blue, classification → purple, DQ rules → green, DQ results → orange, data model → dark navy
+Activity Timeline below outputs: a vertical timeline showing every action the agent took with timestamp and status icon — "📥 File uploaded 14:32", "🧠 DQ Rules generated 14:33", "⚙️ DQ Check executed 14:34"
+Right panel background: white, with ZATCA blue left border accent on each section header
+
+
+Agent Activity Cards
+Replace all chat bubbles (both user messages and assistant responses) with structured Agent Activity Cards. Each card has:
+User Command Card:
+
+Light grey background, left border in ZATCA blue
+Shows: user avatar icon, "Command:" label, the user's message text, timestamp
+Compact — single line if possible, expandable if long
+
+Agent Response Card:
+
+White background, subtle drop shadow, left border color based on action type (green for completed, orange for in-progress, red for failed)
+Card header bar showing: agent avatar icon, action type badge ("DQ Rules" / "Classification" / "Insights" etc.), status badge (✅ Complete / ⚙️ Running / ❌ Failed), timestamp
+Card body showing the 2-3 line summary text — never raw data
+Metrics row below the summary: the scorecard tiles rendered as a horizontal strip inside the card
+Action buttons row at the bottom of the card: "📥 Download result.xlsx", "📧 Send via Email", "💬 Ask Follow-up"
+Collapse/expand chevron on the top right of the card
+
+Phase 2 Confirmation Card:
+
+Styled distinctly with a ZATCA blue gradient header
+Shows the confirmation question, row and rule counts, and the two action buttons (Yes Run / Skip) prominently
+
+
+Command Console
+Replace the plain chat input bar with a styled command console at the bottom of the center panel:
+
+Dark background (#0D2E5C) console bar spanning the full width of the center panel
+Left side: file upload icon button — clicking opens file picker, shows filename when a file is loaded
+Center: input field with placeholder "Enter agent command..." in monospace-style font, white text on dark background
+Right side: Send button labeled "Execute ▶" in ZATCA green
+Above the console: the quick action pill buttons row — same functionality as before but restyled to match the dark console bar aesthetic, pill buttons in semi-transparent white with white text
+Language toggle (EN/AR) and Collapse All / Expand All controls integrated into the console bar left side
+
+
+Agent Thinking Animation
+When the agent is processing replace the typing indicator with a multi-step progress tracker rendered as a small card in the center panel:
+⚙️ Agent Working...
+──────────────────────────────
+✅ Reading uploaded file
+✅ Profiling data structure  
+⚙️ Generating DQ rules...     ← animated spinner on current step
+○  Executing checks
+○  Saving to result.xlsx
+Each step checks off as it completes. Steps are inferred from the type of command being executed.
+
+First Load — Capabilities Dashboard
+When the app loads with no session active, show a capabilities dashboard in the center panel instead of an empty chat:
+
+Header: "What would you like to do today?" in large ZATCA blue text
+Six capability cards in a 2x3 grid, each showing: icon, capability name, one-line description, and a "Start" button
+
+📋 Business Definitions — "Generate business terms and definitions for your data fields"
+🔒 Data Classification — "Classify fields per SDAIA NDMO standards"
+🔬 DQ Rules & Check — "Generate and execute data quality rules"
+🏗️ Analytical Data Model — "Design a star schema from your fields"
+🛡️ PII Detection & Anonymization — "Identify and anonymize personal data"
+📊 Data Insights Report — "Extract key insights from your dataset"
+
+
+Clicking any card pre-fills the command console and focuses it
+Below the grid: a "Upload a file to get started" drag-and-drop zone styled prominently
+
+
+DQ Score & Metrics — Visual Upgrades
+Replace plain number scorecard tiles with richer visuals:
+
+DQ Score rendered as a circular gauge/donut chart — green if ≥90%, yellow if 70–89%, red if <70% — displayed prominently inside the agent response card
+Other metrics rendered as small stat cards with an icon, large bold number, and label
+Use recharts for the donut chart — it is already available in the project
+
+
+Micro-Animations
+Add these subtle animations throughout:
+
+Agent response cards slide in from the bottom when they appear (CSS transform + transition, 200ms)
+Sheet tags in the right panel pop in with a scale animation when added
+Status badge pulses with a CSS keyframe animation when in Thinking or Executing state
+Progress steps in the thinking animation check off with a smooth transition
+Confirmation card buttons have a ripple effect on click
+
+
+Color & Typography System
+Apply consistently across the entire redesigned UI:
+javascriptconst ZATCA_THEME = {
+  navyDark: "#0D2E5C",
+  navyMid: "#1A4B8C",
+  blue: "#2563EB",
+  green: "#2E7D32",
+  orange: "#E65100",
+  red: "#C62828",
+  yellow: "#F9A825",
+  bgLight: "#F4F6F9",
+  bgWhite: "#FFFFFF",
+  textPrimary: "#1A1A2E",
+  textMuted: "#6B7280",
+  borderLight: "#E5E7EB",
+  fontMain: "Inter, sans-serif",
+  fontMono: "Courier New, monospace"
+}
+
+All headings: Inter bold
+All body text: Inter regular
+All code/expressions: Courier New
+Import Inter from Google Fonts at the top of the app
+
+
+RTL / Arabic Mode
+All layout changes must support RTL correctly:
+
+Three-panel layout mirrors: right panel moves to left, left sidebar moves to right
+Card border accents flip sides
+Console input and buttons reorder
+All flex directions use row-reverse in RTL mode
+Animations direction-aware
+
+
+What Must Not Change
+
+All Claude API calls and prompts
+All Excel generation logic and sheet formatting
+All session state management
+All feature functionality (DQ, classification, definitions, PII, insights, data model)
+All translations in the translations object
+All trigger detection logic
+The confirmation step for Phase 2 DQ execution
