@@ -43,6 +43,7 @@ import {
   GripVertical,
   ScanEye,
   Globe,
+  BarChart3,
 } from "lucide-react";
 import type { Conversation, Message } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
@@ -62,6 +63,13 @@ import {
   generatePiiScanSummary,
 } from "@/lib/result-store";
 import DataModelDiagram from "@/components/DataModelDiagram";
+import {
+  type InsightsReport,
+  detectInsightsJSON,
+  generateInsightsExcel,
+  generateInsightsSummary,
+  getInsightsScorecard,
+} from "@/lib/insights-store";
 import zatcaLogoPath from "@assets/zatca-logo.svg";
 import {
   Panel,
@@ -130,6 +138,17 @@ const translations = {
     tagBusinessDefs: "Business Definitions",
     tagDataClassification: "Data Classification",
     tagDataQuality: "Data Quality Rules",
+    tagInsights: "Data Insights",
+    cardInsights: "Data Insights Report",
+    cardInsightsDesc: "Analyze data and generate comprehensive insights report",
+    insightsReportGenerated: "📊 Data Insights Report Generated",
+    insightsToast: (title: string) => `Insights report "${title}" generated`,
+    downloadInsightsReport: "📥 Download Insights Report",
+    previousReports: "Previous Insight Reports",
+    scorecardTotalInsights: "📋 Total Insights Found",
+    scorecardHighImpact: "🔴 High Impact",
+    scorecardAnomalies: "⚠️ Anomalies Detected",
+    scorecardCompleteness: "✅ Data Completeness",
   },
   ar: {
     newChat: "محادثة جديدة",
@@ -189,6 +208,17 @@ const translations = {
     tagBusinessDefs: "تعريفات الأعمال",
     tagDataClassification: "تصنيف البيانات",
     tagDataQuality: "قواعد جودة البيانات",
+    tagInsights: "رؤى البيانات",
+    cardInsights: "تقرير رؤى البيانات",
+    cardInsightsDesc: "تحليل البيانات وإنشاء تقرير رؤى شامل",
+    insightsReportGenerated: "📊 تم إنشاء تقرير رؤى البيانات",
+    insightsToast: (title: string) => `تم إنشاء تقرير الرؤى "${title}"`,
+    downloadInsightsReport: "📥 تحميل تقرير الرؤى",
+    previousReports: "التقارير السابقة",
+    scorecardTotalInsights: "📋 إجمالي الرؤى",
+    scorecardHighImpact: "🔴 تأثير عالي",
+    scorecardAnomalies: "⚠️ شذوذات مكتشفة",
+    scorecardCompleteness: "✅ اكتمال البيانات",
   },
 } as const;
 
@@ -201,6 +231,7 @@ const featureCardKeys: { titleKey: TranslationKey; descKey: TranslationKey }[] =
   { titleKey: "cardDataQuality", descKey: "cardDataQualityDesc" },
   { titleKey: "cardDataModel", descKey: "cardDataModelDesc" },
   { titleKey: "cardPiiDetection", descKey: "cardPiiDetectionDesc" },
+  { titleKey: "cardInsights", descKey: "cardInsightsDesc" },
 ];
 
 const FEATURE_CARDS = [
@@ -249,6 +280,15 @@ const FEATURE_CARDS = [
     bg: "bg-red-50",
     iconBg: "bg-red-100",
   },
+  {
+    icon: BarChart3,
+    title: "Data Insights Report",
+    description: "Analyze data and generate comprehensive insights report",
+    prompt: "I'd like to generate a data insights report. Upload an Excel file with your data and I'll analyze it to find key trends, anomalies, patterns, and provide actionable recommendations.",
+    color: "text-[#00338D]",
+    bg: "bg-[#00338D]/5",
+    iconBg: "bg-[#00338D]/10",
+  },
 ];
 
 interface ThreadPair {
@@ -259,6 +299,8 @@ interface ThreadPair {
 function detectAnalysisTag(userContent: string, assistantContent?: string, t?: Translation): string | null {
   const tr = t || translations.en;
   const combined = `${userContent} ${assistantContent || ""}`.toLowerCase();
+  if (combined.includes("report_title") && combined.includes("key_insights")) return tr.tagInsights;
+  if (combined.includes("insights report") || combined.includes("give me insights") || combined.includes("analyze this data") || combined.includes("explore this dataset") || combined.includes("key findings")) return tr.tagInsights;
   if (combined.includes("pii") || combined.includes("personal data") || combined.includes("sensitive data") || combined.includes("privacy scan") || combined.includes("pdpl") || combined.includes("scan_summary")) return tr.tagPiiScan;
   if (combined.includes("data model") || combined.includes("star schema") || combined.includes("dimensional model") || combined.includes("analytical model") || combined.includes("fact_tables")) return tr.tagDataModel;
   if (combined.includes("business definition") || combined.includes("business def")) return tr.tagBusinessDefs;
@@ -349,6 +391,10 @@ export default function ChatPage() {
   const [piiScans, setPiiScans] = useState<Record<number, PiiScanResult>>({});
   const [latestPiiScan, setLatestPiiScan] = useState<PiiScanResult | null>(null);
 
+  const [insightsReports, setInsightsReports] = useState<{ report: InsightsReport; fileName: string; timestamp: string; excelFileName: string }[]>([]);
+  const [insightsForMessage, setInsightsForMessage] = useState<Record<number, InsightsReport>>({});
+  const [isInsightsMode, setIsInsightsMode] = useState(false);
+
   const [collapsedThreads, setCollapsedThreads] = useState<Set<number>>(new Set());
 
   const [deletingConvId, setDeletingConvId] = useState<number | null>(null);
@@ -431,10 +477,17 @@ export default function ChatPage() {
     const overrides: Record<number, string> = {};
     const modelMap: Record<number, DataModelJSON> = {};
     const piiMap: Record<number, PiiScanResult> = {};
+    const insightsMap: Record<number, InsightsReport> = {};
     let lastModel: DataModelJSON | null = null;
     let lastPii: PiiScanResult | null = null;
     for (const msg of activeConversation.messages) {
       if (msg.role !== "assistant") continue;
+      const insights = detectInsightsJSON(msg.content);
+      if (insights) {
+        insightsMap[msg.id] = insights;
+        overrides[msg.id] = generateInsightsSummary(insights);
+        continue;
+      }
       const piiScan = detectPiiScanJSON(msg.content);
       if (piiScan) {
         piiMap[msg.id] = piiScan;
@@ -471,6 +524,16 @@ export default function ChatPage() {
       setPiiScans(prev => ({ ...prev, ...piiMap }));
       setLatestPiiScan(lastPii);
     }
+    if (Object.keys(insightsMap).length > 0) {
+      setInsightsForMessage(prev => ({ ...prev, ...insightsMap }));
+      const rehydrated = Object.entries(insightsMap).map(([, report]) => {
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const now = new Date();
+        const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        return { report, fileName: uploadedFileName || "data.xlsx", timestamp: ts, excelFileName: `insights_report_${ts}.xlsx` };
+      });
+      setInsightsReports(rehydrated);
+    }
     if (Object.keys(overrides).length > 0) {
       setSummaryOverrides(prev => ({ ...prev, ...overrides }));
     }
@@ -486,9 +549,34 @@ export default function ChatPage() {
     setLatestDataModel(null);
     setPiiScans({});
     setLatestPiiScan(null);
+    setInsightsReports([]);
+    setInsightsForMessage({});
+    setIsInsightsMode(false);
   };
 
   const processAIResponse = (content: string, messageId?: number) => {
+    const insightsReport = detectInsightsJSON(content);
+    if (insightsReport) {
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      const srcFile = uploadedFileName || "data.xlsx";
+      const excelFileName = generateInsightsExcel(insightsReport, srcFile);
+      setInsightsReports(prev => [...prev, { report: insightsReport, fileName: srcFile, timestamp: ts, excelFileName }]);
+      if (messageId) {
+        setInsightsForMessage(prev => ({ ...prev, [messageId]: insightsReport }));
+      }
+      const summary = generateInsightsSummary(insightsReport);
+      if (messageId) {
+        setSummaryOverrides(prev => ({ ...prev, [messageId]: summary }));
+      }
+      toast({
+        title: t.insightsReportGenerated,
+        description: t.insightsToast(insightsReport.report_title),
+      });
+      return;
+    }
+
     const piiScan = detectPiiScanJSON(content);
     if (piiScan) {
       setLatestPiiScan(piiScan);
@@ -634,6 +722,9 @@ export default function ChatPage() {
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
+                if (data.insightsMode) {
+                  setIsInsightsMode(true);
+                }
                 if (data.fieldNames) {
                   setSessionFieldNames(data.fieldNames);
                   if (file) setUploadedFileName(file.name);
@@ -645,11 +736,13 @@ export default function ChatPage() {
                 if (data.done) {
                   setIsStreaming(false);
                   setStreamingContent("");
+                  setIsInsightsMode(false);
 
-                  const detectedPii = detectPiiScanJSON(accumulated);
-                  const detectedModel = detectDataModelJSON(accumulated);
-                  const analysisResults = detectAndExtractAllAnalyses(accumulated);
-                  if (detectedPii || detectedModel || analysisResults.length > 0) {
+                  const detectedInsights = detectInsightsJSON(accumulated);
+                  const detectedPii = !detectedInsights ? detectPiiScanJSON(accumulated) : null;
+                  const detectedModel = !detectedInsights && !detectedPii ? detectDataModelJSON(accumulated) : null;
+                  const analysisResults = !detectedInsights && !detectedPii && !detectedModel ? detectAndExtractAllAnalyses(accumulated) : [];
+                  if (detectedInsights || detectedPii || detectedModel || analysisResults.length > 0) {
                     processAIResponse(accumulated);
 
                     await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
@@ -659,7 +752,11 @@ export default function ChatPage() {
                     if (convData?.messages) {
                       const lastMsg = convData.messages[convData.messages.length - 1];
                       if (lastMsg?.role === "assistant") {
-                        if (detectedPii) {
+                        if (detectedInsights) {
+                          setInsightsForMessage(prev => ({ ...prev, [lastMsg.id]: detectedInsights }));
+                          const summary = generateInsightsSummary(detectedInsights);
+                          setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: summary }));
+                        } else if (detectedPii) {
                           setPiiScans(prev => ({ ...prev, [lastMsg.id]: detectedPii }));
                           const summary = generatePiiScanSummary(detectedPii);
                           setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: summary }));
@@ -1070,7 +1167,7 @@ export default function ChatPage() {
                     <p className="text-muted-foreground text-center mb-8 max-w-md text-sm leading-relaxed">
                       {t.heroDescription}
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 w-full max-w-4xl">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-4xl">
                       {FEATURE_CARDS.map((card, cardIdx) => (
                         <button
                           key={card.title}
@@ -1140,6 +1237,8 @@ export default function ChatPage() {
                                   summaryOverride={summaryOverrides[thread.assistantMsg.id]}
                                   onDownloadResult={(resultRows.length > 0 || latestDataModel || latestPiiScan) ? handleDownloadResult : undefined}
                                   dataModel={dataModels[thread.assistantMsg.id] || undefined}
+                                  insightsReport={insightsForMessage[thread.assistantMsg.id] || undefined}
+                                  allInsightsReports={insightsReports}
                                   lang={lang}
                                   t={t}
                                 />
@@ -1300,6 +1399,8 @@ function MessageBubble({
   summaryOverride,
   onDownloadResult,
   dataModel,
+  insightsReport,
+  allInsightsReports,
   lang = "en",
   t,
 }: {
@@ -1308,6 +1409,8 @@ function MessageBubble({
   summaryOverride?: string;
   onDownloadResult?: () => void;
   dataModel?: DataModelJSON | null;
+  insightsReport?: InsightsReport | null;
+  allInsightsReports?: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string }[];
   lang?: Lang;
   t?: Translation;
 }) {
@@ -1316,8 +1419,13 @@ function MessageBubble({
   const isRtl = lang === "ar";
   const shouldShowSummary = !isUser && !isStreaming && summaryOverride;
   const hasDataModel = !isUser && !isStreaming && dataModel;
+  const hasInsights = !isUser && !isStreaming && insightsReport;
 
   const { displayText, fileName } = isUser ? stripExcelContent(message.content) : { displayText: message.content, fileName: null };
+
+  const handleDownloadInsights = (report: InsightsReport, srcFile?: string) => {
+    generateInsightsExcel(report, srcFile || "data.xlsx");
+  };
 
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`} data-testid={`message-${message.id}`}>
@@ -1379,7 +1487,62 @@ function MessageBubble({
                 </div>
               )}
             </div>
-            {shouldShowSummary && onDownloadResult && !hasDataModel && (
+            {hasInsights && (() => {
+              const sc = getInsightsScorecard(insightsReport!);
+              return (
+                <div className="mt-3 space-y-3" data-testid={`insights-card-${message.id}`}>
+                  <div className="grid grid-cols-2 gap-2 max-w-sm">
+                    <div className="rounded-lg border-2 px-3 py-2 bg-white" style={{ borderColor: "#00338D" }} data-testid="scorecard-total-insights">
+                      <p className="text-[10px] text-muted-foreground">{tr.scorecardTotalInsights}</p>
+                      <p className="text-lg font-bold" style={{ color: "#00338D" }}>{sc.totalInsights}</p>
+                    </div>
+                    <div className="rounded-lg border-2 px-3 py-2 bg-white" style={{ borderColor: "#00338D" }} data-testid="scorecard-high-impact">
+                      <p className="text-[10px] text-muted-foreground">{tr.scorecardHighImpact}</p>
+                      <p className="text-lg font-bold text-red-600">{sc.highImpact}</p>
+                    </div>
+                    <div className="rounded-lg border-2 px-3 py-2 bg-white" style={{ borderColor: "#00338D" }} data-testid="scorecard-anomalies">
+                      <p className="text-[10px] text-muted-foreground">{tr.scorecardAnomalies}</p>
+                      <p className="text-lg font-bold text-amber-600">{sc.anomalies}</p>
+                    </div>
+                    <div className="rounded-lg border-2 px-3 py-2 bg-white" style={{ borderColor: "#00338D" }} data-testid="scorecard-completeness">
+                      <p className="text-[10px] text-muted-foreground">{tr.scorecardCompleteness}</p>
+                      <p className="text-lg font-bold text-emerald-600">{sc.completeness}%</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => handleDownloadInsights(insightsReport!)}
+                    className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md"
+                    style={{ backgroundColor: "#00338D" }}
+                    data-testid={`button-download-insights-${message.id}`}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {tr.downloadInsightsReport}
+                  </Button>
+                  {allInsightsReports && allInsightsReports.length > 1 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-medium text-muted-foreground">{tr.previousReports}</p>
+                      {allInsightsReports.map((rpt, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <FileSpreadsheet className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                          <span className="text-[10px] text-muted-foreground truncate flex-1">{rpt.excelFileName}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-5 px-1.5 text-[9px]"
+                            onClick={() => handleDownloadInsights(rpt.report, rpt.fileName)}
+                            data-testid={`button-download-prev-insights-${i}`}
+                          >
+                            <Download className="w-2.5 h-2.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            {shouldShowSummary && onDownloadResult && !hasDataModel && !hasInsights && (
               <div className="mt-2">
                 <Button
                   size="sm"

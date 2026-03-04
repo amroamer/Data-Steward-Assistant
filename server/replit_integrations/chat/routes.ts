@@ -165,6 +165,241 @@ Each table MUST use the exact column headers defined above. Do NOT skip any requ
 
 Always be thorough, practical, and align your recommendations with international data governance best practices and Saudi NDMO regulations.`;
 
+const INSIGHTS_TRIGGER_KEYWORDS = [
+  "give me insights",
+  "analyze this data",
+  "what does this data tell me",
+  "generate insights report",
+  "generate insights",
+  "insights report",
+  "data insights",
+  "summarize this data",
+  "key findings",
+  "data report",
+  "explore this dataset",
+  "what are the key",
+  "generate a data insights",
+];
+
+const INSIGHTS_SYSTEM_PROMPT = `You are a senior data analyst. The user has uploaded a dataset and wants a comprehensive insights report. You will receive pre-computed column-level statistics and a sample of up to 10 rows.
+
+Your task is to analyze the profiled statistics and sample data, then return ONLY a JSON object (wrapped in triple-backtick json fences) with the following schema. Do NOT include any prose, explanation, or markdown outside the JSON code block.
+
+\`\`\`json
+{
+  "report_title": "A descriptive title for the insights report",
+  "dataset_summary": {
+    "total_rows": 0,
+    "total_columns": 0,
+    "numeric_columns": 0,
+    "text_columns": 0,
+    "date_columns": 0,
+    "overall_completeness_pct": 0.0,
+    "summary_text": "A 2-3 sentence high-level summary of the dataset."
+  },
+  "key_insights": [
+    {
+      "insight_no": 1,
+      "category": "Distribution | Correlation | Anomaly | Trend | Quality | Pattern",
+      "title": "Short insight title",
+      "description": "Detailed description of the insight",
+      "affected_columns": ["col1", "col2"],
+      "business_impact": "High | Medium | Low",
+      "confidence": "High | Medium | Low"
+    }
+  ],
+  "column_profiles": [
+    {
+      "column_name": "...",
+      "data_type": "Numeric | Text | Date | Boolean | Mixed",
+      "null_count": 0,
+      "null_pct": 0.0,
+      "unique_values": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "median": null,
+      "std_dev": null,
+      "top_values": null,
+      "anomaly_flag": false,
+      "anomaly_detail": null
+    }
+  ],
+  "recommendations": [
+    {
+      "recommendation_no": 1,
+      "title": "Short recommendation title",
+      "description": "Detailed recommendation",
+      "priority": "High | Medium | Low",
+      "effort": "High | Medium | Low",
+      "affected_columns": ["col1"]
+    }
+  ],
+  "data_quality_flags": [
+    {
+      "flag_no": 1,
+      "column_name": "...",
+      "issue": "Description of the quality issue",
+      "severity": "Critical | High | Medium | Low",
+      "suggested_fix": "How to fix it"
+    }
+  ]
+}
+\`\`\`
+
+Rules:
+- Provide at least 5 key_insights if the data supports it, up to 15
+- Include a column_profiles entry for EVERY column
+- Provide at least 3 recommendations
+- Flag any data quality issues you detect (nulls > 20%, low cardinality, outlier patterns, type mismatches, etc.)
+- base your analysis on the profiled statistics provided, not assumptions
+- confidence should reflect how certain you are given the stats and sample size
+- Return ONLY the JSON block, no other text`;
+
+interface ColumnProfile {
+  column_name: string;
+  data_type: string;
+  null_count: number;
+  null_pct: number;
+  unique_values: number;
+  min?: number | string | null;
+  max?: number | string | null;
+  mean?: number | null;
+  median?: number | null;
+  std_dev?: number | null;
+  top_values?: { value: string; count: number }[] | null;
+  earliest?: string | null;
+  latest?: string | null;
+  date_range_days?: number | null;
+}
+
+interface ProfiledData {
+  total_rows: number;
+  total_columns: number;
+  columns: ColumnProfile[];
+  sample_rows: any[][];
+  headers: string[];
+}
+
+function profileExcelData(buffer: Buffer, filename: string): ProfiledData | null {
+  try {
+    const workbook = XLSX.read(buffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) return null;
+    const sheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+    if (jsonData.length < 2) return null;
+
+    const headers = jsonData[0].map((h: any) => String(h || ""));
+    const dataRows = jsonData.slice(1);
+    const totalRows = dataRows.length;
+    const totalColumns = headers.length;
+
+    const columns: ColumnProfile[] = headers.map((header, colIdx) => {
+      const values = dataRows.map(row => row[colIdx]);
+      const nonNullValues = values.filter(v => v != null && v !== "");
+      const nullCount = totalRows - nonNullValues.length;
+      const nullPct = totalRows > 0 ? Math.round((nullCount / totalRows) * 10000) / 100 : 0;
+      const uniqueValues = new Set(nonNullValues.map(v => String(v))).size;
+      const colType = inferColumnType(nonNullValues);
+
+      const profile: ColumnProfile = {
+        column_name: header,
+        data_type: colType,
+        null_count: nullCount,
+        null_pct: nullPct,
+        unique_values: uniqueValues,
+      };
+
+      if (colType === "Number") {
+        const nums = nonNullValues.map(v => typeof v === "number" ? v : Number(v)).filter(n => !isNaN(n));
+        if (nums.length > 0) {
+          nums.sort((a, b) => a - b);
+          profile.min = nums[0];
+          profile.max = nums[nums.length - 1];
+          const sum = nums.reduce((a, b) => a + b, 0);
+          profile.mean = Math.round((sum / nums.length) * 100) / 100;
+          const mid = Math.floor(nums.length / 2);
+          profile.median = nums.length % 2 === 0 ? Math.round(((nums[mid - 1] + nums[mid]) / 2) * 100) / 100 : nums[mid];
+          if (nums.length > 1) {
+            const mean = sum / nums.length;
+            const variance = nums.reduce((acc, n) => acc + (n - mean) ** 2, 0) / (nums.length - 1);
+            profile.std_dev = Math.round(Math.sqrt(variance) * 100) / 100;
+          } else {
+            profile.std_dev = 0;
+          }
+        }
+      } else if (colType === "String") {
+        const freqMap = new Map<string, number>();
+        nonNullValues.forEach(v => {
+          const s = String(v);
+          freqMap.set(s, (freqMap.get(s) || 0) + 1);
+        });
+        const sorted = Array.from(freqMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        profile.top_values = sorted.map(([value, count]) => ({ value, count }));
+      } else if (colType === "Date") {
+        const dates = nonNullValues.map(v => {
+          if (v instanceof Date) return v;
+          const d = new Date(String(v));
+          return isNaN(d.getTime()) ? null : d;
+        }).filter((d): d is Date => d !== null);
+        if (dates.length > 0) {
+          dates.sort((a, b) => a.getTime() - b.getTime());
+          profile.earliest = dates[0].toISOString().split("T")[0];
+          profile.latest = dates[dates.length - 1].toISOString().split("T")[0];
+          profile.date_range_days = Math.round((dates[dates.length - 1].getTime() - dates[0].getTime()) / (1000 * 60 * 60 * 24));
+        }
+      }
+
+      return profile;
+    });
+
+    const sampleRows = dataRows.slice(0, 10);
+
+    return { total_rows: totalRows, total_columns: totalColumns, columns, sample_rows: sampleRows, headers };
+  } catch (error) {
+    console.error("Error profiling Excel data:", error);
+    return null;
+  }
+}
+
+function formatProfiledDataForPrompt(profile: ProfiledData, filename: string): string {
+  let text = `## Dataset: ${filename}\n`;
+  text += `- Total Rows: ${profile.total_rows}\n`;
+  text += `- Total Columns: ${profile.total_columns}\n\n`;
+
+  text += `## Column Statistics\n\n`;
+  for (const col of profile.columns) {
+    text += `### ${col.column_name} (${col.data_type})\n`;
+    text += `- Nulls: ${col.null_count} (${col.null_pct}%)\n`;
+    text += `- Unique values: ${col.unique_values}\n`;
+    if (col.data_type === "Number") {
+      text += `- Min: ${col.min}, Max: ${col.max}, Mean: ${col.mean}, Median: ${col.median}, StdDev: ${col.std_dev}\n`;
+    }
+    if (col.top_values) {
+      text += `- Top values: ${col.top_values.map(tv => `"${tv.value}" (${tv.count})`).join(", ")}\n`;
+    }
+    if (col.earliest) {
+      text += `- Earliest: ${col.earliest}, Latest: ${col.latest}, Range: ${col.date_range_days} days\n`;
+    }
+    text += "\n";
+  }
+
+  text += `## Sample Data (first ${profile.sample_rows.length} rows)\n\n`;
+  text += "| " + profile.headers.join(" | ") + " |\n";
+  text += "| " + profile.headers.map(() => "---").join(" | ") + " |\n";
+  for (const row of profile.sample_rows) {
+    text += "| " + profile.headers.map((_, j) => row[j] ?? "").join(" | ") + " |\n";
+  }
+
+  return text;
+}
+
+function isInsightsRequest(message: string): boolean {
+  const lower = message.toLowerCase();
+  return INSIGHTS_TRIGGER_KEYWORDS.some(keyword => lower.includes(keyword));
+}
+
 function inferColumnType(values: any[]): string {
   let numCount = 0, dateCount = 0, boolCount = 0, strCount = 0;
   for (const v of values) {
@@ -299,11 +534,23 @@ export function registerChatRoutes(app: Express): void {
       const conversationId = parseInt(req.params.id);
       let userContent = req.body.content || "";
       let extractedFieldNames: string[] = [];
+      let insightsMode = false;
+      let profiledDataText = "";
+
+      const originalUserMessage = userContent;
 
       if (req.file) {
-        const { text: excelContent, fieldNames } = parseExcelBuffer(req.file.buffer, req.file.originalname);
+        const { text: excelContent, fieldNames, hasDataRows } = parseExcelBuffer(req.file.buffer, req.file.originalname);
         userContent = userContent ? `${userContent}\n\n${excelContent}` : excelContent;
         extractedFieldNames = fieldNames;
+
+        if (hasDataRows && isInsightsRequest(originalUserMessage)) {
+          insightsMode = true;
+          const profiledData = profileExcelData(req.file.buffer, req.file.originalname);
+          if (profiledData) {
+            profiledDataText = formatProfiledDataForPrompt(profiledData, req.file.originalname);
+          }
+        }
       }
 
 
@@ -319,18 +566,31 @@ export function registerChatRoutes(app: Express): void {
         content: m.content,
       }));
 
+      if (insightsMode && profiledDataText) {
+        const lastMsg = chatMessages[chatMessages.length - 1];
+        if (lastMsg) {
+          lastMsg.content = `${originalUserMessage}\n\n${profiledDataText}`;
+        }
+      }
+
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
+
+      if (insightsMode) {
+        res.write(`data: ${JSON.stringify({ insightsMode: true })}\n\n`);
+      }
 
       if (extractedFieldNames.length > 0) {
         res.write(`data: ${JSON.stringify({ fieldNames: extractedFieldNames })}\n\n`);
       }
 
+      const systemPrompt = insightsMode ? INSIGHTS_SYSTEM_PROMPT : SYSTEM_PROMPT;
+
       const stream = anthropic.messages.stream({
         model: "claude-sonnet-4-6",
         max_tokens: 8192,
-        system: SYSTEM_PROMPT,
+        system: systemPrompt,
         messages: chatMessages,
       });
 

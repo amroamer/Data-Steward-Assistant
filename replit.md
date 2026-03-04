@@ -59,6 +59,16 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 - Server sends `fieldNames` SSE event when an Excel file is uploaded, allowing the frontend to track session fields
 - System prompt instructs Claude to always include structured summary tables with exact column headers per analysis type
 
+### Data Insights Report
+- Standalone feature triggered by keywords like "give me insights", "analyze this data", etc. when an Excel file with data rows is uploaded
+- Backend (`routes.ts`): `profileExcelData()` computes per-column statistics (type, nulls, unique count, min/max/mean/median/stddev for numeric, top 5 for text, date range for dates); `INSIGHTS_SYSTEM_PROMPT` instructs Claude to return structured JSON with report_title, dataset_summary, key_insights, column_profiles, recommendations, data_quality_flags
+- Backend sends `{ insightsMode: true }` SSE event before streaming so frontend knows to expect insights JSON
+- Frontend (`insights-store.ts`): `detectInsightsJSON()` detects the insights JSON, `generateInsightsExcel()` creates a styled `insights_report_YYYYMMDD_HHMMSS.xlsx` with 5 sheets (executive_summary, key_insights, column_profiles, recommendations, data_quality_flags), `getInsightsScorecard()` extracts scorecard values
+- Chat shows compact summary text + 2x2 scorecard grid (Total Insights, High Impact, Anomalies, Completeness) + dark blue download button
+- Insights reports are completely separate from result.xlsx — each generates its own timestamped file
+- `insightsReports` array in state stores all reports for the session; `insightsForMessage` maps message IDs to reports for re-hydration
+- Previous reports list shown below download button when multiple reports exist in the session
+
 ### Multi-Language Support (Arabic / English)
 - `lang` state (`"en" | "ar"`) toggles between English (LTR) and Arabic (RTL)
 - Globe icon toggle button in the top header bar shows "EN" or "AR"
@@ -113,6 +123,7 @@ Preferred communication style: Simple, everyday language.
 |---|---|
 | `client/src/pages/chat.tsx` | Main chat page with sidebar, messages, input area, summary display |
 | `client/src/lib/result-store.ts` | Cumulative result.xlsx logic: detection, extraction, merge, Excel generation, summary generation |
+| `client/src/lib/insights-store.ts` | Standalone insights report: detection, Excel generation (5 styled sheets), scorecard extraction |
 | `client/src/components/DataModelDiagram.tsx` | Interactive SVG star schema diagram with draggable tables, PNG export, DDL download |
 | `client/src/lib/table-utils.ts` | Markdown table parsing utilities |
 | `server/replit_integrations/chat/routes.ts` | Chat API with file upload and Claude streaming |
