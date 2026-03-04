@@ -6,6 +6,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   Plus,
@@ -39,6 +49,16 @@ import {
   downloadAllTablesAsExcel,
   hasMarkdownTables,
 } from "@/lib/table-utils";
+import {
+  type AnalysisType,
+  type ResultRow,
+  detectAndExtractAllAnalyses,
+  mergeResults,
+  mergeDqResults,
+  generateResultExcel,
+  getIncludedAnalysisLabels,
+  getAnalysisLabel,
+} from "@/lib/result-store";
 
 const FEATURE_CARDS = [
   {
@@ -82,6 +102,14 @@ export default function ChatPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const [resultRows, setResultRows] = useState<ResultRow[]>([]);
+  const [includedAnalyses, setIncludedAnalyses] = useState<AnalysisType[]>([]);
+  const [sessionFieldNames, setSessionFieldNames] = useState<string[] | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -91,7 +119,7 @@ export default function ChatPage() {
     queryKey: ["/api/conversations"],
   });
 
-  const { data: activeConversation, isLoading: messagesLoading } = useQuery<Conversation & { messages: Message[] }>({
+  const { data: activeConversation } = useQuery<Conversation & { messages: Message[] }>({
     queryKey: ["/api/conversations", activeConversationId],
     enabled: !!activeConversationId,
   });
@@ -115,6 +143,7 @@ export default function ChatPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
       if (activeConversationId === deletedId) {
         setActiveConversationId(null);
+        resetResultState();
       }
     },
   });
@@ -126,6 +155,47 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [activeConversation?.messages, streamingContent, scrollToBottom]);
+
+  useEffect(() => {
+    resetResultState();
+  }, [activeConversationId]);
+
+  const resetResultState = () => {
+    setResultRows([]);
+    setIncludedAnalyses([]);
+    setSessionFieldNames(null);
+    setUploadedFileName(null);
+  };
+
+  const processAIResponse = (content: string) => {
+    const analysisResults = detectAndExtractAllAnalyses(content);
+    if (analysisResults.length === 0) return;
+
+    const newTypes: AnalysisType[] = [];
+
+    for (const result of analysisResults) {
+      if (result.analysisType === "data_quality" && result.dqMultiRows && result.dqMultiRows.length > 0) {
+        setResultRows((prev) => mergeDqResults(prev, result.dqMultiRows!));
+      } else if (Object.keys(result.fieldData).length > 0) {
+        setResultRows((prev) => mergeResults(prev, [result]));
+      }
+      newTypes.push(result.analysisType);
+    }
+
+    setIncludedAnalyses((prev) => {
+      const updated = [...prev];
+      for (const t of newTypes) {
+        if (!updated.includes(t)) updated.push(t);
+      }
+      return updated;
+    });
+
+    const labels = newTypes.map((t) => getAnalysisLabel(t)).join(", ");
+    toast({
+      title: "result.xlsx updated",
+      description: `Added ${labels} analysis results`,
+    });
+  };
 
   const sendMessage = async (content: string, file?: File | null) => {
     if (!content.trim() && !file) return;
@@ -149,7 +219,7 @@ export default function ChatPage() {
           id: Date.now(),
           conversationId,
           role: "user",
-          content: file ? `${content}\n\n📎 Uploaded: ${file.name}` : content,
+          content: file ? `${content}\n\nUploaded: ${file.name}` : content,
           createdAt: new Date().toISOString(),
         };
         return old
@@ -188,6 +258,10 @@ export default function ChatPage() {
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
+                if (data.fieldNames) {
+                  setSessionFieldNames(data.fieldNames);
+                  if (file) setUploadedFileName(file.name);
+                }
                 if (data.content) {
                   accumulated += data.content;
                   setStreamingContent(accumulated);
@@ -195,6 +269,7 @@ export default function ChatPage() {
                 if (data.done) {
                   setIsStreaming(false);
                   setStreamingContent("");
+                  processAIResponse(accumulated);
                   queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
                   queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
                 }
@@ -229,18 +304,37 @@ export default function ChatPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const validTypes = [
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/vnd.ms-excel",
-        "text/csv",
-      ];
-      if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
-        toast({ title: "Invalid file", description: "Please upload an Excel (.xlsx, .xls) or CSV file.", variant: "destructive" });
-        return;
-      }
+    if (!file) return;
+
+    const validTypes = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+      "text/csv",
+    ];
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      toast({ title: "Invalid file", description: "Please upload an Excel (.xlsx, .xls) or CSV file.", variant: "destructive" });
+      return;
+    }
+
+    if (sessionFieldNames && sessionFieldNames.length > 0 && resultRows.length > 0) {
+      setPendingFile(file);
+      setShowResetDialog(true);
+    } else {
       setSelectedFile(file);
     }
+  };
+
+  const handleResetConfirm = () => {
+    resetResultState();
+    setSelectedFile(pendingFile);
+    setPendingFile(null);
+    setShowResetDialog(false);
+  };
+
+  const handleResetCancel = () => {
+    setPendingFile(null);
+    setShowResetDialog(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleFeatureCard = (prompt: string) => {
@@ -252,12 +346,34 @@ export default function ChatPage() {
     setInputValue("");
     setSelectedFile(null);
     setStreamingContent("");
+    resetResultState();
+  };
+
+  const handleDownloadResult = () => {
+    if (resultRows.length > 0) {
+      generateResultExcel(resultRows, includedAnalyses);
+    }
   };
 
   const messages = activeConversation?.messages || [];
 
   return (
     <div className="flex h-screen bg-background" data-testid="chat-page">
+      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset result.xlsx?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You already have analysis results from "{uploadedFileName}". Uploading a new file will reset result.xlsx and start fresh with the new file. Your current results ({getIncludedAnalysisLabels(includedAnalyses)}) will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleResetCancel} data-testid="button-reset-cancel">Keep Current</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetConfirm} data-testid="button-reset-confirm">Reset & Upload New</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Sidebar */}
       <div
         className={`${sidebarCollapsed ? "w-0 overflow-hidden" : "w-72"} border-r border-border bg-sidebar flex flex-col transition-all duration-300`}
@@ -353,6 +469,18 @@ export default function ChatPage() {
               {activeConversation?.title || "Data Owner Agent"}
             </h2>
           </div>
+          {resultRows.length > 0 && (
+            <Button
+              size="sm"
+              variant="default"
+              onClick={handleDownloadResult}
+              className="gap-1.5 text-xs flex-shrink-0"
+              data-testid="button-header-download-result"
+            >
+              <Download className="w-3.5 h-3.5" />
+              result.xlsx
+            </Button>
+          )}
           {activeConversationId && (
             <Badge variant="secondary" className="text-xs flex-shrink-0">
               {messages.length} messages
@@ -423,6 +551,36 @@ export default function ChatPage() {
           </div>
         </ScrollArea>
 
+        {/* Result Banner */}
+        {resultRows.length > 0 && (
+          <div className="border-t border-border bg-muted/30 px-4 py-2 flex-shrink-0" data-testid="result-banner">
+            <div className="max-w-3xl mx-auto flex items-center gap-3">
+              <FileSpreadsheet className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium">
+                  result.xlsx updated
+                  {uploadedFileName && (
+                    <span className="text-muted-foreground font-normal"> — source: {uploadedFileName}</span>
+                  )}
+                </p>
+                <p className="text-[10px] text-muted-foreground truncate">
+                  Includes: {getIncludedAnalysisLabels(includedAnalyses)} ({resultRows.length} fields)
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="default"
+                onClick={handleDownloadResult}
+                className="gap-1.5 text-xs flex-shrink-0"
+                data-testid="button-download-result"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download result.xlsx
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Input Area */}
         <div className="border-t border-border bg-background p-4 flex-shrink-0">
           <div className="max-w-3xl mx-auto">
@@ -442,6 +600,12 @@ export default function ChatPage() {
                 >
                   <X className="w-3 h-3" />
                 </Button>
+              </div>
+            )}
+            {sessionFieldNames && sessionFieldNames.length > 0 && !selectedFile && (
+              <div className="flex items-center gap-2 mb-2 text-[10px] text-muted-foreground">
+                <FileSpreadsheet className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">Session fields: {sessionFieldNames.slice(0, 6).join(", ")}{sessionFieldNames.length > 6 ? `, +${sessionFieldNames.length - 6} more` : ""}</span>
               </div>
             )}
             <form onSubmit={handleSubmit} className="flex items-end gap-2">
@@ -468,7 +632,11 @@ export default function ChatPage() {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask about data classification, quality rules, business definitions, or nudge & sludge analysis..."
+                placeholder={
+                  sessionFieldNames
+                    ? "Ask for business definitions, data classification, data quality rules, or nudge & sludge analysis..."
+                    : "Upload an Excel file and ask about data classification, quality rules, business definitions, or nudge & sludge analysis..."
+                }
                 className="min-h-[44px] max-h-32 resize-none flex-1"
                 disabled={isStreaming}
                 data-testid="input-message"

@@ -18,43 +18,56 @@ You have deep expertise in:
 1. **Data Classification (Saudi SDAIA NDMO Standards)**:
    - You classify data fields according to the Saudi Data & AI Authority (SDAIA) National Data Management Office (NDMO) data classification framework.
    - The classification levels are:
-     * **Top Secret**: Data whose unauthorized disclosure could cause exceptionally grave damage to national security, public safety, or vital interests. Examples: military intelligence, critical infrastructure details, state secrets.
-     * **Secret**: Data whose unauthorized disclosure could cause serious damage. Examples: sensitive government communications, security protocols, classified research.
-     * **Confidential**: Data whose unauthorized disclosure could cause damage to organizations or individuals. Examples: personal identifiable information (PII), financial records, health records, employee data, customer data.
-     * **Restricted**: Data intended for internal use only whose disclosure could cause minor harm. Examples: internal policies, organizational charts, internal reports, business strategies.
-     * **Public**: Data that is openly available and whose disclosure causes no harm. Examples: published reports, public statistics, marketing materials.
+     * **Top Secret**: Data whose unauthorized disclosure could cause exceptionally grave damage to national security, public safety, or vital interests.
+     * **Secret**: Data whose unauthorized disclosure could cause serious damage.
+     * **Confidential**: Data whose unauthorized disclosure could cause damage to organizations or individuals. Examples: PII, financial records, health records, employee data, customer data.
+     * **Restricted**: Data intended for internal use only whose disclosure could cause minor harm.
+     * **Public**: Data that is openly available and whose disclosure causes no harm.
    - When classifying fields, consider: the nature of the data, potential impact of disclosure, regulatory requirements, and privacy implications.
-   - Provide the classification level, justification, and any relevant NDMO regulatory references.
 
 2. **Business Definitions**:
    - You generate clear, comprehensive business definitions for data fields/elements.
    - Each definition should include: a clear description of what the field represents, its business context, data type recommendation, expected format, valid values or ranges, business rules, and relationships to other fields.
-   - Definitions should be understandable by both technical and business stakeholders.
 
 3. **Data Quality Rules & Dimensions**:
-   - You suggest appropriate data quality rules for data elements based on the following dimensions:
-     * **Completeness**: Whether all required data is present
-     * **Accuracy**: Whether data correctly represents the real-world entity
-     * **Consistency**: Whether data is uniform across systems
-     * **Timeliness**: Whether data is up-to-date
-     * **Validity**: Whether data conforms to defined formats and rules
-     * **Uniqueness**: Whether there are no duplicate records
+   - You suggest appropriate data quality rules for data elements based on dimensions: Completeness, Accuracy, Consistency, Timeliness, Validity, Uniqueness.
    - For each field, provide specific rules, thresholds, and validation logic.
 
 4. **Nudge & Sludge (Behavioural Analysis)**:
    - You analyze nudge (positive behavioral interventions) and sludge (friction or obstacles) use cases.
    - For nudge use cases, you identify the data elements needed to implement positive behavioral changes.
    - For sludge use cases, you identify data elements that can help reduce friction.
-   - You provide the data architecture needed to support these behavioral analytics.
 
-When the user uploads an Excel file with data fields, analyze the columns/fields and provide your expert analysis. Format your responses with clear tables, bullet points, and structured sections using Markdown.
+## CRITICAL OUTPUT FORMAT RULES
+
+When analyzing data fields, you MUST always include a structured summary markdown table. The table format depends on the type of analysis:
+
+**For Business Definitions — use exactly these columns:**
+| Field Name | Business Term | Business Definition | Data Type | Example |
+
+**For Data Classification — use exactly these columns:**
+| Field Name | Classification Level | Classification Rationale | Data Owner | Sensitivity Category |
+
+**For Data Quality Rules — use exactly these columns:**
+| Field Name | DQ Dimension | DQ Rule | DQ Threshold | DQ Priority |
+
+**For Nudge & Sludge Analysis — use exactly these columns:**
+| Field Name | Nudge/Sludge Type | Use Case | Required Data Elements | Implementation Notes |
+
+Rules for the table:
+- The first column MUST always be "Field Name" containing the exact field/column names from the user's data
+- Include ONE ROW per field being analyzed
+- If a field needs multiple DQ rules, create separate rows for each rule (same Field Name, different DQ Dimension)
+- You may include additional narrative text, explanations, and detailed breakdowns BEFORE or AFTER the summary table
+- The summary table is essential — it enables the app to merge results into a cumulative Excel file
 
 Always be thorough, practical, and align your recommendations with international data governance best practices and Saudi NDMO regulations.`;
 
-function parseExcelBuffer(buffer: Buffer, filename: string): string {
+function parseExcelBuffer(buffer: Buffer, filename: string): { text: string; fieldNames: string[] } {
   try {
     const workbook = XLSX.read(buffer, { type: "buffer" });
     let result = `**Uploaded File: ${filename}**\n\n`;
+    let allFieldNames: string[] = [];
 
     for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName];
@@ -62,8 +75,10 @@ function parseExcelBuffer(buffer: Buffer, filename: string): string {
 
       if (jsonData.length === 0) continue;
 
+      const headers = jsonData[0].map((h: any) => String(h || ""));
+      allFieldNames = [...allFieldNames, ...headers.filter((h: string) => h.trim())];
+
       result += `**Sheet: ${sheetName}**\n`;
-      const headers = jsonData[0];
       result += `**Fields/Columns:** ${headers.join(", ")}\n\n`;
 
       if (jsonData.length > 1) {
@@ -78,9 +93,12 @@ function parseExcelBuffer(buffer: Buffer, filename: string): string {
       result += "\n";
     }
 
-    return result;
+    return { text: result, fieldNames: allFieldNames };
   } catch (error) {
-    return `**Error parsing file ${filename}:** ${error instanceof Error ? error.message : "Unknown error"}`;
+    return {
+      text: `**Error parsing file ${filename}:** ${error instanceof Error ? error.message : "Unknown error"}`,
+      fieldNames: [],
+    };
   }
 }
 
@@ -136,10 +154,12 @@ export function registerChatRoutes(app: Express): void {
     try {
       const conversationId = parseInt(req.params.id);
       let userContent = req.body.content || "";
+      let extractedFieldNames: string[] = [];
 
       if (req.file) {
-        const excelContent = parseExcelBuffer(req.file.buffer, req.file.originalname);
+        const { text: excelContent, fieldNames } = parseExcelBuffer(req.file.buffer, req.file.originalname);
         userContent = userContent ? `${userContent}\n\n${excelContent}` : excelContent;
+        extractedFieldNames = fieldNames;
       }
 
       if (!userContent.trim()) {
@@ -157,6 +177,10 @@ export function registerChatRoutes(app: Express): void {
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
+
+      if (extractedFieldNames.length > 0) {
+        res.write(`data: ${JSON.stringify({ fieldNames: extractedFieldNames })}\n\n`);
+      }
 
       const stream = anthropic.messages.stream({
         model: "claude-sonnet-4-6",

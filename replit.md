@@ -18,6 +18,19 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 - Table parsing handles both standard (`| col |`) and flexible markdown table formats
 - Client-side Excel generation using the `xlsx` (SheetJS) library with auto-sized columns
 
+### Cumulative result.xlsx Feature
+- Maintains an in-memory cumulative data structure (`ResultRow[]`) keyed by `field_name` across multiple AI analyses
+- After each AI response, `detectAndExtractAllAnalyses()` scans all markdown tables for analysis-specific headers and extracts field data
+- Supports multiple analysis types in a single response (each table detected independently)
+- Data Quality rules support multi-row per field (multiple DQ dimensions/rules per field preserved)
+- Column ordering in result.xlsx: Field Name → Business Definitions cols → Data Classification cols → DQ cols → Nudge & Sludge cols (only groups with data included)
+- Result banner appears above the input area when results exist, with a "Download result.xlsx" button
+- Header bar also shows a compact download button when results exist
+- File-reset confirmation dialog (AlertDialog) appears when uploading a new file while results already exist
+- Session state (results, field names, file name) resets on: new chat, conversation switch, conversation delete, or confirmed file reset
+- Server sends `fieldNames` SSE event when an Excel file is uploaded, allowing the frontend to track session fields
+- System prompt instructs Claude to always include structured summary tables with exact column headers per analysis type
+
 ---
 
 ## User Preferences
@@ -64,6 +77,7 @@ Preferred communication style: Simple, everyday language.
 | `client/src/pages/chat.tsx` | Main chat page with sidebar, messages, input area |
 | `client/src/components/markdown-table.tsx` | Custom table renderer with per-table download buttons |
 | `client/src/lib/table-utils.ts` | Markdown table parsing and Excel export utilities |
+| `client/src/lib/result-store.ts` | Cumulative result.xlsx logic: detection, extraction, merge, Excel generation |
 | `server/replit_integrations/chat/routes.ts` | Chat API with file upload and Claude streaming |
 | `shared/models/chat.ts` | Database schema for conversations and messages |
 
