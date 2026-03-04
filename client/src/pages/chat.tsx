@@ -696,9 +696,6 @@ export default function ChatPage() {
                 <div className="p-4 pb-3">
                   <div className="flex items-center gap-3 mb-4">
                     <img src={zatcaLogoPath} alt="ZATCA" className="h-7 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <h1 className="text-xs font-bold tracking-tight truncate">Data Owner Agent</h1>
-                    </div>
                     <Button
                       size="icon"
                       variant="ghost"
