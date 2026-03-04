@@ -4,6 +4,7 @@ import { chatStorage } from "./storage";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { PDFParse } from "pdf-parse";
+import mammoth from "mammoth";
 
 const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
@@ -450,6 +451,158 @@ function isPdf(filename: string, mimetype?: string): boolean {
   return /\.pdf$/i.test(filename) || mimetype === "application/pdf";
 }
 
+const SUPPORTED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+
+function isImage(filename: string, mimetype?: string): boolean {
+  return /\.(png|jpe?g|gif|webp)$/i.test(filename) || (mimetype ? SUPPORTED_IMAGE_MIMES.has(mimetype) : false);
+}
+
+function isWord(filename: string, mimetype?: string): boolean {
+  return /\.docx$/i.test(filename) ||
+    mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+}
+
+function getImageMediaType(mimetype: string): "image/png" | "image/jpeg" | "image/gif" | "image/webp" {
+  if (mimetype === "image/png") return "image/png";
+  if (mimetype === "image/gif") return "image/gif";
+  if (mimetype === "image/webp") return "image/webp";
+  return "image/jpeg";
+}
+
+async function parseWordBuffer(buffer: Buffer, filename: string): Promise<{ text: string; fieldNames: string[]; hasDataRows: boolean }> {
+  try {
+    const result = await mammoth.extractRawText({ buffer });
+    const rawText = result.value || "";
+    if (!rawText.trim()) {
+      return {
+        text: `**Uploaded File: ${filename}**\n\nThe Word document appears to be empty.`,
+        fieldNames: [],
+        hasDataRows: false,
+      };
+    }
+
+    const lines = rawText.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+
+    let fieldNames: string[] = [];
+    let hasDataRows = false;
+    let parsedTable = false;
+    let resultText = `**Uploaded File: ${filename}**\n\n`;
+
+    const tsvLines = lines.filter(l => l.includes("\t") && l.split("\t").length >= 2);
+    if (tsvLines.length >= 2) {
+      const headers = tsvLines[0].split("\t").map(h => h.trim());
+      fieldNames = headers.filter(h => h.length > 0);
+      hasDataRows = tsvLines.length > 1;
+      parsedTable = true;
+
+      resultText += `**Detected Table (${tsvLines.length - 1} rows)**\n`;
+      resultText += `**Fields/Columns:** ${headers.join(", ")}\n\n`;
+
+      const dataRows = tsvLines.slice(1);
+      const columnTypes = headers.map((_, j) => {
+        const colValues = dataRows.slice(0, 100).map(row => row.split("\t")[j]?.trim());
+        return inferColumnType(colValues);
+      });
+      resultText += `**Column Data Types (inferred):** ${headers.map((h, i) => `${h} (${columnTypes[i]})`).join(", ")}\n\n`;
+
+      const sampleCount = Math.min(5, dataRows.length);
+      resultText += `**Sample Data (first ${sampleCount} rows):**\n`;
+      resultText += "| " + headers.join(" | ") + " |\n";
+      resultText += "| " + headers.map(() => "---").join(" | ") + " |\n";
+      for (let i = 0; i < sampleCount; i++) {
+        const cells = dataRows[i].split("\t").map(c => c.trim());
+        resultText += "| " + headers.map((_, j) => cells[j] ?? "").join(" | ") + " |\n";
+      }
+      resultText += `\n**Total rows:** ${dataRows.length}\n\n`;
+    }
+
+    if (!parsedTable) {
+      const csvLikeLines = lines.filter(l => l.includes(",") && l.split(",").length >= 3);
+      if (csvLikeLines.length >= 2) {
+        const headers = csvLikeLines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+        const isLikelyHeader = headers.every(h => !/^\d+(\.\d+)?$/.test(h) && h.length < 80);
+        if (isLikelyHeader) {
+          fieldNames = headers.filter(h => h.length > 0);
+          hasDataRows = csvLikeLines.length > 1;
+          parsedTable = true;
+
+          resultText += `**Detected Table (${csvLikeLines.length - 1} rows)**\n`;
+          resultText += `**Fields/Columns:** ${headers.join(", ")}\n\n`;
+
+          const dataRows = csvLikeLines.slice(1);
+          const sampleCount = Math.min(5, dataRows.length);
+          resultText += `**Sample Data (first ${sampleCount} rows):**\n`;
+          resultText += "| " + headers.join(" | ") + " |\n";
+          resultText += "| " + headers.map(() => "---").join(" | ") + " |\n";
+          for (let i = 0; i < sampleCount; i++) {
+            const cells = dataRows[i].split(",").map(c => c.trim().replace(/^"|"$/g, ""));
+            resultText += "| " + headers.map((_, j) => cells[j] ?? "").join(" | ") + " |\n";
+          }
+          resultText += `\n**Total rows:** ${dataRows.length}\n\n`;
+        }
+      }
+    }
+
+    if (!parsedTable) {
+      for (const delim of ["|", ";"]) {
+        const delimLines = lines.filter(l => l.includes(delim) && l.split(delim).length >= 3);
+        if (delimLines.length >= 2) {
+          const separatorLineIdx = delimLines.findIndex(l => /^[\s|;:-]+$/.test(l.replace(/[|;]/g, "").trim()));
+          let headerLine = delimLines[0];
+          let dataStart = 1;
+          if (separatorLineIdx === 1) dataStart = 2;
+          const headers = headerLine.split(delim).map(h => h.trim()).filter(h => h.length > 0);
+          if (headers.length >= 2) {
+            fieldNames = headers;
+            const dataRows = delimLines.slice(dataStart).filter(l => !/^[\s|;:-]+$/.test(l.replace(/[|;]/g, "").trim()));
+            hasDataRows = dataRows.length > 0;
+            parsedTable = true;
+
+            resultText += `**Detected Table (${dataRows.length} rows)**\n`;
+            resultText += `**Fields/Columns:** ${headers.join(", ")}\n\n`;
+
+            const sampleCount = Math.min(5, dataRows.length);
+            resultText += `**Sample Data (first ${sampleCount} rows):**\n`;
+            resultText += "| " + headers.join(" | ") + " |\n";
+            resultText += "| " + headers.map(() => "---").join(" | ") + " |\n";
+            for (let i = 0; i < sampleCount; i++) {
+              const cells = dataRows[i].split(delim).map(c => c.trim()).filter(c => c.length > 0);
+              resultText += "| " + headers.map((_, j) => cells[j] ?? "").join(" | ") + " |\n";
+            }
+            resultText += `\n**Total rows:** ${dataRows.length}\n\n`;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!parsedTable) {
+      const potentialHeaders: string[] = [];
+      for (const line of lines.slice(0, 30)) {
+        const colonMatch = line.match(/^([^:]+):\s*(.+)/);
+        if (colonMatch) {
+          potentialHeaders.push(colonMatch[1].trim());
+        }
+      }
+      if (potentialHeaders.length >= 3) {
+        fieldNames = potentialHeaders;
+      }
+    }
+
+    const maxTextLen = 8000;
+    const textForContext = rawText.length > maxTextLen ? rawText.slice(0, maxTextLen) + "\n\n[...text truncated...]" : rawText;
+    resultText += `**Full Extracted Text:**\n\`\`\`\n${textForContext}\n\`\`\`\n`;
+
+    return { text: resultText, fieldNames, hasDataRows };
+  } catch (error) {
+    return {
+      text: `**Error parsing Word document ${filename}:** ${error instanceof Error ? error.message : "Unknown error"}`,
+      fieldNames: [],
+      hasDataRows: false,
+    };
+  }
+}
+
 async function extractPdfText(buffer: Buffer): Promise<string> {
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
   const result = await parser.getText();
@@ -765,33 +918,54 @@ export function registerChatRoutes(app: Express): void {
 
       const originalUserMessage = userContent;
 
+      let imageContent: { base64: string; mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp" } | null = null;
+
       if (req.file) {
-        let fileContent: { text: string; fieldNames: string[]; hasDataRows: boolean };
-
-        if (isPdf(req.file.originalname, req.file.mimetype)) {
-          fileContent = await parsePdfBuffer(req.file.buffer, req.file.originalname);
+        if (isImage(req.file.originalname, req.file.mimetype)) {
+          imageContent = {
+            base64: req.file.buffer.toString("base64"),
+            mediaType: getImageMediaType(req.file.mimetype),
+          };
+          const imageDesc = `**Uploaded Image: ${req.file.originalname}**\n\n[Image uploaded for analysis — data will be extracted by AI vision]`;
+          userContent = userContent ? `${userContent}\n\n${imageDesc}` : imageDesc;
         } else {
-          fileContent = parseExcelBuffer(req.file.buffer, req.file.originalname);
-        }
+          let fileContent: { text: string; fieldNames: string[]; hasDataRows: boolean };
 
-        userContent = userContent ? `${userContent}\n\n${fileContent.text}` : fileContent.text;
-        extractedFieldNames = fileContent.fieldNames;
-
-        if (fileContent.hasDataRows && isInsightsRequest(originalUserMessage)) {
-          insightsMode = true;
           if (isPdf(req.file.originalname, req.file.mimetype)) {
-            const rawText = await extractPdfText(req.file.buffer);
-            const pdfLines = rawText.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-            const profiledData = profilePdfData(pdfLines);
-            if (profiledData) {
-              profiledDataText = formatProfiledDataForPrompt(profiledData, req.file.originalname);
-              profiledColumns = profiledData.columns;
-            }
+            fileContent = await parsePdfBuffer(req.file.buffer, req.file.originalname);
+          } else if (isWord(req.file.originalname, req.file.mimetype)) {
+            fileContent = await parseWordBuffer(req.file.buffer, req.file.originalname);
           } else {
-            const profiledData = profileExcelData(req.file.buffer, req.file.originalname);
-            if (profiledData) {
-              profiledDataText = formatProfiledDataForPrompt(profiledData, req.file.originalname);
-              profiledColumns = profiledData.columns;
+            fileContent = parseExcelBuffer(req.file.buffer, req.file.originalname);
+          }
+
+          userContent = userContent ? `${userContent}\n\n${fileContent.text}` : fileContent.text;
+          extractedFieldNames = fileContent.fieldNames;
+
+          if (fileContent.hasDataRows && isInsightsRequest(originalUserMessage)) {
+            insightsMode = true;
+            if (isPdf(req.file.originalname, req.file.mimetype)) {
+              const rawText = await extractPdfText(req.file.buffer);
+              const pdfLines = rawText.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+              const profiledData = profilePdfData(pdfLines);
+              if (profiledData) {
+                profiledDataText = formatProfiledDataForPrompt(profiledData, req.file.originalname);
+                profiledColumns = profiledData.columns;
+              }
+            } else if (isWord(req.file.originalname, req.file.mimetype)) {
+              const wordResult = await mammoth.extractRawText({ buffer: req.file.buffer });
+              const wordLines = (wordResult.value || "").split("\n").map(l => l.trim()).filter(l => l.length > 0);
+              const profiledData = profilePdfData(wordLines);
+              if (profiledData) {
+                profiledDataText = formatProfiledDataForPrompt(profiledData, req.file.originalname);
+                profiledColumns = profiledData.columns;
+              }
+            } else {
+              const profiledData = profileExcelData(req.file.buffer, req.file.originalname);
+              if (profiledData) {
+                profiledDataText = formatProfiledDataForPrompt(profiledData, req.file.originalname);
+                profiledColumns = profiledData.columns;
+              }
             }
           }
         }
@@ -833,6 +1007,26 @@ export function registerChatRoutes(app: Express): void {
       }
 
       const systemPrompt = insightsMode ? INSIGHTS_SYSTEM_PROMPT : SYSTEM_PROMPT;
+
+      if (imageContent) {
+        const lastMsg = chatMessages[chatMessages.length - 1];
+        if (lastMsg && lastMsg.role === "user") {
+          (lastMsg as any).content = [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: imageContent.mediaType,
+                data: imageContent.base64,
+              },
+            },
+            {
+              type: "text",
+              text: originalUserMessage || "Please extract and analyze all data from this image. If it contains a table, extract the table data with headers and rows. Then apply data governance analysis as requested.",
+            },
+          ];
+        }
+      }
 
       const stream = anthropic.messages.stream({
         model: "claude-sonnet-4-6",

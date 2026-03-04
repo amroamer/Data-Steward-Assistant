@@ -81,6 +81,25 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 - AI responses are NOT translated — they remain in whatever language Claude responds in
 - Language preference persists in React state for the session (not across sessions)
 
+### Mobile Responsiveness
+- `useIsMobile()` hook (768px breakpoint) from `client/src/hooks/use-mobile.tsx`
+- On mobile: sidebar renders as a fixed overlay with backdrop instead of a resizable panel
+- Hamburger menu (`Menu` icon) button replaces the panel expand button on mobile
+- Selecting a conversation auto-closes the mobile sidebar
+- Feature cards use `grid-cols-2` on mobile with compact padding and smaller text
+- Cards, icons, and text scale down on mobile for better fit
+
+### Feature Card Disabled State
+- Feature cards are disabled (opacity/grayscale + cursor-not-allowed) when no file is uploaded
+- Shows "Upload a file first" hint with Upload icon below card text when disabled
+- Cards become fully interactive once a file is attached
+
+### Approach Explanations
+- Each summarized AI response includes a collapsible "Approach" section
+- Info icon + "How was this generated?" toggle reveals methodology text
+- Approach text is auto-detected based on summary content keywords (classification, definitions, quality, PII, model, insights)
+- Both EN and AR translations provided for all 6 analysis type approaches
+
 ---
 
 ## User Preferences
@@ -106,7 +125,11 @@ Preferred communication style: Simple, everyday language.
 - **Framework**: Express.js with TypeScript, run via `tsx` in development
 - **Entry**: `server/index.ts` creates an HTTP server and registers routes
 - **Routes**: `server/routes.ts` delegates to `server/replit_integrations/chat/routes.ts`
-- **File Uploads**: `multer` handles file uploads (in-memory, max 10MB). Excel files parsed with `xlsx`, PDF files parsed with `pdf-parse` v2 (class-based API: `PDFParse`). PDF table extraction attempts TSV, CSV, pipe/semicolon delimiters, and key-value patterns. Falls back to raw text for unstructured PDFs.
+- **File Uploads**: `multer` handles file uploads (in-memory, max 10MB). Supported file types:
+  - **Excel** (.xlsx, .xls): parsed with `xlsx` library
+  - **PDF** (.pdf): parsed with `pdf-parse` v2 (class-based API: `PDFParse`). Table extraction attempts TSV, CSV, pipe/semicolon delimiters, and key-value patterns. Falls back to raw text for unstructured PDFs.
+  - **Word** (.docx, .doc): parsed with `mammoth` library for text extraction, then reuses PDF table detection logic
+  - **Images** (.png, .jpg, .jpeg, .gif, .webp): sent to Claude via vision API (base64-encoded) for data extraction
 
 ### Chat System (`server/replit_integrations/chat/`)
 - **`routes.ts`**: REST endpoints for conversations and messages. Parses uploaded Excel files. Uses Anthropic streaming API (SSE).
