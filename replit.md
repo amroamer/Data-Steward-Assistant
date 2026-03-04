@@ -19,6 +19,8 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 - A KPMG green (#00A3A1) "Download result.xlsx" button appears below each summary message
 - summaryOverrides state tracks which message IDs should show summaries vs full content
 - When switching conversations, existing messages are re-scanned to populate summaryOverrides
+- User messages strip Excel file content via `stripExcelContent()` — only the user's prompt text and a file attachment indicator are shown; raw parsed Excel data is never displayed in the UI
+- Multi-analysis requests are supported: system prompt instructs Claude to output all requested tables in one response; frontend parser extracts all tables independently
 
 ### Collapsible Thread Blocks
 - Messages are grouped into user+assistant pairs ("threads") via `groupMessagesIntoThreads()`
@@ -43,6 +45,7 @@ Users interact through a chat interface. They can type prompts or upload Excel f
 - Supports multiple analysis types in a single response (each table detected independently)
 - Data Quality rules support multi-row per field (multiple DQ dimensions/rules per field preserved)
 - Generates separate sheets per analysis type: business_definitions, data_classification, data_quality_rules
+- Non-DQ sheets (business_definitions, data_classification) are deduplicated by field_name in `generateResultExcel()` to prevent duplicate rows caused by DQ multi-row merging
 - Result banner appears above the input area when results exist, with KPMG green download button
 - Header bar also shows a compact download button when results exist
 - File-reset confirmation dialog (AlertDialog) appears when uploading a new file while results already exist

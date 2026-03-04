@@ -53,6 +53,17 @@ Rules for the table:
 - You may include a brief introductory sentence before the table
 - The summary table is essential — it enables the app to merge results into a cumulative Excel file
 
+## MULTI-ANALYSIS REQUESTS
+
+When the user asks for MULTIPLE analyses in a single request (e.g. "give me business definitions, data classification, and data quality rules"), you MUST produce ALL requested tables in ONE response. Output each table sequentially with a brief label before each:
+
+Example structure for a multi-analysis request:
+1. Brief intro sentence for Business Definitions, then the business_definitions table
+2. Brief intro sentence for Data Classification, then the data_classification table
+3. Brief intro sentence for Data Quality Rules, then the data_quality table
+
+Each table MUST use the exact column headers defined above. Do NOT skip any requested analysis. Do NOT merge different analyses into a single table.
+
 ## OUTPUT RESTRICTIONS — Keep responses focused and clean:
 - For **Data Classification**: Output ONLY the field-level classification table. Do NOT include Classification Distribution Summary tables, governance recommendations, regulation references, per-field narrative breakdowns, or emoji-decorated section headers. Just a brief intro and the table.
 - For **Business Definitions**: Output ONLY the field-level definitions table. Do NOT include per-field narrative breakdowns. Just a brief intro and the table.

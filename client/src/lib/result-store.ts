@@ -325,8 +325,29 @@ export function generateResultExcel(rows: ResultRow[], includedAnalyses: Analysi
 
     if (relevantRows.length === 0) continue;
 
+    let outputRows: ResultRow[];
+    if (analysis === "data_quality") {
+      outputRows = relevantRows;
+    } else {
+      const seen = new Map<string, ResultRow>();
+      for (const row of relevantRows) {
+        const key = row.field_name.toLowerCase();
+        if (!seen.has(key)) {
+          seen.set(key, row);
+        } else {
+          const existing = seen.get(key)!;
+          for (const k of config.keys) {
+            if (row[k] && row[k]!.trim() !== "" && (!existing[k] || existing[k]!.trim() === "")) {
+              existing[k] = row[k];
+            }
+          }
+        }
+      }
+      outputRows = Array.from(seen.values());
+    }
+
     const wsData = [headers];
-    for (const row of relevantRows) {
+    for (const row of outputRows) {
       wsData.push(keys.map((k) => row[k] || ""));
     }
 
