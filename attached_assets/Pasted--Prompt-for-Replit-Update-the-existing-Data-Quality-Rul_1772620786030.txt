@@ -1,0 +1,235 @@
+**Prompt for Replit:**
+
+Update the existing **Data Quality Rules** feature. Do not create a new feature or a new trigger — this is an enhancement to what already exists. When the user asks for data quality rules, the output must now be significantly richer, covering three layers: DQ dimensions, technical rules, AND logical/business rules together in one unified analysis.
+
+Also apply a **global branding change** across the entire app — replace all KPMG colors and branding with ZATCA (Zakat, Tax and Customs Authority) branding. This applies to every screen, component, button, header, sidebar, scorecard, and Excel sheet in the app.
+
+---
+
+**Global Branding Change — ZATCA**
+
+Replace every instance of KPMG colors with the ZATCA brand palette:
+
+```javascript
+const ZATCA_COLORS = {
+  primary: "#1A4B8C",        // ZATCA deep blue — replaces KPMG dark blue #00338D
+  secondary: "#2E7D32",      // ZATCA green — replaces KPMG green #00A3A1
+  accent: "#E65100",         // ZATCA orange — replaces KPMG blue #005EB8
+  lightBlue: "#E3F2FD",      // light blue background tints
+  lightGreen: "#E8F5E9",     // light green background tints
+  headerBg: "#1A4B8C",       // all header backgrounds
+  headerText: "#FFFFFF",     // all header text
+  sidebarBg: "#0D2E5C",      // sidebar dark navy
+  sidebarText: "#FFFFFF",
+  buttonPrimary: "#1A4B8C",
+  buttonHover: "#0D2E5C",
+  scoreCardBorder: "#1A4B8C",
+  excelHeaderBg: "1A4B8C",   // for openpyxl hex without #
+  excelHeaderFont: "FFFFFF",
+  altRow: "EBF2FB"
+}
+```
+
+Remove all references to "KPMG" in code comments, variable names, and UI text. Replace with "ZATCA" where a brand reference is needed.
+
+Update the app title, navbar, and any branding text to reflect ZATCA styling — use "Data Owner Agent | ZATCA" as the app title in the navbar.
+
+---
+
+**What Changes in the DQ Feature**
+
+The existing data quality feature currently generates basic DQ dimensions and technical rules. Expand it so that every data quality analysis now automatically includes:
+
+- **Layer 1 — DQ Dimensions & Technical Rules** (already exists — keep, do not remove)
+- **Layer 2 — Logical Rules** (new — add this)
+- **Layer 3 — Business Rules & Cross-Field Rules** (new — add this)
+- **Layer 4 — Business Logic Warnings** (new — add this)
+
+All four layers are generated in a single Claude call from a single user request — the user does not need to ask separately.
+
+---
+
+**Updated Claude Prompt**
+
+Replace the existing Claude system prompt for data quality with this expanded version. Instruct Claude to act as a senior data quality architect with expertise in DAMA DMBOK, enterprise DQ frameworks, and business rule validation. Return **only** this unified JSON, no prose:
+
+```json
+{
+  "analysis_summary": {
+    "total_fields_analyzed": 0,
+    "total_rules_generated": 0,
+    "technical_rules_count": 0,
+    "logical_rules_count": 0,
+    "business_rules_count": 0,
+    "cross_field_rules_count": 0,
+    "warnings_count": 0,
+    "fields_with_critical_rules": 0,
+    "overall_complexity": "High | Medium | Low"
+  },
+  "field_rules": [
+    {
+      "field_name": "...",
+      "inferred_data_type": "...",
+      "business_context": "...",
+      "rules": [
+        {
+          "rule_id": "DQ-001",
+          "rule_name": "...",
+          "rule_layer": "Technical | Logical | Business",
+          "dq_dimension": "Completeness | Validity | Accuracy | Consistency | Uniqueness | Timeliness | Integrity",
+          "rule_type": "Null Check | Format | Range | Pattern | Referential | Conditional | Cross-Field | Uniqueness | Timeliness",
+          "rule_description": "...",
+          "rule_expression": "...",
+          "severity": "Critical | High | Medium | Low",
+          "expected_behavior": "...",
+          "failure_example": "...",
+          "pass_example": "...",
+          "remediation": "..."
+        }
+      ]
+    }
+  ],
+  "cross_field_rules": [
+    {
+      "rule_id": "CF-001",
+      "rule_name": "...",
+      "involved_fields": ["..."],
+      "rule_description": "...",
+      "rule_expression": "...",
+      "business_rationale": "...",
+      "severity": "Critical | High | Medium | Low",
+      "failure_example": "...",
+      "remediation": "..."
+    }
+  ],
+  "business_logic_warnings": [
+    {
+      "warning_id": "BW-001",
+      "field_name": "...",
+      "warning_type": "Suspicious Pattern | Missing Constraint | Ambiguous Definition | Potential Conflict | Risky Default",
+      "description": "...",
+      "recommendation": "..."
+    }
+  ]
+}
+```
+
+Claude must apply all of the following rule generation logic in every analysis:
+
+**Technical Rules (Layer 1 — already exists, keep)**
+- Null/completeness checks for mandatory fields
+- Data type validation
+- Format pattern checks (dates, emails, phone numbers, IDs)
+- Length constraints (min/max character counts)
+- Allowed values / enumeration checks
+
+**Logical Rules (Layer 2 — new)**
+- Range boundaries (age 0–120, percentage 0–100, quantities must be positive, prices must be non-negative)
+- Date ordering logic (start_date must be before end_date, created_at before updated_at, birth_date before hire_date)
+- Uniqueness constraints (ID fields, reference numbers, codes must be unique)
+- Referential integrity (foreign key fields must reference valid parent records)
+- Numerical precision rules (financial fields should have exactly 2 decimal places)
+
+**Business Rules (Layer 3 — new)**
+- Conditional rules — if field A has value X then field B must not be null (e.g. if payment_status = PAID then payment_date must exist, if contract_type = EXTERNAL then vendor_id must be populated)
+- Status transition rules — field values must follow valid state machine logic (e.g. status cannot go from CLOSED back to DRAFT)
+- Business classification rules — field values must align with organizational taxonomy or reference data
+- Regulatory rules — fields subject to ZATCA VAT regulations, Zakat rules, customs declarations, and e-invoicing (FATOORAH) requirements must meet specific constraints
+- SLA rules — date/time fields with business deadlines must be within acceptable windows
+
+**Cross-Field Rules (Layer 3 continued)**
+- Detect relationships between fields that imply business constraints
+- Flag combinations of fields that together must satisfy a condition
+- Identify parent-child field relationships within the same dataset
+
+**Business Logic Warnings (Layer 4 — new)**
+- Flag fields with suspicious naming that suggests they might be storing mixed content
+- Warn about fields that are likely mandatory but have no constraint defined
+- Flag ambiguous field definitions that could cause inconsistent data entry
+- Identify fields that probably need a reference/lookup table but don't have one defined
+- Warn about fields where the data type inferred from the name conflicts with the data type inferred from sample values
+
+---
+
+**Updated Chat Response (Summary Only)**
+
+Replace the existing chat summary for DQ analysis with this richer version:
+
+> ✅ Data Quality Rules Generated
+>
+> Analyzed 24 fields — 94 rules generated across 7 DQ dimensions.
+> Technical: 38 | Logical: 28 | Business: 20 | Cross-field: 8
+> Critical rules: 12 | Business warnings: 6
+> Results saved to result.xlsx — Sheets: dq_rules_by_field, cross_field_rules, business_warnings
+
+Show the **"Download result.xlsx"** button in ZATCA green (`#2E7D32`).
+
+Render an updated **DQ scorecard** in the chat with six tiles:
+
+- 📋 Total Rules: N
+- ⚙️ Technical: N
+- 🧠 Logical: N
+- 💼 Business: N
+- 🔗 Cross-Field: N
+- ⚠️ Warnings: N
+
+Style scorecard tiles with ZATCA primary blue (`#1A4B8C`) border, light background, bold numbers, small labels.
+
+---
+
+**Updated result.xlsx Sheets**
+
+Replace the existing single DQ sheet with these three expanded sheets. All Excel header rows must use ZATCA primary blue (`1A4B8C`) background with white bold text — no KPMG colors anywhere in any sheet.
+
+**Sheet: `dq_rules_by_field`**
+
+| field_name | inferred_data_type | business_context | rule_id | rule_name | rule_layer | dq_dimension | rule_type | rule_description | rule_expression | severity | expected_behavior | failure_example | pass_example | remediation |
+
+Formatting:
+- Header: ZATCA blue (`1A4B8C`), white bold text
+- `rule_layer` color-coded: Technical → blue fill, Logical → purple fill, Business → dark green fill — all white text
+- `severity` color-coded: Critical → red, High → orange, Medium → yellow dark text, Low → green
+- `dq_dimension` column: each dimension gets a unique pastel background
+- `rule_expression` column: monospace font (`Courier New` size 9), light grey background (`#F5F5F5`)
+- Group rows by `field_name` — merge `field_name` cell vertically per group, apply ZATCA blue left border accent
+- Auto-width, freeze header, wrap text enabled
+
+**Sheet: `cross_field_rules`**
+
+| rule_id | rule_name | involved_fields | rule_description | rule_expression | business_rationale | severity | failure_example | remediation |
+
+Formatting:
+- Header: ZATCA blue, white bold text
+- `severity` color-coded same as above
+- `rule_expression`: monospace font, grey background
+- Highlight entire row in light yellow (`#FFFDE7`) for Critical rows
+- Auto-width, freeze header
+
+**Sheet: `business_warnings`**
+
+| warning_id | field_name | warning_type | description | recommendation |
+
+Formatting:
+- Header: ZATCA blue, white bold text
+- `warning_type` color-coded with distinct pastel fills per type
+- Auto-width, freeze header
+
+---
+
+**Session State**
+
+- Replace the existing DQ session state object with the new expanded JSON structure
+- If the user previously generated basic DQ rules in the same session, overwrite those sheets with the new richer output — do not create duplicate DQ sheets
+- Show status banner: "result.xlsx updated — dq_rules_by_field, cross_field_rules, business_warnings now include technical + logical + business rules"
+- Follow-up questions like "explain rule DQ-005" or "why is this a critical rule" should use the stored JSON as context and respond conversationally in chat with short prose
+
+---
+
+**Quick Action Button**
+
+Update the existing button label to:
+- ✅ **"Generate Full DQ Rules (Technical + Logical + Business)"**
+
+In Arabic mode: **"توليد قواعد جودة البيانات الكاملة"**
+
+No new button needed — this replaces the existing one.
