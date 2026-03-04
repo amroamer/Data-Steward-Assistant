@@ -108,7 +108,6 @@ const translations = {
     deleteAllSessions: "Delete all sessions?",
     yesDeleteAll: "Yes, Delete All",
     clearAllSessions: "Clear All Sessions",
-    poweredBy: "Powered by Claude AI",
     appTitle: "ZATCA Data Owner Agent",
     heroTitle: "Data Owner Agent",
     heroDescription: "Your AI assistant for data governance. Upload Excel, PDF, Word, or image files to classify data, generate definitions, or define quality rules.",
@@ -215,7 +214,6 @@ const translations = {
     deleteAllSessions: "حذف جميع الجلسات؟",
     yesDeleteAll: "نعم، حذف الكل",
     clearAllSessions: "مسح جميع الجلسات",
-    poweredBy: "مدعوم بواسطة Claude AI",
     appTitle: "وكيل مالك البيانات - زاتكا",
     heroTitle: "وكيل مالك البيانات",
     heroDescription: "مساعدك الذكي لحوكمة البيانات. قم بتحميل ملفات Excel أو PDF أو Word أو صور لتصنيف البيانات أو إنشاء التعريفات أو تحديد قواعد الجودة.",
@@ -575,7 +573,6 @@ function SidebarContent({
         </div>
         <div className="mb-3">
           <h1 className="text-white font-bold text-sm" data-testid="text-app-title">Data Owner Agent</h1>
-          <p className="text-white/50 text-[10px]">{t.poweredBy}</p>
         </div>
         <div
           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium ${statusConfig.pulse ? "animate-pulse-status" : ""}`}
