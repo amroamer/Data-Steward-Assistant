@@ -48,7 +48,17 @@ import {
   Info,
   Image,
   Camera,
+  Play,
+  Clock,
+  FileText,
+  Activity,
+  Circle,
+  CheckCircle2,
+  AlertCircle,
+  Folder,
+  Tag,
 } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTouchDevice } from "@/hooks/use-touch-device";
 import type { Conversation, Message } from "@shared/schema";
@@ -168,6 +178,33 @@ const translations = {
     approachInsights: "Insights were generated from statistical profiling of all columns, including distribution analysis, null patterns, anomaly detection, and trend identification.",
     cameraCapture: "Take a photo",
     cameraError: "Could not access camera. Please check your camera permissions.",
+    outputsActivity: "Outputs & Activity",
+    liveOutputs: "Live Outputs",
+    sheetTracker: "Sheet Tracker",
+    activityTimeline: "Activity Timeline",
+    noFileLoaded: "No file loaded",
+    executeCmd: "Execute",
+    enterCommand: "Enter agent command...",
+    whatToDo: "What would you like to do today?",
+    dragDropUpload: "Upload a file to get started",
+    startBtn: "Start",
+    commandLabel: "Command:",
+    agentIdle: "Idle",
+    agentThinking: "Thinking",
+    agentExecuting: "Executing",
+    agentDone: "Done",
+    agentWorking: "Agent Working...",
+    stepReadingFile: "Reading uploaded file",
+    stepProfilingData: "Profiling data structure",
+    stepGenerating: "Generating analysis",
+    stepExecuting: "Executing checks",
+    stepSaving: "Saving to result.xlsx",
+    askFollowUp: "Ask Follow-up",
+    quickActions: "Quick Actions",
+    sheetsInResult: "sheets",
+    fileUploaded: "File uploaded",
+    noOutputsYet: "No outputs generated yet",
+    noActivityYet: "No activity yet",
   },
   ar: {
     newChat: "محادثة جديدة",
@@ -248,6 +285,33 @@ const translations = {
     approachInsights: "تم إنشاء الرؤى من التحليل الإحصائي لجميع الأعمدة، بما في ذلك تحليل التوزيع وأنماط القيم الفارغة واكتشاف الشذوذ وتحديد الاتجاهات.",
     cameraCapture: "التقاط صورة",
     cameraError: "تعذر الوصول إلى الكاميرا. يرجى التحقق من أذونات الكاميرا.",
+    outputsActivity: "المخرجات والنشاط",
+    liveOutputs: "المخرجات المباشرة",
+    sheetTracker: "متتبع الأوراق",
+    activityTimeline: "الجدول الزمني للنشاط",
+    noFileLoaded: "لم يتم تحميل ملف",
+    executeCmd: "تنفيذ",
+    enterCommand: "أدخل أمر الوكيل...",
+    whatToDo: "ماذا تريد أن تفعل اليوم؟",
+    dragDropUpload: "قم بتحميل ملف للبدء",
+    startBtn: "ابدأ",
+    commandLabel: "أمر:",
+    agentIdle: "خامل",
+    agentThinking: "يفكر",
+    agentExecuting: "ينفذ",
+    agentDone: "تم",
+    agentWorking: "الوكيل يعمل...",
+    stepReadingFile: "قراءة الملف المحمل",
+    stepProfilingData: "تحليل هيكل البيانات",
+    stepGenerating: "إنشاء التحليل",
+    stepExecuting: "تنفيذ الفحوصات",
+    stepSaving: "حفظ في result.xlsx",
+    askFollowUp: "اطرح سؤال متابعة",
+    quickActions: "إجراءات سريعة",
+    sheetsInResult: "أوراق",
+    fileUploaded: "تم تحميل الملف",
+    noOutputsYet: "لم يتم إنشاء مخرجات بعد",
+    noActivityYet: "لا يوجد نشاط بعد",
   },
 } as const;
 
@@ -324,6 +388,35 @@ interface ThreadPair {
   userMsg: Message;
   assistantMsg?: Message;
 }
+
+interface ActivityLogEntry {
+  icon: string;
+  text: string;
+  timestamp: string;
+}
+
+type AgentStatus = "idle" | "thinking" | "executing" | "done";
+
+interface ThinkingStep {
+  label: string;
+  status: "done" | "active" | "pending";
+}
+
+const SHEET_TAG_COLORS: Record<string, string> = {
+  business_definitions: "#2563EB",
+  data_classification: "#774896",
+  data_quality: "#2E7D32",
+  pii_scan: "#C62828",
+  data_model: "#0D2E5C",
+  insights: "#E65100",
+};
+
+const STATUS_COLORS: Record<AgentStatus, { bg: string; text: string; pulse: boolean }> = {
+  idle: { bg: "#6B7280", text: "#ffffff", pulse: false },
+  thinking: { bg: "#2563EB", text: "#ffffff", pulse: true },
+  executing: { bg: "#E65100", text: "#ffffff", pulse: true },
+  done: { bg: "#2E7D32", text: "#ffffff", pulse: false },
+};
 
 function detectAnalysisTag(userContent: string, assistantContent?: string, t?: Translation): string | null {
   const tr = t || translations.en;
@@ -439,6 +532,7 @@ function SidebarContent({
   showClearAllConfirm,
   setShowClearAllConfirm,
   handleDeleteAllConversations,
+  agentStatus,
 }: {
   t: Translation;
   conversations: Conversation[];
@@ -455,47 +549,54 @@ function SidebarContent({
   showClearAllConfirm: boolean;
   setShowClearAllConfirm: (v: boolean) => void;
   handleDeleteAllConversations: () => void;
+  agentStatus: AgentStatus;
 }) {
+  const statusConfig = STATUS_COLORS[agentStatus];
+  const statusLabel = agentStatus === "idle" ? t.agentIdle : agentStatus === "thinking" ? t.agentThinking : agentStatus === "executing" ? t.agentExecuting : t.agentDone;
+
   return (
     <div
-      className="h-full border-r border-border bg-sidebar flex flex-col"
+      className="h-full flex flex-col font-main"
+      style={{ backgroundColor: "#0D2E5C" }}
       data-testid="sidebar"
     >
       <div className="p-4 pb-3">
-        <div className="flex items-center gap-3 mb-4">
-          <img src={zatcaLogoPath} alt="ZATCA" className="h-7 flex-shrink-0" />
+        <div className="flex items-center gap-3 mb-2">
+          <img src={zatcaLogoPath} alt="ZATCA" className="h-7 flex-shrink-0 brightness-0 invert" />
           <Button
             size="icon"
             variant="ghost"
             onClick={onCollapse}
-            className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground"
+            className="h-7 w-7 flex-shrink-0 text-white/60 hover:text-white hover:bg-white/10"
             data-testid="button-collapse-sidebar"
           >
             <PanelLeftClose className="w-4 h-4" />
           </Button>
         </div>
-        <Button
-          onClick={handleNewChat}
-          className="w-full justify-center gap-2 font-medium"
-          variant="default"
-          size="sm"
-          data-testid="button-new-chat"
+        <div className="mb-3">
+          <h1 className="text-white font-bold text-sm" data-testid="text-app-title">Data Owner Agent</h1>
+          <p className="text-white/50 text-[10px]">{t.poweredBy}</p>
+        </div>
+        <div
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium ${statusConfig.pulse ? "animate-pulse-status" : ""}`}
+          style={{ backgroundColor: statusConfig.bg + "30", color: statusConfig.text }}
+          data-testid="status-agent"
         >
-          <Plus className="w-4 h-4" />
-          {t.newChat}
-        </Button>
+          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusConfig.bg }} />
+          {statusLabel}
+        </div>
       </div>
-      <Separator />
+      <div className="border-t border-white/10" />
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-0.5">
           {conversationsLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              <Loader2 className="w-5 h-5 animate-spin text-white/40" />
             </div>
           ) : conversations.length === 0 ? (
             <div className="text-center py-10 px-4">
-              <MessageSquare className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-              <p className="text-xs text-muted-foreground">
+              <MessageSquare className="w-8 h-8 text-white/20 mx-auto mb-2" />
+              <p className="text-xs text-white/40">
                 {t.noConversations}
               </p>
             </div>
@@ -509,8 +610,8 @@ function SidebarContent({
                 data-testid={`conversation-item-${conv.id}`}
               >
                 {deletingConvId === conv.id ? (
-                  <div className="px-3 py-2.5 rounded-md bg-destructive/8 border border-destructive/15">
-                    <p className="text-[11px] text-destructive font-medium mb-2">{t.deleteSession}</p>
+                  <div className="px-3 py-2.5 rounded-md border" style={{ backgroundColor: "#C6282820", borderColor: "#C6282840" }}>
+                    <p className="text-[11px] font-medium mb-2" style={{ color: "#FF8A80" }}>{t.deleteSession}</p>
                     <div className="flex gap-2">
                       <Button
                         size="sm"
@@ -524,7 +625,7 @@ function SidebarContent({
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-6 text-[11px] px-2.5"
+                        className="h-6 text-[11px] px-2.5 text-white/60 hover:text-white hover:bg-white/10"
                         onClick={() => setDeletingConvId(null)}
                         data-testid={`button-cancel-delete-${conv.id}`}
                       >
@@ -534,19 +635,24 @@ function SidebarContent({
                   </div>
                 ) : (
                   <div
-                    className={`group flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer text-sm transition-colors ${
-                      activeConversationId === conv.id
-                        ? "bg-accent text-accent-foreground font-medium"
-                        : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                    }`}
+                    className="group flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer text-sm transition-colors"
+                    style={{
+                      backgroundColor: activeConversationId === conv.id ? "#1A4B8C" : "transparent",
+                      color: activeConversationId === conv.id ? "#ffffff" : "rgba(255,255,255,0.6)",
+                    }}
                     onClick={() => setActiveConversationId(conv.id)}
+                    onMouseEnter={(e) => { if (activeConversationId !== conv.id) e.currentTarget.style.backgroundColor = "#1A4B8C50"; }}
+                    onMouseLeave={(e) => { if (activeConversationId !== conv.id) e.currentTarget.style.backgroundColor = "transparent"; }}
                   >
                     <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
-                    <span className="truncate flex-1 text-[13px]">{conv.title}</span>
+                    <div className="truncate flex-1">
+                      <span className="text-[13px] block truncate">{conv.title}</span>
+                      <span className="text-[10px] opacity-50">{new Date(conv.createdAt).toLocaleDateString()}</span>
+                    </div>
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="opacity-0 group-hover:opacity-100 h-6 w-6 flex-shrink-0 hover:text-destructive"
+                      className="opacity-0 group-hover:opacity-100 h-6 w-6 flex-shrink-0 text-white/40 hover:text-red-400 hover:bg-white/10"
                       onClick={(e) => {
                         e.stopPropagation();
                         setDeletingConvId(conv.id);
@@ -562,13 +668,13 @@ function SidebarContent({
           )}
         </div>
       </ScrollArea>
-      <Separator />
+      <div className="border-t border-white/10" />
       <div className="p-3 space-y-2">
         {conversations.length > 0 && (
           <>
             {showClearAllConfirm ? (
-              <div className="px-2 py-2 rounded-md bg-destructive/8 border border-destructive/15">
-                <p className="text-[11px] text-destructive font-medium mb-2">{t.deleteAllSessions}</p>
+              <div className="px-2 py-2 rounded-md border" style={{ backgroundColor: "#C6282820", borderColor: "#C6282840" }}>
+                <p className="text-[11px] font-medium mb-2" style={{ color: "#FF8A80" }}>{t.deleteAllSessions}</p>
                 <div className="flex gap-2">
                   <Button
                     size="sm"
@@ -582,7 +688,7 @@ function SidebarContent({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 text-[11px] px-2.5"
+                    className="h-6 text-[11px] px-2.5 text-white/60 hover:text-white hover:bg-white/10"
                     onClick={() => setShowClearAllConfirm(false)}
                     data-testid="button-cancel-clear-all"
                   >
@@ -594,7 +700,7 @@ function SidebarContent({
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full justify-center gap-1.5 text-[11px] text-destructive/70 hover:text-destructive hover:bg-destructive/8"
+                className="w-full justify-center gap-1.5 text-[11px] text-white/40 hover:text-red-400 hover:bg-white/10"
                 onClick={() => setShowClearAllConfirm(true)}
                 data-testid="button-clear-all-sessions"
               >
@@ -604,9 +710,16 @@ function SidebarContent({
             )}
           </>
         )}
-        <p className="text-[10px] text-muted-foreground/60 text-center">
-          {t.poweredBy}
-        </p>
+        <Button
+          onClick={handleNewChat}
+          className="w-full justify-center gap-2 font-medium text-white ripple-button"
+          size="sm"
+          style={{ backgroundColor: "#2563EB" }}
+          data-testid="button-new-chat"
+        >
+          <Plus className="w-4 h-4" />
+          {t.newChat}
+        </Button>
       </div>
     </div>
   );
@@ -647,6 +760,11 @@ export default function ChatPage() {
   const profiledColumnsRef = useRef<BackendColumnProfile[]>([]);
 
   const [collapsedThreads, setCollapsedThreads] = useState<Set<number>>(new Set());
+
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>("idle");
+  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
+  const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
+  const [mobileOutputsOpen, setMobileOutputsOpen] = useState(false);
 
   const [deletingConvId, setDeletingConvId] = useState<number | null>(null);
   const [fadingOutConvId, setFadingOutConvId] = useState<number | null>(null);
@@ -817,6 +935,33 @@ export default function ChatPage() {
     }
   }, [activeConversation?.messages]);
 
+  const addActivityEntry = useCallback((icon: string, text: string) => {
+    const now = new Date();
+    const ts = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    setActivityLog(prev => [...prev, { icon, text, timestamp: ts }]);
+  }, []);
+
+  const getThinkingStepsForCommand = useCallback((content: string): ThinkingStep[] => {
+    const lower = content.toLowerCase();
+    const steps: string[] = [t.stepReadingFile, t.stepProfilingData];
+    if (lower.includes("quality") || lower.includes("dq") || lower.includes("جودة")) {
+      steps.push(t.stepGenerating, t.stepExecuting, t.stepSaving);
+    } else if (lower.includes("classification") || lower.includes("تصنيف")) {
+      steps.push(t.stepGenerating, t.stepSaving);
+    } else if (lower.includes("definition") || lower.includes("تعريف")) {
+      steps.push(t.stepGenerating, t.stepSaving);
+    } else if (lower.includes("model") || lower.includes("نموذج") || lower.includes("star schema")) {
+      steps.push(t.stepGenerating, t.stepSaving);
+    } else if (lower.includes("pii") || lower.includes("بيانات شخصية") || lower.includes("privacy")) {
+      steps.push(t.stepGenerating, t.stepSaving);
+    } else if (lower.includes("insight") || lower.includes("رؤى")) {
+      steps.push(t.stepGenerating, t.stepSaving);
+    } else {
+      steps.push(t.stepGenerating);
+    }
+    return steps.map((label, i) => ({ label, status: i === 0 ? "active" as const : "pending" as const }));
+  }, [t]);
+
   const resetResultState = () => {
     setResultRows([]);
     setIncludedAnalyses([]);
@@ -958,6 +1103,9 @@ export default function ChatPage() {
     setStreamingContent("");
     setInputValue("");
     setSelectedFile(null);
+    setAgentStatus("thinking");
+    setThinkingSteps(getThinkingStepsForCommand(content));
+    addActivityEntry("📤", `${t.commandLabel} ${content.substring(0, 40)}...`);
 
     queryClient.setQueryData(
       ["/api/conversations", conversationId],
@@ -1022,8 +1170,8 @@ export default function ChatPage() {
                   await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
                   await queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
                   toast({
-                    title: language === "ar" ? "خطأ" : "Error",
-                    description: data.content || (language === "ar" ? "حدث خطأ أثناء معالجة الصورة" : "An error occurred while processing the image"),
+                    title: lang === "ar" ? "خطأ" : "Error",
+                    description: data.content || (lang === "ar" ? "حدث خطأ أثناء معالجة الصورة" : "An error occurred while processing the image"),
                     variant: "destructive",
                   });
                   return;
@@ -1031,11 +1179,25 @@ export default function ChatPage() {
                 if (data.content) {
                   accumulated += data.content;
                   setStreamingContent(accumulated);
+                  setAgentStatus("executing");
+                  setThinkingSteps(prev => {
+                    const activeIdx = prev.findIndex(s => s.status === "active");
+                    if (activeIdx >= 0 && activeIdx < prev.length - 1 && accumulated.length > (activeIdx + 1) * 500) {
+                      return prev.map((s, i) => ({
+                        ...s,
+                        status: i <= activeIdx ? "done" as const : i === activeIdx + 1 ? "active" as const : s.status,
+                      }));
+                    }
+                    return prev;
+                  });
                 }
                 if (data.done) {
                   setIsStreaming(false);
                   setStreamingContent("");
                   setIsInsightsMode(false);
+                  setThinkingSteps(prev => prev.map(s => ({ ...s, status: "done" as const })));
+                  setAgentStatus("done");
+                  setTimeout(() => setAgentStatus("idle"), 3000);
 
                   const detectedInsights = detectInsightsJSON(accumulated);
                   const detectedPii = detectPiiScanJSON(accumulated);
@@ -1045,6 +1207,16 @@ export default function ChatPage() {
                   const hasAnyDetection = detectedInsights || detectedPii || detectedDq || detectedModel || analysisResults.length > 0;
                   if (hasAnyDetection) {
                     processAIResponse(accumulated);
+                    if (detectedInsights) addActivityEntry("📊", t.tagInsights);
+                    if (detectedPii) addActivityEntry("🛡️", t.tagPiiScan);
+                    if (detectedDq) addActivityEntry("🔬", t.tagDataQuality);
+                    if (detectedModel) addActivityEntry("🏗️", t.tagDataModel);
+                    if (analysisResults.length > 0) {
+                      for (const r of analysisResults) {
+                        if (r.analysisType === "data_classification") addActivityEntry("📋", t.tagDataClassification);
+                        else if (r.analysisType === "business_definitions") addActivityEntry("📖", t.tagBusinessDefs);
+                      }
+                    }
 
                     await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
                     await queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
@@ -1099,6 +1271,8 @@ export default function ChatPage() {
       }
     } catch (error) {
       toast({ title: t.toastError, description: t.toastErrorDesc, variant: "destructive" });
+      setAgentStatus("idle");
+      setThinkingSteps([]);
     } finally {
       setIsStreaming(false);
       setStreamingContent("");
@@ -1143,6 +1317,7 @@ export default function ChatPage() {
       setShowResetDialog(true);
     } else {
       setSelectedFile(file);
+      addActivityEntry("📥", `${t.fileUploaded}: ${file.name}`);
     }
   };
 
@@ -1231,8 +1406,27 @@ export default function ChatPage() {
   const messages = activeConversation?.messages || [];
   const threads = groupMessagesIntoThreads(messages);
 
+  const sheetCount = includedAnalyses.length + (latestDataModel ? 3 : 0) + (latestPiiScan ? 1 : 0) + (latestDqAnalysis ? 3 : 0);
+
+  const sidebarProps = {
+    t,
+    conversations,
+    conversationsLoading,
+    activeConversationId,
+    handleNewChat,
+    deletingConvId,
+    setDeletingConvId,
+    handleDeleteConversation,
+    fadingOutConvId,
+    fadingOutAll,
+    showClearAllConfirm,
+    setShowClearAllConfirm,
+    handleDeleteAllConversations,
+    agentStatus,
+  };
+
   return (
-    <div className="flex h-screen bg-background" dir={isRtl ? "rtl" : "ltr"} data-testid="chat-page">
+    <div className="flex h-screen font-main" dir={isRtl ? "rtl" : "ltr"} data-testid="chat-page">
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1256,658 +1450,777 @@ export default function ChatPage() {
             data-testid="mobile-sidebar-overlay"
           />
           <div
-            className="fixed inset-y-0 left-0 z-50 w-[75vw] max-w-[320px]"
+            className={`fixed inset-y-0 z-50 w-[75vw] max-w-[280px] ${isRtl ? "right-0" : "left-0"}`}
             data-testid="mobile-sidebar-drawer"
           >
             <SidebarContent
-              t={t}
-              conversations={conversations}
-              conversationsLoading={conversationsLoading}
-              activeConversationId={activeConversationId}
+              {...sidebarProps}
               setActiveConversationId={(id) => { setActiveConversationId(id); setMobileSidebarOpen(false); }}
               onCollapse={() => setMobileSidebarOpen(false)}
-              handleNewChat={handleNewChat}
-              deletingConvId={deletingConvId}
-              setDeletingConvId={setDeletingConvId}
-              handleDeleteConversation={handleDeleteConversation}
-              fadingOutConvId={fadingOutConvId}
-              fadingOutAll={fadingOutAll}
-              showClearAllConfirm={showClearAllConfirm}
-              setShowClearAllConfirm={setShowClearAllConfirm}
-              handleDeleteAllConversations={handleDeleteAllConversations}
             />
           </div>
         </>
       )}
 
-      <PanelGroup direction="horizontal" autoSaveId="chat-layout">
-        {!isMobile && !sidebarCollapsed && (
-          <>
-            <Panel
-              defaultSize={20}
-              minSize={15}
-              maxSize={35}
-              id="sidebar"
-              order={1}
+      {isMobile && mobileOutputsOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/40 z-40"
+            onClick={() => setMobileOutputsOpen(false)}
+          />
+          <div className={`fixed inset-y-0 z-50 w-[80vw] max-w-[320px] ${isRtl ? "left-0" : "right-0"}`}>
+            <OutputsPanel
+              t={t}
+              isRtl={isRtl}
+              resultRows={resultRows}
+              includedAnalyses={includedAnalyses}
+              latestDataModel={latestDataModel}
+              latestPiiScan={latestPiiScan}
+              latestDqAnalysis={latestDqAnalysis}
+              insightsReports={insightsReports}
+              uploadedFileName={uploadedFileName}
+              onDownloadResult={handleDownloadResult}
+              activityLog={activityLog}
+              sheetCount={sheetCount}
+            />
+          </div>
+        </>
+      )}
+
+      {!isMobile && !sidebarCollapsed && (
+        <div className="w-[240px] flex-shrink-0" data-testid="sidebar-panel">
+          <SidebarContent
+            {...sidebarProps}
+            setActiveConversationId={setActiveConversationId}
+            onCollapse={() => setSidebarCollapsed(true)}
+          />
+        </div>
+      )}
+
+      <div className="flex-1 min-w-0 flex flex-col command-center-bg">
+        <div className="h-12 flex items-center gap-3 px-4 flex-shrink-0 border-b" style={{ borderColor: "#E5E7EB", backgroundColor: "#FFFFFF" }}>
+          {(isMobile || sidebarCollapsed) && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => { if (isMobile) setMobileSidebarOpen(true); else setSidebarCollapsed(false); }}
+              className="h-8 w-8"
+              data-testid="button-expand-sidebar"
             >
-              <SidebarContent
-                t={t}
-                conversations={conversations}
-                conversationsLoading={conversationsLoading}
-                activeConversationId={activeConversationId}
-                setActiveConversationId={setActiveConversationId}
-                onCollapse={() => setSidebarCollapsed(true)}
-                handleNewChat={handleNewChat}
-                deletingConvId={deletingConvId}
-                setDeletingConvId={setDeletingConvId}
-                handleDeleteConversation={handleDeleteConversation}
-                fadingOutConvId={fadingOutConvId}
-                fadingOutAll={fadingOutAll}
-                showClearAllConfirm={showClearAllConfirm}
-                setShowClearAllConfirm={setShowClearAllConfirm}
-                handleDeleteAllConversations={handleDeleteAllConversations}
-              />
-            </Panel>
-
-            <PanelResizeHandle className="w-1.5 bg-transparent hover:bg-primary/10 active:bg-primary/20 transition-colors flex items-center justify-center group" data-testid="resize-handle-sidebar">
-              <div className="w-0.5 h-8 rounded-full bg-border group-hover:bg-primary/30 group-active:bg-primary/50 transition-colors" />
-            </PanelResizeHandle>
-          </>
-        )}
-
-        <Panel
-          defaultSize={isMobile || sidebarCollapsed ? 100 : 80}
-          minSize={50}
-          id="main"
-          order={2}
-        >
-          <div className="h-full flex flex-col min-w-0 min-h-0">
-            <div className="h-14 border-b border-border flex items-center gap-3 px-4 bg-background/95 backdrop-blur-sm flex-shrink-0">
-              {(isMobile || sidebarCollapsed) && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => { if (isMobile) setMobileSidebarOpen(true); else setSidebarCollapsed(false); }}
-                  className="h-8 w-8"
-                  data-testid="button-expand-sidebar"
-                >
-                  {isMobile ? <Menu className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
-                </Button>
-              )}
-              <div className="flex-1 min-w-0">
-                <h2 className="text-sm font-semibold truncate">
-                  {activeConversation?.title || t.appTitle}
-                </h2>
-              </div>
-              {threads.length > 1 && (
-                <div className="flex gap-0.5">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 text-[11px] gap-1 px-2 text-muted-foreground hover:text-foreground"
-                    onClick={() => collapseAll(threads)}
-                    data-testid="button-collapse-all"
-                  >
-                    <Minimize2 className="w-3 h-3" />
-                    {t.collapse}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 text-[11px] gap-1 px-2 text-muted-foreground hover:text-foreground"
-                    onClick={expandAll}
-                    data-testid="button-expand-all"
-                  >
-                    <Maximize2 className="w-3 h-3" />
-                    {t.expand}
-                  </Button>
-                </div>
-              )}
+              {isMobile ? <Menu className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+            </Button>
+          )}
+          <div className="flex items-center gap-2 text-xs flex-1 min-w-0" style={{ color: "#1A1A2E" }}>
+            <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#2563EB" }} />
+            <span className="truncate font-medium">
+              {uploadedFileName ? `📁 ${uploadedFileName}` : t.noFileLoaded}
+            </span>
+            {sessionFieldNames && (
+              <span className="text-[10px]" style={{ color: "#6B7280" }}> — {sessionFieldNames.length} columns</span>
+            )}
+          </div>
+          {sheetCount > 0 && (
+            <div className="flex items-center gap-1.5 text-xs" style={{ color: "#2E7D32" }}>
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span className="font-medium">📊 result.xlsx — {sheetCount} {t.sheetsInResult}</span>
+            </div>
+          )}
+          {threads.length > 1 && (
+            <div className="flex gap-0.5">
               <Button
                 size="sm"
-                variant="outline"
-                className="h-8 px-2.5 gap-1.5 text-[11px] font-medium flex-shrink-0"
-                onClick={() => setLang(lang === "en" ? "ar" : "en")}
-                data-testid="button-lang-toggle"
+                variant="ghost"
+                className="h-7 text-[11px] gap-1 px-2"
+                style={{ color: "#6B7280" }}
+                onClick={() => collapseAll(threads)}
+                data-testid="button-collapse-all"
               >
-                <Globe className="w-3.5 h-3.5" />
-                {lang === "en" ? "EN" : "AR"}
+                <Minimize2 className="w-3 h-3" />
+                {t.collapse}
               </Button>
-              {(resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis) && (
-                <Button
-                  size="sm"
-                  onClick={handleDownloadResult}
-                  className="gap-1.5 text-[11px] flex-shrink-0 text-white font-medium h-8 px-3 rounded-md"
-                  style={{ backgroundColor: "#2E7D32" }}
-                  data-testid="button-header-download-result"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  {t.resultXlsx}
-                </Button>
-              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-[11px] gap-1 px-2"
+                style={{ color: "#6B7280" }}
+                onClick={expandAll}
+                data-testid="button-expand-all"
+              >
+                <Maximize2 className="w-3 h-3" />
+                {t.expand}
+              </Button>
             </div>
+          )}
+          {isMobile && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setMobileOutputsOpen(true)}
+              className="h-8 w-8"
+              data-testid="button-mobile-outputs"
+            >
+              <Activity className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
 
-            <div className="flex-1 min-h-0 overflow-hidden">
-            <ScrollArea className="h-full">
-              <div className="max-w-3xl mx-auto w-full px-4 py-6">
-                {!activeConversationId && messages.length === 0 && !isStreaming ? (
-                  <div className="flex flex-col items-center justify-center">
-                    <img src={zatcaLogoPath} alt="ZATCA" className="h-12 mb-6" />
-                    <h2 className="text-2xl font-bold mb-2 tracking-tight">{t.heroTitle}</h2>
-                    <p className="text-muted-foreground text-center mb-8 max-w-md text-sm leading-relaxed">
-                      {t.heroDescription}
-                    </p>
-                    <div className={`grid grid-cols-2 ${isMobile ? "" : "lg:grid-cols-3"} gap-3 w-full max-w-4xl`}>
-                      {FEATURE_CARDS.map((card, cardIdx) => {
-                        const disabled = !selectedFile;
-                        return (
-                          <button
-                            key={card.title}
-                            onClick={() => !disabled && handleFeatureCard(card.prompt)}
-                            className={`${card.bg} rounded-xl ${isMobile ? "p-3" : "p-5"} ${isRtl ? "text-right" : "text-left"} transition-all border border-transparent ${disabled ? "opacity-50 cursor-not-allowed grayscale" : "hover:border-border hover:shadow-sm"} group relative`}
-                            data-testid={`card-feature-${card.title.toLowerCase().replace(/\s+/g, "-")}`}
-                            disabled={disabled}
-                          >
-                            <div className={`${isMobile ? "w-7 h-7 mb-2" : "w-9 h-9 mb-3"} rounded-lg ${card.iconBg} flex items-center justify-center`}>
-                              <card.icon className={`${isMobile ? "w-3.5 h-3.5" : "w-4.5 h-4.5"} ${card.color}`} />
-                            </div>
-                            <h3 className={`${isMobile ? "text-xs" : "text-sm"} font-semibold mb-1`}>{t[featureCardKeys[cardIdx].titleKey] as string}</h3>
-                            <p className={`${isMobile ? "text-[10px]" : "text-xs"} text-muted-foreground leading-relaxed`}>
-                              {t[featureCardKeys[cardIdx].descKey] as string}
-                            </p>
-                            {disabled && (
-                              <div className={`${isMobile ? "text-[9px] mt-1.5" : "text-[10px] mt-2"} text-muted-foreground/60 flex items-center gap-1`}>
-                                <Upload className={`${isMobile ? "w-2.5 h-2.5" : "w-3 h-3"}`} />
-                                {t.uploadFirst}
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="h-full">
+            <div className="max-w-4xl mx-auto w-full px-4 py-6">
+              {!activeConversationId && messages.length === 0 && !isStreaming ? (
+                <div className="flex flex-col items-center justify-center pt-8">
+                  <h2 className="text-2xl font-bold mb-2 tracking-tight font-main" style={{ color: "#2563EB" }} data-testid="text-hero-title">{t.whatToDo}</h2>
+                  <p className="text-center mb-8 max-w-md text-sm leading-relaxed" style={{ color: "#6B7280" }}>
+                    {t.heroDescription}
+                  </p>
+                  <div className={`grid grid-cols-2 ${isMobile ? "" : "lg:grid-cols-3"} gap-4 w-full max-w-4xl`}>
+                    {FEATURE_CARDS.map((card, cardIdx) => (
+                      <button
+                        key={card.title}
+                        onClick={() => {
+                          setInputValue(card.prompt);
+                          textareaRef.current?.focus();
+                        }}
+                        className="bg-white rounded-xl p-5 text-left transition-all border hover:shadow-md animate-slide-up group"
+                        style={{ borderColor: "#E5E7EB", animationDelay: `${cardIdx * 50}ms` }}
+                        data-testid={`card-feature-${card.title.toLowerCase().replace(/\s+/g, "-")}`}
+                      >
+                        <div className={`w-10 h-10 mb-3 rounded-lg ${card.iconBg} flex items-center justify-center`}>
+                          <card.icon className={`w-5 h-5 ${card.color}`} />
+                        </div>
+                        <h3 className="text-sm font-semibold mb-1" style={{ color: "#1A1A2E" }}>{t[featureCardKeys[cardIdx].titleKey] as string}</h3>
+                        <p className="text-xs leading-relaxed mb-3" style={{ color: "#6B7280" }}>
+                          {t[featureCardKeys[cardIdx].descKey] as string}
+                        </p>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium ripple-button rounded-md px-2.5 py-1" style={{ color: "#2563EB", backgroundColor: "#2563EB10" }}>
+                          <Play className="w-3 h-3" />
+                          {t.startBtn}
+                        </span>
+                      </button>
+                    ))}
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {threads.map((thread, idx) => {
-                      const isCollapsed = collapsedThreads.has(idx);
-                      const tag = detectAnalysisTag(
-                        thread.userMsg.content,
-                        thread.assistantMsg?.content,
-                        t
-                      );
-                      const { displayText: previewText } = stripExcelContent(thread.userMsg.content);
-                      const preview = previewText.substring(0, 60) + (previewText.length > 60 ? "..." : "");
-                      const timestamp = formatTimestamp(thread.userMsg.createdAt);
+                  <div
+                    className="mt-8 w-full max-w-xl border-2 border-dashed rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
+                    style={{ borderColor: "#E5E7EB" }}
+                    onClick={() => fileInputRef.current?.click()}
+                    data-testid="dropzone-upload"
+                  >
+                    <Upload className="w-8 h-8 mx-auto mb-2" style={{ color: "#6B7280" }} />
+                    <p className="text-sm font-medium" style={{ color: "#6B7280" }}>{t.dragDropUpload}</p>
+                    <p className="text-[10px] mt-1" style={{ color: "#9CA3AF" }}>{t.uploadFooter}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {threads.map((thread, idx) => {
+                    const isCollapsed = collapsedThreads.has(idx);
+                    const tag = detectAnalysisTag(
+                      thread.userMsg.content,
+                      thread.assistantMsg?.content,
+                      t
+                    );
+                    const { displayText: previewText } = stripExcelContent(thread.userMsg.content);
+                    const timestamp = formatTimestamp(thread.userMsg.createdAt);
 
-                      return (
+                    return (
+                      <div
+                        key={thread.userMsg.id}
+                        className="animate-slide-up"
+                        style={{ animationDelay: `${idx * 30}ms` }}
+                        data-testid={`thread-block-${idx}`}
+                      >
+                        <UserCommandCard
+                          message={thread.userMsg}
+                          displayText={previewText}
+                          timestamp={timestamp}
+                          isCollapsed={isCollapsed}
+                          onToggle={() => toggleThread(idx)}
+                          tag={tag}
+                          isRtl={isRtl}
+                          t={t}
+                        />
+                        {!isCollapsed && thread.assistantMsg && (
+                          <AgentResponseCard
+                            message={thread.assistantMsg}
+                            summaryOverride={summaryOverrides[thread.assistantMsg.id]}
+                            onDownloadResult={(resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis) ? handleDownloadResult : undefined}
+                            dataModel={dataModels[thread.assistantMsg.id] || undefined}
+                            dqAnalysis={dqAnalyses[thread.assistantMsg.id] || undefined}
+                            insightsReport={insightsForMessage[thread.assistantMsg.id] || undefined}
+                            allInsightsReports={insightsReports}
+                            profiledColumns={profiledColumns}
+                            lang={lang}
+                            t={t}
+                            tag={tag}
+                            onAskFollowUp={(text) => { setInputValue(text); textareaRef.current?.focus(); }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                  {isStreaming && (
+                    <>
+                      <ThinkingProgressCard steps={thinkingSteps} t={t} isRtl={isRtl} />
+                      {streamingContent && (
                         <div
-                          key={thread.userMsg.id}
-                          className="rounded-xl border border-border overflow-hidden bg-card/30"
-                          data-testid={`thread-block-${idx}`}
+                          className="rounded-xl bg-white shadow-sm p-4 animate-slide-up"
+                          style={{ borderLeft: isRtl ? "none" : "3px solid #E65100", borderRight: isRtl ? "3px solid #E65100" : "none" }}
+                          data-testid="streaming-content"
                         >
-                          <button
-                            onClick={() => toggleThread(idx)}
-                            className={`w-full flex items-center gap-3 px-4 py-2.5 ${isRtl ? "text-right" : "text-left"} bg-muted/40 hover:bg-muted/60 transition-colors`}
-                            style={isRtl ? { borderRight: "3px solid #067647" } : { borderLeft: "3px solid #067647" }}
-                            data-testid={`thread-header-${idx}`}
-                          >
-                            {isCollapsed ? (
-                              <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
-                            ) : (
-                              <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
-                            )}
-                            <span className="text-[12px] text-foreground truncate flex-1 font-medium">{preview}</span>
-                            {tag && (
-                              <Badge variant="secondary" className="text-[10px] h-5 px-2 flex-shrink-0 font-medium">
-                                {tag}
-                              </Badge>
-                            )}
-                            <span className="text-[10px] text-muted-foreground/70 flex-shrink-0 tabular-nums">{timestamp}</span>
-                          </button>
-                          {!isCollapsed && (
-                            <div className="px-4 py-4 space-y-4" data-testid={`thread-content-${idx}`}>
-                              <MessageBubble
-                                message={thread.userMsg}
-                                lang={lang}
-                                t={t}
-                              />
-                              {thread.assistantMsg && (
-                                <MessageBubble
-                                  message={thread.assistantMsg}
-                                  summaryOverride={summaryOverrides[thread.assistantMsg.id]}
-                                  onDownloadResult={(resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis) ? handleDownloadResult : undefined}
-                                  dataModel={dataModels[thread.assistantMsg.id] || undefined}
-                                  dqAnalysis={dqAnalyses[thread.assistantMsg.id] || undefined}
-                                  insightsReport={insightsForMessage[thread.assistantMsg.id] || undefined}
-                                  allInsightsReports={insightsReports}
-                                  profiledColumns={profiledColumns}
-                                  lang={lang}
-                                  t={t}
-                                />
-                              )}
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: "#067647" }}>
+                              <Bot className="w-3.5 h-3.5 text-white" />
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {isStreaming && (
-                      <div className="rounded-xl border border-border overflow-hidden bg-card/30" data-testid="thread-streaming">
-                        <div
-                          className="flex items-center gap-3 px-4 py-2.5 bg-muted/40"
-                          style={isRtl ? { borderRight: "3px solid #067647" } : { borderLeft: "3px solid #067647" }}
-                        >
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground flex-shrink-0" />
-                          <span className="text-[12px] text-foreground font-medium truncate flex-1">{t.processing}</span>
-                        </div>
-                        <div className="px-4 py-4">
-                          <div className="flex gap-3">
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#067647" }}>
-                              <Bot className="w-4 h-4 text-white" />
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>{t.analyzing}</span>
-                            </div>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "#E65100" }} />
+                          </div>
+                          <div className="prose prose-sm max-w-none break-words" style={{ color: "#1A1A2E" }}>
+                            <ReactMarkdown>{streamingContent}</ReactMarkdown>
+                            <span className={`inline-block w-2 h-4 bg-primary animate-pulse ${isRtl ? "mr-0.5" : "ml-0.5"} align-text-bottom`} />
                           </div>
                         </div>
-                      </div>
-                    )}
-                    <div ref={messagesEndRef} />
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-            </div>
-
-            {(resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis) && (
-              <div className="border-t border-border bg-emerald-50/50 px-4 py-2.5 flex-shrink-0" data-testid="result-banner">
-                <div className="max-w-3xl mx-auto flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-emerald-800">
-                      {t.resultReady}
-                      {uploadedFileName && (
-                        <span className="font-normal text-emerald-600"> — {uploadedFileName}</span>
                       )}
-                    </p>
-                    <p className="text-[10px] text-emerald-600/80 truncate">
-                      {getIncludedAnalysisLabels(includedAnalyses)}{resultRows.length > 0 ? ` (${resultRows.length} fields)` : ""}{latestDataModel ? ` + Data Model: ${latestDataModel.model_name}` : ""}{latestPiiScan ? ` + PII Scan (${latestPiiScan.scan_summary.pii_columns_found} PII columns)` : ""}{latestDqAnalysis ? ` + DQ Rules (${latestDqAnalysis.analysis_summary.total_rules_generated} rules)` : ""}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={handleDownloadResult}
-                    className="gap-1.5 text-[11px] flex-shrink-0 text-white font-medium h-8 px-3 rounded-md"
-                    style={{ backgroundColor: "#2E7D32" }}
-                    data-testid="button-download-result"
+                    </>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+
+        <div className="flex-shrink-0">
+          {activeConversationId && (
+            <div className="px-4 pt-2 pb-1">
+              <div className="max-w-4xl mx-auto flex gap-2 flex-wrap">
+                {FEATURE_CARDS.map((card, cardIdx) => (
+                  <button
+                    key={card.title}
+                    onClick={() => {
+                      setInputValue(card.prompt);
+                      textareaRef.current?.focus();
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all hover:opacity-90"
+                    style={{ backgroundColor: "#0D2E5C", color: "rgba(255,255,255,0.85)" }}
+                    data-testid={`pill-feature-${cardIdx}`}
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    {t.downloadResultXlsx}
+                    <card.icon className="w-3 h-3" />
+                    {t[featureCardKeys[cardIdx].titleKey] as string}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="p-3 flex-shrink-0" style={{ backgroundColor: "#0D2E5C" }}>
+            <div className="max-w-4xl mx-auto">
+              {selectedFile && (
+                <div className="flex items-center gap-2 mb-2 rounded-lg px-3 py-1.5" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}>
+                  {selectedFile.type.startsWith("image/") ? (
+                    <ImagePreview file={selectedFile} />
+                  ) : (
+                    <FileSpreadsheet className="w-4 h-4 text-white/60 flex-shrink-0" />
+                  )}
+                  <span className="text-xs truncate flex-1 text-white/80 font-medium">{selectedFile.name}</span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 flex-shrink-0 text-white/40 hover:text-red-400 hover:bg-transparent"
+                    onClick={() => {
+                      setSelectedFile(null);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                      if (cameraInputRef.current) cameraInputRef.current.value = "";
+                    }}
+                    data-testid="button-remove-file"
+                  >
+                    <X className="w-3 h-3" />
                   </Button>
                 </div>
-              </div>
-            )}
-
-            <div className="border-t border-border bg-background p-4 flex-shrink-0">
-              <div className="max-w-3xl mx-auto">
-                {selectedFile && (
-                  <div className="flex items-center gap-2 mb-3 bg-emerald-50 rounded-lg px-3 py-2 border border-emerald-200">
-                    {selectedFile.type.startsWith("image/") ? (
-                      <ImagePreview file={selectedFile} />
-                    ) : (
-                      <FileSpreadsheet className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                    )}
-                    <span className="text-sm truncate flex-1 text-emerald-800 font-medium">{selectedFile.name}</span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-6 w-6 flex-shrink-0 hover:text-destructive"
-                      onClick={() => {
-                        setSelectedFile(null);
-                        if (fileInputRef.current) fileInputRef.current.value = "";
-                        if (cameraInputRef.current) cameraInputRef.current.value = "";
-                      }}
-                      data-testid="button-remove-file"
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
-                  </div>
-                )}
-                {sessionFieldNames && sessionFieldNames.length > 0 && !selectedFile && (
-                  <div className="flex items-center gap-2 mb-2 text-[10px] text-muted-foreground/70">
-                    <FileSpreadsheet className="w-3 h-3 flex-shrink-0" />
-                    <span className="truncate">{t.sessionFields} {sessionFieldNames.slice(0, 6).join(", ")}{sessionFieldNames.length > 6 ? `, +${sessionFieldNames.length - 6} ${t.more}` : ""}</span>
-                  </div>
-                )}
-                <form onSubmit={handleSubmit} className="flex items-end gap-2">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.gif,.webp,.docx"
-                    onChange={handleFileChange}
-                    className="hidden"
-                    data-testid="input-file"
-                  />
-                  <input
-                    ref={cameraInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleCameraCapture}
-                    className="hidden"
-                    data-testid="input-camera"
-                  />
+              )}
+              <form onSubmit={handleSubmit} className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.gif,.webp,.docx"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  data-testid="input-file"
+                />
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleCameraCapture}
+                  className="hidden"
+                  data-testid="input-camera"
+                />
+                <div className="flex items-center gap-1">
                   <Button
                     type="button"
                     size="icon"
                     variant="ghost"
-                    className="h-9 w-9 flex-shrink-0"
+                    className="h-8 w-8 flex-shrink-0 text-white/50 hover:text-white hover:bg-white/10"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isStreaming}
                     data-testid="button-upload-file"
                   >
-                    <Paperclip className="w-4.5 h-4.5" />
+                    <Paperclip className="w-4 h-4" />
                   </Button>
                   {isTouchDevice && (
                     <Button
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-9 w-9 flex-shrink-0 touch-device-only"
+                      className="h-8 w-8 flex-shrink-0 touch-device-only text-white/50 hover:text-white hover:bg-white/10"
                       onClick={() => cameraInputRef.current?.click()}
                       disabled={isStreaming}
                       title={t.cameraCapture}
                       data-testid="button-camera-capture"
                     >
-                      <Camera className="w-4.5 h-4.5" />
+                      <Camera className="w-4 h-4" />
                     </Button>
                   )}
-                  <Textarea
-                    ref={textareaRef}
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={
-                      sessionFieldNames
-                        ? t.placeholderWithFile
-                        : t.placeholderNoFile
-                    }
-                    className="min-h-[44px] max-h-32 resize-none flex-1 rounded-xl text-sm"
-                    disabled={isStreaming}
-                    data-testid="input-message"
-                  />
                   <Button
-                    type="submit"
-                    size="icon"
-                    className="h-9 w-9 flex-shrink-0 rounded-xl"
-                    disabled={isStreaming || (!inputValue.trim() && !selectedFile)}
-                    data-testid="button-send-message"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 px-2 gap-1 text-[10px] font-medium text-white/50 hover:text-white hover:bg-white/10"
+                    onClick={() => setLang(lang === "en" ? "ar" : "en")}
+                    data-testid="button-lang-toggle"
                   >
-                    {isStreaming ? (
-                      <Loader2 className="w-4.5 h-4.5 animate-spin" />
-                    ) : (
-                      <Send className="w-4.5 h-4.5" />
-                    )}
+                    <Globe className="w-3.5 h-3.5" />
+                    {lang === "en" ? "EN" : "AR"}
                   </Button>
-                </form>
-                <p className="text-[10px] text-muted-foreground/50 text-center mt-2">
-                  {t.uploadFooter}
-                </p>
-              </div>
+                </div>
+                <Textarea
+                  ref={textareaRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={t.enterCommand}
+                  className="min-h-[36px] max-h-24 resize-none flex-1 rounded-lg text-sm border-0 font-mono-cmd"
+                  style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#ffffff" }}
+                  disabled={isStreaming}
+                  data-testid="input-message"
+                />
+                <Button
+                  type="submit"
+                  className="h-9 px-4 flex-shrink-0 rounded-lg gap-1.5 text-xs font-medium text-white ripple-button"
+                  style={{ backgroundColor: "#2E7D32" }}
+                  disabled={isStreaming || (!inputValue.trim() && !selectedFile)}
+                  data-testid="button-send-message"
+                >
+                  {isStreaming ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      {t.executeCmd}
+                      <Play className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </Button>
+              </form>
             </div>
           </div>
-        </Panel>
-      </PanelGroup>
+        </div>
+      </div>
+
+      {!isMobile && (
+        <div className="w-[300px] flex-shrink-0" data-testid="outputs-panel">
+          <OutputsPanel
+            t={t}
+            isRtl={isRtl}
+            resultRows={resultRows}
+            includedAnalyses={includedAnalyses}
+            latestDataModel={latestDataModel}
+            latestPiiScan={latestPiiScan}
+            latestDqAnalysis={latestDqAnalysis}
+            insightsReports={insightsReports}
+            uploadedFileName={uploadedFileName}
+            onDownloadResult={handleDownloadResult}
+            activityLog={activityLog}
+            sheetCount={sheetCount}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
-function MessageBubble({
-  message,
-  isStreaming = false,
-  summaryOverride,
-  onDownloadResult,
-  dataModel,
-  dqAnalysis,
-  insightsReport,
-  allInsightsReports,
-  profiledColumns = [],
-  lang = "en",
-  t,
+function OutputsPanel({
+  t, isRtl, resultRows, includedAnalyses, latestDataModel, latestPiiScan, latestDqAnalysis, insightsReports, uploadedFileName, onDownloadResult, activityLog, sheetCount,
 }: {
-  message: Message;
-  isStreaming?: boolean;
-  summaryOverride?: string;
-  onDownloadResult?: () => void;
-  dataModel?: DataModelJSON | null;
-  dqAnalysis?: DqAnalysisResult | null;
+  t: Translation; isRtl: boolean;
+  resultRows: ResultRow[]; includedAnalyses: AnalysisType[];
+  latestDataModel: DataModelJSON | null; latestPiiScan: PiiScanResult | null; latestDqAnalysis: DqAnalysisResult | null;
+  insightsReports: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
+  uploadedFileName: string | null; onDownloadResult: () => void; activityLog: ActivityLogEntry[]; sheetCount: number;
+}) {
+  const hasResultXlsx = resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis;
+  const hasOutputs = hasResultXlsx || insightsReports.length > 0;
+
+  const sheetTags: { label: string; color: string }[] = [];
+  for (const a of includedAnalyses) {
+    sheetTags.push({ label: getAnalysisLabel(a), color: SHEET_TAG_COLORS[a] || "#6B7280" });
+  }
+  if (latestDataModel) sheetTags.push({ label: "Data Model", color: SHEET_TAG_COLORS.data_model });
+  if (latestPiiScan) sheetTags.push({ label: "PII Scan", color: SHEET_TAG_COLORS.pii_scan });
+  if (latestDqAnalysis) sheetTags.push({ label: "DQ Rules", color: SHEET_TAG_COLORS.data_quality });
+
+  return (
+    <div className="h-full bg-white flex flex-col font-main" style={{ borderLeft: isRtl ? "none" : "1px solid #E5E7EB", borderRight: isRtl ? "1px solid #E5E7EB" : "none" }} data-testid="outputs-panel-content">
+      <div className="p-4 pb-3">
+        <h2 className="text-sm font-bold" style={{ color: "#2563EB" }}>{t.outputsActivity}</h2>
+      </div>
+
+      <ScrollArea className="flex-1">
+        <div className="px-4 space-y-4">
+          <div>
+            <h3 className="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style={{ color: "#1A1A2E", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}>
+              <FileSpreadsheet className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />
+              {t.liveOutputs}
+            </h3>
+            {hasOutputs ? (
+              <div className="space-y-2">
+                {hasResultXlsx && (
+                  <div
+                    className="rounded-lg border p-3 cursor-pointer hover:shadow-sm transition-shadow"
+                    style={{ borderColor: "#E5E7EB" }}
+                    onClick={onDownloadResult}
+                    data-testid="output-card-result"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet className="w-5 h-5" style={{ color: "#2E7D32" }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold" style={{ color: "#1A1A2E" }}>result.xlsx</p>
+                        <p className="text-[10px]" style={{ color: "#6B7280" }}>{sheetCount} {t.sheetsInResult}{uploadedFileName ? ` — ${uploadedFileName}` : ""}</p>
+                      </div>
+                      <Button size="sm" className="h-7 px-2 text-[10px] text-white" style={{ backgroundColor: "#2E7D32" }} onClick={(e) => { e.stopPropagation(); onDownloadResult(); }} data-testid="button-download-result">
+                        <Download className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {insightsReports.map((rpt, i) => (
+                  <div key={i} className="rounded-lg border p-2.5" style={{ borderColor: "#E5E7EB" }}>
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4" style={{ color: "#E65100" }} />
+                      <span className="text-[10px] truncate flex-1" style={{ color: "#1A1A2E" }}>{rpt.excelFileName}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[10px] py-3 text-center" style={{ color: "#9CA3AF" }}>{t.noOutputsYet}</p>
+            )}
+          </div>
+
+          <div>
+            <h3 className="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style={{ color: "#1A1A2E", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}>
+              <Tag className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />
+              {t.sheetTracker}
+            </h3>
+            {sheetTags.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {sheetTags.map((tag, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white animate-pop-in"
+                    style={{ backgroundColor: tag.color, animationDelay: `${i * 80}ms` }}
+                    data-testid={`sheet-tag-${i}`}
+                  >
+                    {tag.label}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[10px] py-2" style={{ color: "#9CA3AF" }}>—</p>
+            )}
+          </div>
+
+          <div>
+            <h3 className="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style={{ color: "#1A1A2E", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}>
+              <Clock className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />
+              {t.activityTimeline}
+            </h3>
+            {activityLog.length > 0 ? (
+              <div className="space-y-0">
+                {activityLog.slice(-20).reverse().map((entry, i) => (
+                  <div key={i} className="flex items-start gap-2 py-1.5" style={{ borderLeft: isRtl ? "none" : "2px solid #E5E7EB", borderRight: isRtl ? "2px solid #E5E7EB" : "none", paddingLeft: isRtl ? 0 : 10, paddingRight: isRtl ? 10 : 0 }}>
+                    <span className="text-[11px] flex-shrink-0">{entry.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] truncate" style={{ color: "#1A1A2E" }}>{entry.text}</p>
+                      <p className="text-[9px]" style={{ color: "#9CA3AF" }}>{entry.timestamp}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[10px] py-2" style={{ color: "#9CA3AF" }}>{t.noActivityYet}</p>
+            )}
+          </div>
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
+function UserCommandCard({
+  message, displayText, timestamp, isCollapsed, onToggle, tag, isRtl, t,
+}: {
+  message: Message; displayText: string; timestamp: string; isCollapsed: boolean; onToggle: () => void; tag: string | null; isRtl: boolean; t: Translation;
+}) {
+  const { fileName } = stripExcelContent(message.content);
+  const preview = displayText.substring(0, 80) + (displayText.length > 80 ? "..." : "");
+
+  return (
+    <div
+      className="rounded-t-xl bg-white/80 cursor-pointer"
+      style={{ borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none" }}
+      onClick={onToggle}
+      data-testid={`user-command-${message.id}`}
+    >
+      <div className="flex items-center gap-3 px-4 py-2.5">
+        <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+          <User className="w-3.5 h-3.5" style={{ color: "#6B7280" }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold" style={{ color: "#2563EB" }}>{t.commandLabel}</span>
+            {tag && (
+              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#2563EB15", color: "#2563EB" }}>{tag}</span>
+            )}
+          </div>
+          <p className="text-xs truncate" style={{ color: "#1A1A2E" }}>{preview}</p>
+          {fileName && (
+            <div className="flex items-center gap-1 mt-0.5">
+              <Paperclip className="w-2.5 h-2.5" style={{ color: "#9CA3AF" }} />
+              <span className="text-[9px]" style={{ color: "#9CA3AF" }}>{fileName}</span>
+            </div>
+          )}
+        </div>
+        <span className="text-[9px] flex-shrink-0 tabular-nums" style={{ color: "#9CA3AF" }}>{timestamp}</span>
+        {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" style={{ color: "#9CA3AF" }} /> : <ChevronDown className="w-3.5 h-3.5" style={{ color: "#9CA3AF" }} />}
+      </div>
+    </div>
+  );
+}
+
+function DqDonutChart({ dqAnalysis, lang }: { dqAnalysis: DqAnalysisResult; lang: Lang }) {
+  const total = dqAnalysis.analysis_summary.total_rules_generated;
+  const technical = dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Technical").length, 0);
+  const logical = dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Logical").length, 0);
+  const business = dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Business").length, 0);
+  const crossField = dqAnalysis.cross_field_rules.length;
+  const warnings = dqAnalysis.business_logic_warnings.length;
+
+  const data = [
+    { name: "Technical", value: technical, color: "#0094D3" },
+    { name: "Logical", value: logical, color: "#51BAB4" },
+    { name: "Business", value: business, color: "#774896" },
+    { name: "Cross-Field", value: crossField, color: "#067647" },
+    { name: "Warnings", value: warnings, color: "#D97706" },
+  ].filter(d => d.value > 0);
+
+  const score = total > 0 ? Math.min(100, Math.round((total / Math.max(dqAnalysis.analysis_summary.total_fields_analyzed * 3, 1)) * 100)) : 0;
+  const scoreColor = score >= 90 ? "#2E7D32" : score >= 70 ? "#F9A825" : "#C62828";
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="relative w-20 h-20">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={data} cx="50%" cy="50%" innerRadius={25} outerRadius={35} paddingAngle={2} dataKey="value" strokeWidth={0}>
+              {data.map((entry, i) => (
+                <Cell key={i} fill={entry.color} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-sm font-bold" style={{ color: scoreColor }}>{total}</span>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+        {[
+          { label: lang === "ar" ? "تقنية" : "Technical", value: technical, color: "#0094D3" },
+          { label: lang === "ar" ? "منطقية" : "Logical", value: logical, color: "#51BAB4" },
+          { label: lang === "ar" ? "أعمال" : "Business", value: business, color: "#774896" },
+          { label: lang === "ar" ? "عبر الحقول" : "Cross-Field", value: crossField, color: "#067647" },
+          { label: lang === "ar" ? "تحذيرات" : "Warnings", value: warnings, color: "#D97706" },
+        ].map((item, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+            <span className="text-[10px]" style={{ color: "#6B7280" }}>{item.label}</span>
+            <span className="text-[10px] font-bold" style={{ color: item.color }}>{item.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AgentResponseCard({
+  message, summaryOverride, onDownloadResult, dataModel, dqAnalysis, insightsReport, allInsightsReports, profiledColumns = [], lang = "en", t, tag, onAskFollowUp,
+}: {
+  message: Message; summaryOverride?: string; onDownloadResult?: () => void;
+  dataModel?: DataModelJSON | null; dqAnalysis?: DqAnalysisResult | null;
   insightsReport?: InsightsReport | null;
   allInsightsReports?: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
-  profiledColumns?: BackendColumnProfile[];
-  lang?: Lang;
-  t?: Translation;
+  profiledColumns?: BackendColumnProfile[]; lang?: Lang; t?: Translation; tag?: string | null;
+  onAskFollowUp?: (text: string) => void;
 }) {
   const tr = t || translations[lang];
-  const isUser = message.role === "user";
   const isRtl = lang === "ar";
-  const shouldShowSummary = !isUser && !isStreaming && summaryOverride;
-  const hasDataModel = !isUser && !isStreaming && dataModel;
-  const hasDqAnalysis = !isUser && !isStreaming && dqAnalysis;
-  const hasInsights = !isUser && !isStreaming && insightsReport;
-  const [showApproach, setShowApproach] = useState(false);
+  const hasDataModel = dataModel != null;
+  const hasDqAnalysis = dqAnalysis != null;
+  const hasInsights = insightsReport != null;
+  const hasSummary = !!summaryOverride;
+  const [expanded, setExpanded] = useState(true);
+  const timestamp = formatTimestamp(message.createdAt);
 
-  const { displayText, fileName } = isUser ? stripExcelContent(message.content) : { displayText: message.content, fileName: null };
+  const borderColor = "#2E7D32";
+  const statusText = "✅ Complete";
+  const statusColor = "#2E7D32";
 
   const handleDownloadInsights = (report: InsightsReport, srcFile?: string, cols?: BackendColumnProfile[]) => {
     generateInsightsExcel(report, srcFile || "data.xlsx", cols || profiledColumns);
   };
 
-  const getApproachText = (): string | null => {
-    if (!summaryOverride) return null;
-    const s = summaryOverride.toLowerCase();
-    if (s.includes("classification") || s.includes("تصنيف")) return tr.approachClassification;
-    if (s.includes("business definition") || s.includes("تعريفات")) return tr.approachDefinitions;
-    if (s.includes("quality rule") || s.includes("قواعد جودة")) return tr.approachQuality;
-    if (s.includes("pii") || s.includes("بيانات شخصية") || s.includes("privacy scan") || s.includes("sensitive data")) return tr.approachPii;
-    if (s.includes("data model") || s.includes("نموذج البيانات") || s.includes("star schema")) return tr.approachModel;
-    if (s.includes("insights") || s.includes("رؤى")) return tr.approachInsights;
-    return null;
-  };
-  const approachText = getApproachText();
-
   return (
-    <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`} data-testid={`message-${message.id}`}>
-      <div
-        className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-          isUser ? "bg-secondary" : ""
-        }`}
-        style={!isUser ? { backgroundColor: "#067647" } : undefined}
-      >
-        {isUser ? (
-          <User className="w-4 h-4 text-secondary-foreground" />
-        ) : (
-          <Bot className="w-4 h-4 text-white" />
+    <div
+      className="rounded-b-xl bg-white shadow-sm mb-3 animate-slide-up"
+      style={{ borderLeft: isRtl ? "none" : `3px solid ${borderColor}`, borderRight: isRtl ? `3px solid ${borderColor}` : "none" }}
+      data-testid={`agent-response-${message.id}`}
+    >
+      <div className="flex items-center gap-2 px-4 py-2 border-b" style={{ borderColor: "#E5E7EB" }}>
+        <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: "#067647" }}>
+          <Bot className="w-3.5 h-3.5 text-white" />
+        </div>
+        {tag && (
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#0D2E5C", color: "#ffffff" }}>{tag}</span>
         )}
+        <span className="text-[10px] font-medium" style={{ color: statusColor }}>{statusText}</span>
+        <div className="flex-1" />
+        <span className="text-[9px] tabular-nums" style={{ color: "#9CA3AF" }}>{timestamp}</span>
+        <button onClick={() => setExpanded(!expanded)} className="p-0.5" data-testid={`button-toggle-response-${message.id}`}>
+          {expanded ? <ChevronDown className="w-3.5 h-3.5" style={{ color: "#9CA3AF" }} /> : <ChevronRight className="w-3.5 h-3.5" style={{ color: "#9CA3AF" }} />}
+        </button>
       </div>
-      <div
-        className={`flex-1 min-w-0 ${isUser ? (isRtl ? "text-left" : "text-right") : (isRtl ? "text-right" : "")}`}
-      >
-        {hasDataModel ? (
-          <div className={isRtl ? "text-right" : "text-left"}>
-            {shouldShowSummary && (
-              <div className={`inline-block ${isRtl ? "text-right" : "text-left"} rounded-xl px-4 py-3 text-sm max-w-full bg-card border border-card-border mb-3`}>
-                <div className="whitespace-pre-wrap break-words leading-relaxed">{summaryOverride}</div>
-                {approachText && (
-                  <div className="mt-2 pt-2 border-t border-border/50">
-                    <button
-                      onClick={() => setShowApproach(!showApproach)}
-                      className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                      data-testid={`button-approach-${message.id}`}
-                    >
-                      <Info className="w-3 h-3" />
-                      {tr.approachTitle}
-                      {showApproach ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                    </button>
-                    {showApproach && (
-                      <p className="mt-1.5 text-[11px] text-muted-foreground leading-relaxed">{approachText}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-            <DataModelDiagram
-              model={dataModel!}
-              onDownloadExcel={onDownloadResult}
-              lang={lang}
-            />
-          </div>
-        ) : hasDqAnalysis && dqAnalysis ? (
-          <div className={isRtl ? "text-right" : "text-left"}>
-            {shouldShowSummary && (
-              <div className={`inline-block ${isRtl ? "text-right" : "text-left"} rounded-xl px-4 py-3 text-sm max-w-full bg-card border border-card-border mb-3`}>
-                <div className="whitespace-pre-wrap break-words leading-relaxed">{summaryOverride}</div>
-              </div>
-            )}
-            <div className="space-y-2" data-testid={`dq-scorecard-${message.id}`}>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: lang === "ar" ? "إجمالي القواعد" : "Total Rules", value: dqAnalysis.analysis_summary.total_rules_generated, color: "#1A4B8C" },
-                  { label: lang === "ar" ? "قواعد تقنية" : "Technical", value: dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Technical").length, 0), color: "#0094D3" },
-                  { label: lang === "ar" ? "قواعد منطقية" : "Logical", value: dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Logical").length, 0), color: "#51BAB4" },
-                  { label: lang === "ar" ? "قواعد أعمال" : "Business", value: dqAnalysis.field_rules.reduce((sum, f) => sum + f.rules.filter(r => r.rule_layer === "Business").length, 0), color: "#774896" },
-                  { label: lang === "ar" ? "قواعد عبر الحقول" : "Cross-Field", value: dqAnalysis.cross_field_rules.length, color: "#067647" },
-                  { label: lang === "ar" ? "تحذيرات" : "Warnings", value: dqAnalysis.business_logic_warnings.length, color: "#D97706" },
-                ].map((tile, i) => (
-                  <div
-                    key={i}
-                    className="rounded-lg border p-2 text-center"
-                    style={{ borderColor: tile.color + "40", backgroundColor: tile.color + "08" }}
-                    data-testid={`dq-tile-${i}`}
-                  >
-                    <div className="text-lg font-bold" style={{ color: tile.color }}>{tile.value}</div>
-                    <div className="text-[10px] text-muted-foreground leading-tight">{tile.label}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="text-[11px] text-muted-foreground">
+
+      {expanded && (
+        <div className="px-4 py-3 space-y-3">
+          {hasSummary && (
+            <div className="text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ color: "#1A1A2E" }}>{summaryOverride}</div>
+          )}
+
+          {hasDataModel && (
+            <DataModelDiagram model={dataModel!} onDownloadExcel={onDownloadResult} lang={lang} />
+          )}
+
+          {hasDqAnalysis && dqAnalysis && (
+            <div className="space-y-3" data-testid={`dq-scorecard-${message.id}`}>
+              <DqDonutChart dqAnalysis={dqAnalysis} lang={lang} />
+              <div className="text-[11px]" style={{ color: "#6B7280" }}>
                 {lang === "ar"
                   ? `تم تحليل ${dqAnalysis.analysis_summary.total_fields_analyzed} حقل — ${dqAnalysis.analysis_summary.total_rules_generated} قاعدة جودة`
                   : `${dqAnalysis.analysis_summary.total_fields_analyzed} fields analyzed — ${dqAnalysis.analysis_summary.total_rules_generated} quality rules generated`}
               </div>
-              {onDownloadResult && (
-                <Button
-                  size="sm"
-                  onClick={onDownloadResult}
-                  className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md"
-                  style={{ backgroundColor: "#2E7D32" }}
-                  data-testid={`button-download-dq-${message.id}`}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  {tr.downloadResultXlsx}
-                </Button>
+            </div>
+          )}
+
+          {hasInsights && (
+            <div className="space-y-2" data-testid={`insights-card-${message.id}`}>
+              <Button
+                size="sm"
+                onClick={() => handleDownloadInsights(insightsReport!)}
+                className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md ripple-button"
+                style={{ backgroundColor: "#1A4B8C" }}
+                data-testid={`button-download-insights-${message.id}`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                {tr.downloadInsightsReport}
+              </Button>
+              {allInsightsReports && allInsightsReports.length > 1 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-medium" style={{ color: "#6B7280" }}>{tr.previousReports}</p>
+                  {allInsightsReports.map((rpt, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <FileSpreadsheet className="w-3 h-3 flex-shrink-0" style={{ color: "#6B7280" }} />
+                      <span className="text-[10px] truncate flex-1" style={{ color: "#6B7280" }}>{rpt.excelFileName}</span>
+                      <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px]" onClick={() => handleDownloadInsights(rpt.report, rpt.fileName, rpt.columns)} data-testid={`button-download-prev-insights-${i}`}>
+                        <Download className="w-2.5 h-2.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
+          )}
+
+          {!hasSummary && !hasDataModel && !hasDqAnalysis && !hasInsights && (
+            <div className="prose prose-sm max-w-none break-words" style={{ color: "#1A1A2E" }}>
+              <ReactMarkdown>{message.content}</ReactMarkdown>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 pt-2 border-t" style={{ borderColor: "#E5E7EB" }}>
+            {onDownloadResult && (
+              <Button
+                size="sm"
+                onClick={onDownloadResult}
+                className="gap-1.5 text-[10px] text-white font-medium h-7 px-2.5 rounded-md ripple-button"
+                style={{ backgroundColor: "#2E7D32" }}
+                data-testid={`button-download-result-${message.id}`}
+              >
+                <Download className="w-3 h-3" />
+                {tr.downloadResultXlsx}
+              </Button>
+            )}
+            {onAskFollowUp && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 text-[10px] h-7 px-2.5"
+                style={{ color: "#6B7280" }}
+                onClick={() => onAskFollowUp("")}
+                data-testid={`button-followup-${message.id}`}
+              >
+                <MessageSquare className="w-3 h-3" />
+                {tr.askFollowUp}
+              </Button>
+            )}
           </div>
-        ) : (
-          <>
-            <div
-              className={`inline-block ${isRtl ? "text-right" : "text-left"} rounded-xl px-4 py-3 text-sm max-w-full ${
-                isUser
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card border border-card-border"
-              }`}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ThinkingProgressCard({ steps, t, isRtl }: { steps: ThinkingStep[]; t: Translation; isRtl: boolean }) {
+  return (
+    <div className="rounded-xl bg-white shadow-sm p-4 animate-slide-up" style={{ borderLeft: isRtl ? "none" : "3px solid #E65100", borderRight: isRtl ? "3px solid #E65100" : "none" }} data-testid="thinking-progress">
+      <div className="flex items-center gap-2 mb-3">
+        <Loader2 className="w-4 h-4 animate-spin" style={{ color: "#E65100" }} />
+        <span className="text-sm font-semibold" style={{ color: "#1A1A2E" }}>{t.agentWorking}</span>
+      </div>
+      <div className="border-t" style={{ borderColor: "#E5E7EB" }} />
+      <div className="mt-3 space-y-2">
+        {steps.map((step, i) => (
+          <div key={i} className="flex items-center gap-2.5">
+            {step.status === "done" ? (
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: "#2E7D32" }} />
+            ) : step.status === "active" ? (
+              <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" style={{ color: "#E65100" }} />
+            ) : (
+              <Circle className="w-4 h-4 flex-shrink-0" style={{ color: "#D1D5DB" }} />
+            )}
+            <span
+              className="text-xs"
+              style={{ color: step.status === "done" ? "#2E7D32" : step.status === "active" ? "#E65100" : "#9CA3AF", fontWeight: step.status === "active" ? 600 : 400 }}
             >
-              {isUser ? (
-                <div>
-                  {displayText && <div className="whitespace-pre-wrap break-words">{displayText}</div>}
-                  {fileName && (
-                    <div className={`flex items-center gap-1.5 ${displayText ? "mt-2 pt-2 border-t border-white/20" : ""}`}>
-                      <Paperclip className="w-3 h-3 opacity-70" />
-                      <span className="text-xs opacity-80">{fileName}</span>
-                    </div>
-                  )}
-                </div>
-              ) : shouldShowSummary ? (
-                <div>
-                  <div className="whitespace-pre-wrap break-words leading-relaxed">{summaryOverride}</div>
-                  {approachText && (
-                    <div className="mt-2 pt-2 border-t border-border/50">
-                      <button
-                        onClick={() => setShowApproach(!showApproach)}
-                        className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                        data-testid={`button-approach-${message.id}`}
-                      >
-                        <Info className="w-3 h-3" />
-                        {tr.approachTitle}
-                        {showApproach ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                      </button>
-                      {showApproach && (
-                        <p className="mt-1.5 text-[11px] text-muted-foreground leading-relaxed">{approachText}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="prose prose-sm max-w-none break-words">
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
-                  {isStreaming && (
-                    <span className={`inline-block w-2 h-4 bg-primary animate-pulse ${isRtl ? "mr-0.5" : "ml-0.5"} align-text-bottom`} />
-                  )}
-                </div>
-              )}
-            </div>
-            {hasInsights && (
-                <div className="mt-2 space-y-2" data-testid={`insights-card-${message.id}`}>
-                  <Button
-                    size="sm"
-                    onClick={() => handleDownloadInsights(insightsReport!)}
-                    className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md"
-                    style={{ backgroundColor: "#1A4B8C" }}
-                    data-testid={`button-download-insights-${message.id}`}
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    {tr.downloadInsightsReport}
-                  </Button>
-                  {allInsightsReports && allInsightsReports.length > 1 && (
-                    <div className="space-y-1.5">
-                      <p className="text-[10px] font-medium text-muted-foreground">{tr.previousReports}</p>
-                      {allInsightsReports.map((rpt, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <FileSpreadsheet className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                          <span className="text-[10px] text-muted-foreground truncate flex-1">{rpt.excelFileName}</span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-5 px-1.5 text-[9px]"
-                            onClick={() => handleDownloadInsights(rpt.report, rpt.fileName, rpt.columns)}
-                            data-testid={`button-download-prev-insights-${i}`}
-                          >
-                            <Download className="w-2.5 h-2.5" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-            )}
-            {shouldShowSummary && onDownloadResult && !hasDataModel && !hasDqAnalysis && !hasInsights && (
-              <div className="mt-2">
-                <Button
-                  size="sm"
-                  onClick={onDownloadResult}
-                  className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md"
-                  style={{ backgroundColor: "#2E7D32" }}
-                  data-testid={`button-download-result-${message.id}`}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  {tr.downloadResultXlsx}
-                </Button>
-              </div>
-            )}
-          </>
-        )}
+              {step.label}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
