@@ -22,9 +22,23 @@ import {
   CheckCircle,
   Brain,
   Loader2,
+  Download,
 } from "lucide-react";
 import type { Conversation, Message } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
+import {
+  DownloadableTable,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableHeader,
+  TableCell,
+} from "@/components/markdown-table";
+import {
+  extractTablesFromMarkdown,
+  downloadAllTablesAsExcel,
+  hasMarkdownTables,
+} from "@/lib/table-utils";
 
 const FEATURE_CARDS = [
   {
@@ -482,6 +496,27 @@ export default function ChatPage() {
   );
 }
 
+const markdownComponents = {
+  table: ({ children }: { children?: React.ReactNode }) => (
+    <DownloadableTable>{children}</DownloadableTable>
+  ),
+  thead: ({ children }: { children?: React.ReactNode }) => (
+    <TableHead>{children}</TableHead>
+  ),
+  tbody: ({ children }: { children?: React.ReactNode }) => (
+    <TableBody>{children}</TableBody>
+  ),
+  tr: ({ children }: { children?: React.ReactNode }) => (
+    <TableRow>{children}</TableRow>
+  ),
+  th: ({ children }: { children?: React.ReactNode }) => (
+    <TableHeader>{children}</TableHeader>
+  ),
+  td: ({ children }: { children?: React.ReactNode }) => (
+    <TableCell>{children}</TableCell>
+  ),
+};
+
 function MessageBubble({
   message,
   isStreaming = false,
@@ -490,6 +525,15 @@ function MessageBubble({
   isStreaming?: boolean;
 }) {
   const isUser = message.role === "user";
+  const showDownloadAll = !isUser && !isStreaming && hasMarkdownTables(message.content);
+
+  const handleDownloadAll = () => {
+    const tables = extractTablesFromMarkdown(message.content);
+    if (tables.length > 0) {
+      const timestamp = new Date().toISOString().slice(0, 10);
+      downloadAllTablesAsExcel(tables, `data-owner-agent-export-${timestamp}`);
+    }
+  };
 
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`} data-testid={`message-${message.id}`}>
@@ -517,14 +561,28 @@ function MessageBubble({
           {isUser ? (
             <div className="whitespace-pre-wrap break-words">{message.content}</div>
           ) : (
-            <div className="prose prose-sm dark:prose-invert max-w-none break-words [&_table]:text-xs [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1">
-              <ReactMarkdown>{message.content}</ReactMarkdown>
+            <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+              <ReactMarkdown components={markdownComponents}>{message.content}</ReactMarkdown>
               {isStreaming && (
                 <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />
               )}
             </div>
           )}
         </div>
+        {showDownloadAll && (
+          <div className="mt-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleDownloadAll}
+              className="gap-1.5 text-xs"
+              data-testid="button-download-all-tables"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download All Tables as Excel
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
