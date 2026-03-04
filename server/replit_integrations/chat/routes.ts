@@ -5,6 +5,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
+import sharp from "sharp";
 
 const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
@@ -469,6 +470,47 @@ function getImageMediaType(mimetype: string): "image/png" | "image/jpeg" | "imag
   return "image/jpeg";
 }
 
+const MAX_IMAGE_BYTES = 4.5 * 1024 * 1024;
+
+async function compressImageBuffer(
+  buffer: Buffer,
+  mimetype: string
+): Promise<{ buffer: Buffer; mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp" }> {
+  if (buffer.length <= MAX_IMAGE_BYTES) {
+    return { buffer, mediaType: getImageMediaType(mimetype) };
+  }
+
+  console.log(`[image] Compressing image: ${(buffer.length / 1024 / 1024).toFixed(1)}MB → target <4.5MB`);
+
+  let compressed = await sharp(buffer)
+    .resize(2048, 2048, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 80 })
+    .toBuffer();
+
+  if (compressed.length <= MAX_IMAGE_BYTES) {
+    console.log(`[image] Pass 1 OK: ${(compressed.length / 1024 / 1024).toFixed(1)}MB`);
+    return { buffer: compressed, mediaType: "image/jpeg" };
+  }
+
+  compressed = await sharp(buffer)
+    .resize(1600, 1600, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 60 })
+    .toBuffer();
+
+  if (compressed.length <= MAX_IMAGE_BYTES) {
+    console.log(`[image] Pass 2 OK: ${(compressed.length / 1024 / 1024).toFixed(1)}MB`);
+    return { buffer: compressed, mediaType: "image/jpeg" };
+  }
+
+  compressed = await sharp(buffer)
+    .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 40 })
+    .toBuffer();
+
+  console.log(`[image] Pass 3: ${(compressed.length / 1024 / 1024).toFixed(1)}MB`);
+  return { buffer: compressed, mediaType: "image/jpeg" };
+}
+
 async function parseWordBuffer(buffer: Buffer, filename: string): Promise<{ text: string; fieldNames: string[]; hasDataRows: boolean }> {
   try {
     const result = await mammoth.extractRawText({ buffer });
@@ -922,9 +964,10 @@ export function registerChatRoutes(app: Express): void {
 
       if (req.file) {
         if (isImage(req.file.originalname, req.file.mimetype)) {
+          const compressed = await compressImageBuffer(req.file.buffer, req.file.mimetype);
           imageContent = {
-            base64: req.file.buffer.toString("base64"),
-            mediaType: getImageMediaType(req.file.mimetype),
+            base64: compressed.buffer.toString("base64"),
+            mediaType: compressed.mediaType,
           };
           const imageDesc = `**Uploaded Image: ${req.file.originalname}**\n\n[Image uploaded for analysis — data will be extracted by AI vision]`;
           userContent = userContent ? `${userContent}\n\n${imageDesc}` : imageDesc;

@@ -28,7 +28,7 @@ Preferred communication style: Simple, everyday language.
     - **Excel (.xlsx, .xls)**: Parsed for structured data.
     - **PDF (.pdf)**: Extracts text and attempts table detection.
     - **Word (.docx, .doc)**: Extracts text, then applies PDF table detection logic.
-    - **Images (.png, .jpg, .jpeg, .gif, .webp)**: Utilizes Claude's vision API for data extraction.
+    - **Images (.png, .jpg, .jpeg, .gif, .webp)**: Utilizes Claude's vision API for data extraction. Images over 4.5MB are automatically compressed/resized using `sharp` (max 2048px, JPEG 80% → 1600px/60% → 1200px/40%) to stay within Claude's 5MB limit.
 - **AI Integration**: Communicates with Anthropic's Claude API for AI processing, leveraging server-sent events (SSE) for streaming responses.
 
 ### Data Layer
@@ -44,5 +44,6 @@ Preferred communication style: Simple, everyday language.
 - **`multer`**: Backend middleware for handling file uploads.
 - **`pdf-parse`**: For extracting text from PDF documents.
 - **`mammoth`**: For extracting text from Word documents.
+- **`sharp`**: Server-side image compression/resizing for large uploads.
 - **`react-markdown`**: For rendering Markdown content in the frontend.
 - **`react-resizable-panels`**: For resizable UI components.
