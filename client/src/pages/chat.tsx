@@ -30,25 +30,11 @@ import {
   ShieldCheck,
   BookOpen,
   CheckCircle,
-  Brain,
   Loader2,
   Download,
 } from "lucide-react";
 import type { Conversation, Message } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
-import {
-  DownloadableTable,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableHeader,
-  TableCell,
-} from "@/components/markdown-table";
-import {
-  extractTablesFromMarkdown,
-  downloadAllTablesAsExcel,
-  hasMarkdownTables,
-} from "@/lib/table-utils";
 import {
   type AnalysisType,
   type ResultRow,
@@ -56,6 +42,7 @@ import {
   mergeResults,
   mergeDqResults,
   generateResultExcel,
+  generateAnalysisSummary,
   getIncludedAnalysisLabels,
   getAnalysisLabel,
 } from "@/lib/result-store";
@@ -85,14 +72,6 @@ const FEATURE_CARDS = [
     color: "text-purple-600 dark:text-purple-400",
     bg: "bg-purple-50 dark:bg-purple-950/30",
   },
-  {
-    icon: Brain,
-    title: "Nudge & Sludge Analysis",
-    description: "Identify data elements for behavioural use cases",
-    prompt: "I'm interested in nudge and sludge (behavioural analysis) use cases. Can you explain how data elements support behavioural interventions and what I need to get started?",
-    color: "text-amber-600 dark:text-amber-400",
-    bg: "bg-amber-50 dark:bg-amber-950/30",
-  },
 ];
 
 export default function ChatPage() {
@@ -109,6 +88,7 @@ export default function ChatPage() {
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [summaryOverrides, setSummaryOverrides] = useState<Record<number, string>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -160,14 +140,35 @@ export default function ChatPage() {
     resetResultState();
   }, [activeConversationId]);
 
+  useEffect(() => {
+    if (!activeConversation?.messages) return;
+    const overrides: Record<number, string> = {};
+    for (const msg of activeConversation.messages) {
+      if (msg.role !== "assistant") continue;
+      const results = detectAndExtractAllAnalyses(msg.content);
+      if (results.length === 0) continue;
+      const totalFields = new Set(
+        results.flatMap(r => [
+          ...Object.keys(r.fieldData),
+          ...(r.dqMultiRows?.map(dr => dr.fieldName) || [])
+        ])
+      ).size;
+      overrides[msg.id] = generateAnalysisSummary(results, totalFields);
+    }
+    if (Object.keys(overrides).length > 0) {
+      setSummaryOverrides(prev => ({ ...prev, ...overrides }));
+    }
+  }, [activeConversation?.messages]);
+
   const resetResultState = () => {
     setResultRows([]);
     setIncludedAnalyses([]);
     setSessionFieldNames(null);
     setUploadedFileName(null);
+    setSummaryOverrides({});
   };
 
-  const processAIResponse = (content: string) => {
+  const processAIResponse = (content: string, messageId?: number) => {
     const analysisResults = detectAndExtractAllAnalyses(content);
     if (analysisResults.length === 0) return;
 
@@ -189,6 +190,19 @@ export default function ChatPage() {
       }
       return updated;
     });
+
+    const totalFields = new Set(
+      analysisResults.flatMap(r => [
+        ...Object.keys(r.fieldData),
+        ...(r.dqMultiRows?.map(dr => dr.fieldName) || [])
+      ])
+    ).size;
+
+    const summary = generateAnalysisSummary(analysisResults, totalFields);
+
+    if (messageId) {
+      setSummaryOverrides(prev => ({ ...prev, [messageId]: summary }));
+    }
 
     const labels = newTypes.map((t) => getAnalysisLabel(t)).join(", ");
     toast({
@@ -269,9 +283,32 @@ export default function ChatPage() {
                 if (data.done) {
                   setIsStreaming(false);
                   setStreamingContent("");
-                  processAIResponse(accumulated);
-                  queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
-                  queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+
+                  const analysisResults = detectAndExtractAllAnalyses(accumulated);
+                  if (analysisResults.length > 0) {
+                    processAIResponse(accumulated);
+
+                    await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
+                    await queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+
+                    const convData = queryClient.getQueryData<any>(["/api/conversations", conversationId]);
+                    if (convData?.messages) {
+                      const lastMsg = convData.messages[convData.messages.length - 1];
+                      if (lastMsg?.role === "assistant") {
+                        const totalFields = new Set(
+                          analysisResults.flatMap((r: any) => [
+                            ...Object.keys(r.fieldData),
+                            ...(r.dqMultiRows?.map((dr: any) => dr.fieldName) || [])
+                          ])
+                        ).size;
+                        const summary = generateAnalysisSummary(analysisResults, totalFields);
+                        setSummaryOverrides(prev => ({ ...prev, [lastMsg.id]: summary }));
+                      }
+                    }
+                  } else {
+                    queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+                  }
                 }
                 if (data.error) {
                   toast({ title: "Error", description: data.error, variant: "destructive" });
@@ -472,9 +509,9 @@ export default function ChatPage() {
           {resultRows.length > 0 && (
             <Button
               size="sm"
-              variant="default"
               onClick={handleDownloadResult}
-              className="gap-1.5 text-xs flex-shrink-0"
+              className="gap-1.5 text-xs flex-shrink-0 text-white"
+              style={{ backgroundColor: "#00A3A1" }}
               data-testid="button-header-download-result"
             >
               <Download className="w-3.5 h-3.5" />
@@ -498,9 +535,9 @@ export default function ChatPage() {
                 </div>
                 <h2 className="text-2xl font-semibold mb-2">Data Owner Agent</h2>
                 <p className="text-muted-foreground text-center mb-8 max-w-md text-sm">
-                  Your AI assistant for data governance. Upload Excel files to classify data, generate definitions, define quality rules, or analyze behavioural use cases.
+                  Your AI assistant for data governance. Upload Excel files to classify data, generate definitions, or define quality rules.
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-xl">
                   {FEATURE_CARDS.map((card) => (
                     <button
                       key={card.title}
@@ -520,19 +557,27 @@ export default function ChatPage() {
             ) : (
               <div className="space-y-6">
                 {messages.map((msg) => (
-                  <MessageBubble key={msg.id} message={msg} />
+                  <MessageBubble
+                    key={msg.id}
+                    message={msg}
+                    summaryOverride={summaryOverrides[msg.id]}
+                    onDownloadResult={resultRows.length > 0 ? handleDownloadResult : undefined}
+                  />
                 ))}
                 {isStreaming && streamingContent && (
-                  <MessageBubble
-                    message={{
-                      id: -1,
-                      conversationId: activeConversationId || 0,
-                      role: "assistant",
-                      content: streamingContent,
-                      createdAt: new Date(),
-                    }}
-                    isStreaming
-                  />
+                  <div className="flex gap-3" data-testid="message-streaming">
+                    <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-4 h-4 text-primary-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="inline-block text-left rounded-lg px-4 py-3 text-sm max-w-full bg-card border border-card-border">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Analyzing your data...</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
                 {isStreaming && !streamingContent && (
                   <div className="flex gap-3">
@@ -569,9 +614,9 @@ export default function ChatPage() {
               </div>
               <Button
                 size="sm"
-                variant="default"
                 onClick={handleDownloadResult}
-                className="gap-1.5 text-xs flex-shrink-0"
+                className="gap-1.5 text-xs flex-shrink-0 text-white"
+                style={{ backgroundColor: "#00A3A1" }}
                 data-testid="button-download-result"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -634,8 +679,8 @@ export default function ChatPage() {
                 onKeyDown={handleKeyDown}
                 placeholder={
                   sessionFieldNames
-                    ? "Ask for business definitions, data classification, data quality rules, or nudge & sludge analysis..."
-                    : "Upload an Excel file and ask about data classification, quality rules, business definitions, or nudge & sludge analysis..."
+                    ? "Ask for business definitions, data classification, or data quality rules..."
+                    : "Upload an Excel file and ask about data classification, quality rules, or business definitions..."
                 }
                 className="min-h-[44px] max-h-32 resize-none flex-1"
                 disabled={isStreaming}
@@ -664,44 +709,19 @@ export default function ChatPage() {
   );
 }
 
-const markdownComponents = {
-  table: ({ children }: { children?: React.ReactNode }) => (
-    <DownloadableTable>{children}</DownloadableTable>
-  ),
-  thead: ({ children }: { children?: React.ReactNode }) => (
-    <TableHead>{children}</TableHead>
-  ),
-  tbody: ({ children }: { children?: React.ReactNode }) => (
-    <TableBody>{children}</TableBody>
-  ),
-  tr: ({ children }: { children?: React.ReactNode }) => (
-    <TableRow>{children}</TableRow>
-  ),
-  th: ({ children }: { children?: React.ReactNode }) => (
-    <TableHeader>{children}</TableHeader>
-  ),
-  td: ({ children }: { children?: React.ReactNode }) => (
-    <TableCell>{children}</TableCell>
-  ),
-};
-
 function MessageBubble({
   message,
   isStreaming = false,
+  summaryOverride,
+  onDownloadResult,
 }: {
   message: Message;
   isStreaming?: boolean;
+  summaryOverride?: string;
+  onDownloadResult?: () => void;
 }) {
   const isUser = message.role === "user";
-  const showDownloadAll = !isUser && !isStreaming && hasMarkdownTables(message.content);
-
-  const handleDownloadAll = () => {
-    const tables = extractTablesFromMarkdown(message.content);
-    if (tables.length > 0) {
-      const timestamp = new Date().toISOString().slice(0, 10);
-      downloadAllTablesAsExcel(tables, `data-owner-agent-export-${timestamp}`);
-    }
-  };
+  const shouldShowSummary = !isUser && !isStreaming && summaryOverride;
 
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`} data-testid={`message-${message.id}`}>
@@ -728,26 +748,28 @@ function MessageBubble({
         >
           {isUser ? (
             <div className="whitespace-pre-wrap break-words">{message.content}</div>
+          ) : shouldShowSummary ? (
+            <div className="whitespace-pre-wrap break-words">{summaryOverride}</div>
           ) : (
             <div className="prose prose-sm dark:prose-invert max-w-none break-words">
-              <ReactMarkdown components={markdownComponents}>{message.content}</ReactMarkdown>
+              <ReactMarkdown>{message.content}</ReactMarkdown>
               {isStreaming && (
                 <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />
               )}
             </div>
           )}
         </div>
-        {showDownloadAll && (
+        {shouldShowSummary && onDownloadResult && (
           <div className="mt-2">
             <Button
               size="sm"
-              variant="secondary"
-              onClick={handleDownloadAll}
-              className="gap-1.5 text-xs"
-              data-testid="button-download-all-tables"
+              onClick={onDownloadResult}
+              className="gap-1.5 text-xs text-white"
+              style={{ backgroundColor: "#00A3A1" }}
+              data-testid={`button-download-result-${message.id}`}
             >
               <Download className="w-3.5 h-3.5" />
-              Download All Tables as Excel
+              Download result.xlsx
             </Button>
           </div>
         )}

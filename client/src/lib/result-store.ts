@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { extractTablesFromMarkdown, type ParsedTable } from "./table-utils";
 
-export type AnalysisType = "business_definitions" | "data_classification" | "data_quality" | "nudge_sludge";
+export type AnalysisType = "business_definitions" | "data_classification" | "data_quality";
 
 export interface ResultRow {
   field_name: string;
@@ -17,10 +17,6 @@ export interface ResultRow {
   dq_rule?: string;
   dq_threshold?: string;
   dq_priority?: string;
-  nudge_sludge_type?: string;
-  use_case?: string;
-  required_data_elements?: string;
-  implementation_notes?: string;
   [key: string]: string | undefined;
 }
 
@@ -37,26 +33,26 @@ const ANALYSIS_COLUMNS: Record<AnalysisType, { keys: string[]; headers: string[]
     keys: ["dq_dimension", "dq_rule", "dq_threshold", "dq_priority"],
     headers: ["DQ Dimension", "DQ Rule", "DQ Threshold", "DQ Priority"],
   },
-  nudge_sludge: {
-    keys: ["nudge_sludge_type", "use_case", "required_data_elements", "implementation_notes"],
-    headers: ["Nudge/Sludge Type", "Use Case", "Required Data Elements", "Implementation Notes"],
-  },
 };
 
 const ANALYSIS_LABELS: Record<AnalysisType, string> = {
   business_definitions: "Business Definitions",
   data_classification: "Data Classification",
   data_quality: "Data Quality Rules",
-  nudge_sludge: "Nudge & Sludge",
 };
 
-const ANALYSIS_ORDER: AnalysisType[] = ["business_definitions", "data_classification", "data_quality", "nudge_sludge"];
+const ANALYSIS_SHEET_NAMES: Record<AnalysisType, string> = {
+  business_definitions: "business_definitions",
+  data_classification: "data_classification",
+  data_quality: "data_quality_rules",
+};
+
+const ANALYSIS_ORDER: AnalysisType[] = ["business_definitions", "data_classification", "data_quality"];
 
 const HEADER_PATTERNS: Record<AnalysisType, string[]> = {
   business_definitions: ["business term", "business definition", "business def"],
   data_classification: ["classification level", "classification", "sensitivity"],
   data_quality: ["dq dimension", "dq rule", "quality dimension", "quality rule", "data quality"],
-  nudge_sludge: ["nudge", "sludge", "nudge/sludge", "behavioural", "behavioral"],
 };
 
 function normalizeHeader(header: string): string {
@@ -116,12 +112,6 @@ const HEADER_MAPPINGS: Record<AnalysisType, Record<string, string[]>> = {
     dq_rule: ["dq_rule", "rule", "quality_rule", "data_quality_rule"],
     dq_threshold: ["dq_threshold", "threshold"],
     dq_priority: ["dq_priority", "priority"],
-  },
-  nudge_sludge: {
-    nudge_sludge_type: ["nudge_sludge_type", "type", "nudge_sludge", "intervention_type"],
-    use_case: ["use_case", "usecase", "case"],
-    required_data_elements: ["required_data_elements", "data_elements", "required_elements", "required_data"],
-    implementation_notes: ["implementation_notes", "notes", "implementation", "details"],
   },
 };
 
@@ -322,39 +312,86 @@ export function mergeDqResults(
 export function generateResultExcel(rows: ResultRow[], includedAnalyses: AnalysisType[]): void {
   const orderedAnalyses = ANALYSIS_ORDER.filter((a) => includedAnalyses.includes(a));
 
-  const hasDq = orderedAnalyses.includes("data_quality");
-  const hasDqMultiRows = hasDq && rows.some(
-    (r, i, arr) => arr.findIndex((x) => x.field_name.toLowerCase() === r.field_name.toLowerCase()) !== i
-  );
-
-  const headers = ["Field Name"];
-  const keys = ["field_name"];
+  const wb = XLSX.utils.book_new();
 
   for (const analysis of orderedAnalyses) {
     const config = ANALYSIS_COLUMNS[analysis];
-    headers.push(...config.headers);
-    keys.push(...config.keys);
-  }
+    const headers = ["Field Name", ...config.headers];
+    const keys = ["field_name", ...config.keys];
 
-  const wsData = [headers];
-  for (const row of rows) {
-    wsData.push(keys.map((k) => row[k] || ""));
-  }
+    const relevantRows = rows.filter((row) => {
+      return config.keys.some((k) => row[k] && row[k]!.trim() !== "");
+    });
 
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
+    if (relevantRows.length === 0) continue;
 
-  const colWidths = headers.map((h, i) => {
-    let max = h.length;
-    for (const row of wsData.slice(1)) {
-      if (row[i] && row[i].length > max) max = row[i].length;
+    const wsData = [headers];
+    for (const row of relevantRows) {
+      wsData.push(keys.map((k) => row[k] || ""));
     }
-    return { wch: Math.min(Math.max(max + 2, 12), 60) };
-  });
-  ws["!cols"] = colWidths;
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Analysis Results");
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const colWidths = headers.map((h, i) => {
+      let max = h.length;
+      for (const row of wsData.slice(1)) {
+        if (row[i] && row[i].length > max) max = row[i].length;
+      }
+      return { wch: Math.min(Math.max(max + 2, 12), 60) };
+    });
+    ws["!cols"] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, ANALYSIS_SHEET_NAMES[analysis]);
+  }
+
+  if (wb.SheetNames.length === 0) {
+    const headers = ["Field Name"];
+    const keys = ["field_name"];
+    for (const analysis of orderedAnalyses) {
+      const config = ANALYSIS_COLUMNS[analysis];
+      headers.push(...config.headers);
+      keys.push(...config.keys);
+    }
+    const wsData = [headers, ...rows.map((row) => keys.map((k) => row[k] || ""))];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, "Analysis Results");
+  }
+
   XLSX.writeFile(wb, "result.xlsx");
+}
+
+export function generateAnalysisSummary(
+  analysisResults: AnalysisResult[],
+  totalFieldCount: number
+): string {
+  const lines: string[] = [];
+
+  for (const result of analysisResults) {
+    const fieldCount = Object.keys(result.fieldData).length || (result.dqMultiRows?.length ?? 0);
+    const sheetName = ANALYSIS_SHEET_NAMES[result.analysisType];
+
+    if (result.analysisType === "business_definitions") {
+      lines.push(`✅ Business definitions generated for ${fieldCount} fields. Results saved to result.xlsx — Sheet: ${sheetName}`);
+    } else if (result.analysisType === "data_classification") {
+      const levels: Record<string, number> = {};
+      for (const columns of Object.values(result.fieldData)) {
+        const level = columns.classification_level || "Unknown";
+        levels[level] = (levels[level] || 0) + 1;
+      }
+      const breakdown = Object.entries(levels)
+        .map(([level, count]) => `${count} ${level}`)
+        .join(", ");
+      lines.push(`✅ Data classification completed for ${fieldCount} fields. ${breakdown}. Sheet: ${sheetName} added to result.xlsx`);
+    } else if (result.analysisType === "data_quality") {
+      const ruleCount = result.dqMultiRows?.length || fieldCount;
+      lines.push(`✅ Data quality rules defined — ${ruleCount} rules across ${fieldCount} fields. Sheet: ${sheetName} added to result.xlsx`);
+    }
+  }
+
+  if (lines.length === 0) {
+    return `✅ Analysis completed for ${totalFieldCount} fields. Results saved to result.xlsx`;
+  }
+
+  return lines.join("\n\n");
 }
 
 export function getIncludedAnalysisLabels(types: AnalysisType[]): string {
