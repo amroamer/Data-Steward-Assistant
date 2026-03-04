@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is an AI-powered data governance assistant called the **Data Owner Agent**, built for KPMG. It helps data owners, data stewards, and data governance professionals with:
+This is an AI-powered data governance assistant called the **Data Owner Agent**. It helps data owners, data stewards, and data governance professionals with:
 
 - **Data Classification** — Classify data fields per Saudi SDAIA NDMO standards (Top Secret, Secret, Confidential, Restricted, Public)
 - **Business Definitions** — Generate clear definitions for data fields/elements
