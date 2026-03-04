@@ -92,7 +92,7 @@ const translations = {
     poweredBy: "Powered by Claude AI",
     appTitle: "ZATCA Data Owner Agent",
     heroTitle: "Data Owner Agent",
-    heroDescription: "Your AI assistant for data governance. Upload Excel files to classify data, generate definitions, or define quality rules.",
+    heroDescription: "Your AI assistant for data governance. Upload Excel or PDF files to classify data, generate definitions, or define quality rules.",
     collapse: "Collapse",
     expand: "Expand",
     resultXlsx: "result.xlsx",
@@ -101,8 +101,8 @@ const translations = {
     processing: "Processing...",
     analyzing: "Analyzing your data...",
     placeholderWithFile: "Ask for business definitions, data classification, or data quality rules...",
-    placeholderNoFile: "Upload an Excel file and ask about data classification, quality rules, or business definitions...",
-    uploadFooter: "Upload Excel files (.xlsx, .xls, .csv) with data fields for analysis",
+    placeholderNoFile: "Upload an Excel or PDF file and ask about data classification, quality rules, or business definitions...",
+    uploadFooter: "Upload Excel (.xlsx, .xls, .csv) or PDF files with data fields for analysis",
     resetTitle: "Reset result.xlsx?",
     resetDescription: (fileName: string, analyses: string) =>
       `You already have analysis results from "${fileName}". Uploading a new file will reset result.xlsx and start fresh with the new file. Your current results (${analyses}) will be lost.`,
@@ -113,7 +113,7 @@ const translations = {
     toastError: "Error",
     toastErrorDesc: "Failed to send message. Please try again.",
     invalidFile: "Invalid file",
-    invalidFileDesc: "Please upload an Excel (.xlsx, .xls) or CSV file.",
+    invalidFileDesc: "Please upload an Excel (.xlsx, .xls), CSV, or PDF file.",
     cardDataClassification: "Data Classification",
     cardDataClassificationDesc: "Classify data fields per Saudi SDAIA NDMO standards",
     cardBusinessDefs: "Business Definitions",
@@ -162,7 +162,7 @@ const translations = {
     poweredBy: "مدعوم بواسطة Claude AI",
     appTitle: "وكيل مالك البيانات - زاتكا",
     heroTitle: "وكيل مالك البيانات",
-    heroDescription: "مساعدك الذكي لحوكمة البيانات. قم بتحميل ملفات Excel لتصنيف البيانات أو إنشاء التعريفات أو تحديد قواعد الجودة.",
+    heroDescription: "مساعدك الذكي لحوكمة البيانات. قم بتحميل ملفات Excel أو PDF لتصنيف البيانات أو إنشاء التعريفات أو تحديد قواعد الجودة.",
     collapse: "طي الكل",
     expand: "توسيع الكل",
     resultXlsx: "result.xlsx",
@@ -171,8 +171,8 @@ const translations = {
     processing: "جارٍ المعالجة...",
     analyzing: "جارٍ تحليل بياناتك...",
     placeholderWithFile: "اطلب تعريفات الأعمال أو تصنيف البيانات أو قواعد جودة البيانات...",
-    placeholderNoFile: "قم بتحميل ملف Excel واسأل عن تصنيف البيانات أو قواعد الجودة أو تعريفات الأعمال...",
-    uploadFooter: "قم بتحميل ملفات Excel (.xlsx, .xls, .csv) مع حقول البيانات للتحليل",
+    placeholderNoFile: "قم بتحميل ملف Excel أو PDF واسأل عن تصنيف البيانات أو قواعد الجودة أو تعريفات الأعمال...",
+    uploadFooter: "قم بتحميل ملفات Excel (.xlsx, .xls, .csv) أو PDF مع حقول البيانات للتحليل",
     resetTitle: "إعادة تعيين result.xlsx؟",
     resetDescription: (fileName: string, analyses: string) =>
       `لديك بالفعل نتائج تحليل من "${fileName}". تحميل ملف جديد سيعيد تعيين result.xlsx ويبدأ من جديد. ستفقد نتائجك الحالية (${analyses}).`,
@@ -183,7 +183,7 @@ const translations = {
     toastError: "خطأ",
     toastErrorDesc: "فشل إرسال الرسالة. يرجى المحاولة مرة أخرى.",
     invalidFile: "ملف غير صالح",
-    invalidFileDesc: "يرجى تحميل ملف Excel (.xlsx, .xls) أو CSV.",
+    invalidFileDesc: "يرجى تحميل ملف Excel (.xlsx, .xls) أو CSV أو PDF.",
     cardDataClassification: "تصنيف البيانات",
     cardDataClassificationDesc: "تصنيف حقول البيانات وفقاً لمعايير SDAIA NDMO السعودية",
     cardBusinessDefs: "تعريفات الأعمال",
@@ -834,8 +834,9 @@ export default function ChatPage() {
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "application/vnd.ms-excel",
       "text/csv",
+      "application/pdf",
     ];
-    if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv|pdf)$/i)) {
       toast({ title: t.invalidFile, description: t.invalidFileDesc, variant: "destructive" });
       return;
     }
@@ -1356,7 +1357,7 @@ export default function ChatPage() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".xlsx,.xls,.csv"
+                    accept=".xlsx,.xls,.csv,.pdf"
                     onChange={handleFileChange}
                     className="hidden"
                     data-testid="input-file"

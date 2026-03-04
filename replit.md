@@ -106,7 +106,7 @@ Preferred communication style: Simple, everyday language.
 - **Framework**: Express.js with TypeScript, run via `tsx` in development
 - **Entry**: `server/index.ts` creates an HTTP server and registers routes
 - **Routes**: `server/routes.ts` delegates to `server/replit_integrations/chat/routes.ts`
-- **File Uploads**: `multer` handles Excel file uploads (in-memory, max 10MB), parsed with `xlsx`
+- **File Uploads**: `multer` handles file uploads (in-memory, max 10MB). Excel files parsed with `xlsx`, PDF files parsed with `pdf-parse` v2 (class-based API: `PDFParse`). PDF table extraction attempts TSV, CSV, pipe/semicolon delimiters, and key-value patterns. Falls back to raw text for unstructured PDFs.
 
 ### Chat System (`server/replit_integrations/chat/`)
 - **`routes.ts`**: REST endpoints for conversations and messages. Parses uploaded Excel files. Uses Anthropic streaming API (SSE).

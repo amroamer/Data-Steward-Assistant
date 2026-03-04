@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { chatStorage } from "./storage";
 import multer from "multer";
 import * as XLSX from "xlsx";
+import { PDFParse } from "pdf-parse";
 
 const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
@@ -445,6 +446,256 @@ function parseExcelBuffer(buffer: Buffer, filename: string): { text: string; fie
   }
 }
 
+function isPdf(filename: string, mimetype?: string): boolean {
+  return /\.pdf$/i.test(filename) || mimetype === "application/pdf";
+}
+
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  const parser = new PDFParse({ data: new Uint8Array(buffer) });
+  const result = await parser.getText();
+  await parser.destroy();
+  return result.text || "";
+}
+
+async function parsePdfBuffer(buffer: Buffer, filename: string): Promise<{ text: string; fieldNames: string[]; hasDataRows: boolean }> {
+  try {
+    const rawText = await extractPdfText(buffer);
+    if (!rawText.trim()) {
+      return {
+        text: `**Uploaded File: ${filename}**\n\nThe PDF appears to be empty or contains only images/scanned content that cannot be extracted as text.`,
+        fieldNames: [],
+        hasDataRows: false,
+      };
+    }
+
+    const lines = rawText.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+
+    let fieldNames: string[] = [];
+    let hasDataRows = false;
+    let parsedTable = false;
+    let resultText = `**Uploaded File: ${filename}**\n\n`;
+
+    const tsvLines = lines.filter(l => l.includes("\t") && l.split("\t").length >= 2);
+    if (tsvLines.length >= 2) {
+      const headers = tsvLines[0].split("\t").map(h => h.trim());
+      fieldNames = headers.filter(h => h.length > 0);
+      hasDataRows = tsvLines.length > 1;
+      parsedTable = true;
+
+      resultText += `**Detected Table (${tsvLines.length - 1} rows)**\n`;
+      resultText += `**Fields/Columns:** ${headers.join(", ")}\n\n`;
+
+      const dataRows = tsvLines.slice(1);
+      const columnTypes = headers.map((_, j) => {
+        const colValues = dataRows.slice(0, 100).map(row => row.split("\t")[j]?.trim());
+        return inferColumnType(colValues);
+      });
+      resultText += `**Column Data Types (inferred):** ${headers.map((h, i) => `${h} (${columnTypes[i]})`).join(", ")}\n\n`;
+
+      const sampleCount = Math.min(5, dataRows.length);
+      resultText += `**Sample Data (first ${sampleCount} rows):**\n`;
+      resultText += "| " + headers.join(" | ") + " |\n";
+      resultText += "| " + headers.map(() => "---").join(" | ") + " |\n";
+      for (let i = 0; i < sampleCount; i++) {
+        const cells = dataRows[i].split("\t").map(c => c.trim());
+        resultText += "| " + headers.map((_, j) => cells[j] ?? "").join(" | ") + " |\n";
+      }
+      resultText += `\n**Total rows:** ${dataRows.length}\n\n`;
+    }
+
+    if (!parsedTable) {
+      const csvLikeLines = lines.filter(l => l.includes(",") && l.split(",").length >= 3);
+      if (csvLikeLines.length >= 2) {
+        const headers = csvLikeLines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+        const isLikelyHeader = headers.every(h => !/^\d+(\.\d+)?$/.test(h) && h.length < 80);
+        if (isLikelyHeader) {
+          fieldNames = headers.filter(h => h.length > 0);
+          hasDataRows = csvLikeLines.length > 1;
+          parsedTable = true;
+
+          resultText += `**Detected Table (${csvLikeLines.length - 1} rows)**\n`;
+          resultText += `**Fields/Columns:** ${headers.join(", ")}\n\n`;
+
+          const dataRows = csvLikeLines.slice(1);
+          const sampleCount = Math.min(5, dataRows.length);
+          resultText += `**Sample Data (first ${sampleCount} rows):**\n`;
+          resultText += "| " + headers.join(" | ") + " |\n";
+          resultText += "| " + headers.map(() => "---").join(" | ") + " |\n";
+          for (let i = 0; i < sampleCount; i++) {
+            const cells = dataRows[i].split(",").map(c => c.trim().replace(/^"|"$/g, ""));
+            resultText += "| " + headers.map((_, j) => cells[j] ?? "").join(" | ") + " |\n";
+          }
+          resultText += `\n**Total rows:** ${dataRows.length}\n\n`;
+        }
+      }
+    }
+
+    if (!parsedTable) {
+      const repeatingDelimiters = ["|", ";"];
+      for (const delim of repeatingDelimiters) {
+        const delimLines = lines.filter(l => l.includes(delim) && l.split(delim).length >= 3);
+        if (delimLines.length >= 2) {
+          const separatorLineIdx = delimLines.findIndex(l => /^[\s|:-]+$/.test(l.replace(/\|/g, "").replace(/-/g, "").replace(/:/g, "").trim()) || l.replace(/[^|]/g, "").length > 2 && l.replace(/[^-]/g, "").length > 2);
+          let headerLine = delimLines[0];
+          let dataStart = 1;
+          if (separatorLineIdx === 1) {
+            dataStart = 2;
+          }
+          const headers = headerLine.split(delim).map(h => h.trim()).filter(h => h.length > 0);
+          if (headers.length >= 2) {
+            fieldNames = headers;
+            const dataRows = delimLines.slice(dataStart).filter(l => !/^[\s|:-]+$/.test(l.replace(/\|/g, "").replace(/-/g, "").replace(/:/g, "").trim()));
+            hasDataRows = dataRows.length > 0;
+            parsedTable = true;
+
+            resultText += `**Detected Table (${dataRows.length} rows)**\n`;
+            resultText += `**Fields/Columns:** ${headers.join(", ")}\n\n`;
+
+            const sampleCount = Math.min(5, dataRows.length);
+            resultText += `**Sample Data (first ${sampleCount} rows):**\n`;
+            resultText += "| " + headers.join(" | ") + " |\n";
+            resultText += "| " + headers.map(() => "---").join(" | ") + " |\n";
+            for (let i = 0; i < sampleCount; i++) {
+              const cells = dataRows[i].split(delim).map(c => c.trim()).filter(c => c.length > 0);
+              resultText += "| " + headers.map((_, j) => cells[j] ?? "").join(" | ") + " |\n";
+            }
+            resultText += `\n**Total rows:** ${dataRows.length}\n\n`;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!parsedTable) {
+      const potentialHeaders: string[] = [];
+      for (const line of lines.slice(0, 30)) {
+        const colonMatch = line.match(/^([^:]+):\s*(.+)/);
+        if (colonMatch) {
+          potentialHeaders.push(colonMatch[1].trim());
+        }
+      }
+      if (potentialHeaders.length >= 3) {
+        fieldNames = potentialHeaders;
+      }
+    }
+
+    const maxTextLen = 8000;
+    const textForContext = rawText.length > maxTextLen ? rawText.slice(0, maxTextLen) + "\n\n[...text truncated...]" : rawText;
+    resultText += `**Full Extracted Text:**\n\`\`\`\n${textForContext}\n\`\`\`\n`;
+
+    return { text: resultText, fieldNames, hasDataRows };
+  } catch (error) {
+    return {
+      text: `**Error parsing PDF ${filename}:** ${error instanceof Error ? error.message : "Unknown error"}`,
+      fieldNames: [],
+      hasDataRows: false,
+    };
+  }
+}
+
+function profilePdfData(lines: string[]): ProfiledData | null {
+  const tsvLines = lines.filter(l => l.includes("\t") && l.split("\t").length >= 2);
+  if (tsvLines.length >= 2) {
+    const headers = tsvLines[0].split("\t").map(h => h.trim());
+    const dataRows = tsvLines.slice(1).map(r => r.split("\t").map(c => c.trim()));
+    return buildProfileFromRows(headers, dataRows);
+  }
+
+  const csvLines = lines.filter(l => l.includes(",") && l.split(",").length >= 3);
+  if (csvLines.length >= 2) {
+    const headers = csvLines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+    const isLikelyHeader = headers.every(h => !/^\d+(\.\d+)?$/.test(h) && h.length < 80);
+    if (isLikelyHeader) {
+      const dataRows = csvLines.slice(1).map(r => r.split(",").map(c => c.trim().replace(/^"|"$/g, "")));
+      return buildProfileFromRows(headers, dataRows);
+    }
+  }
+
+  for (const delim of ["|", ";"]) {
+    const delimLines = lines.filter(l => l.includes(delim) && l.split(delim).length >= 3);
+    if (delimLines.length >= 2) {
+      const separatorLineIdx = delimLines.findIndex(l => /^[\s|;:-]+$/.test(l.replace(/[|;]/g, "").trim()));
+      let headerLine = delimLines[0];
+      let dataStart = 1;
+      if (separatorLineIdx === 1) dataStart = 2;
+      const headers = headerLine.split(delim).map(h => h.trim()).filter(h => h.length > 0);
+      if (headers.length >= 2) {
+        const dataRows = delimLines.slice(dataStart)
+          .filter(l => !/^[\s|;:-]+$/.test(l.replace(/[|;]/g, "").trim()))
+          .map(r => {
+            const cells = r.split(delim).map(c => c.trim()).filter(c => c.length > 0);
+            return headers.map((_, j) => cells[j] || "");
+          });
+        if (dataRows.length > 0) return buildProfileFromRows(headers, dataRows);
+      }
+    }
+  }
+
+  return null;
+}
+
+function buildProfileFromRows(headers: string[], dataRows: string[][]): ProfiledData | null {
+  if (headers.length === 0 || dataRows.length === 0) return null;
+  const totalRows = dataRows.length;
+  const totalColumns = headers.length;
+
+  const columns: ColumnProfile[] = headers.map((header, colIdx) => {
+    const values = dataRows.map(row => row[colIdx]);
+    const nonNullValues = values.filter(v => v != null && v !== "");
+    const nullCount = totalRows - nonNullValues.length;
+    const nullPct = totalRows > 0 ? Math.round((nullCount / totalRows) * 10000) / 100 : 0;
+    const uniqueValues = new Set(nonNullValues.map(v => String(v))).size;
+    const colType = inferColumnType(nonNullValues);
+
+    const profile: ColumnProfile = {
+      column_name: header,
+      data_type: colType,
+      null_count: nullCount,
+      null_pct: nullPct,
+      unique_values: uniqueValues,
+    };
+
+    if (colType === "Number") {
+      const nums = nonNullValues.map(v => Number(v)).filter(n => !isNaN(n));
+      if (nums.length > 0) {
+        nums.sort((a, b) => a - b);
+        profile.min = nums[0];
+        profile.max = nums[nums.length - 1];
+        const sum = nums.reduce((a, b) => a + b, 0);
+        profile.mean = Math.round((sum / nums.length) * 100) / 100;
+        const mid = Math.floor(nums.length / 2);
+        profile.median = nums.length % 2 === 0 ? Math.round(((nums[mid - 1] + nums[mid]) / 2) * 100) / 100 : nums[mid];
+        if (nums.length > 1) {
+          const mean = sum / nums.length;
+          const variance = nums.reduce((acc, n) => acc + (n - mean) ** 2, 0) / (nums.length - 1);
+          profile.std_dev = Math.round(Math.sqrt(variance) * 100) / 100;
+        }
+      }
+    } else if (colType === "String") {
+      const freqMap = new Map<string, number>();
+      nonNullValues.forEach(v => {
+        const s = String(v);
+        freqMap.set(s, (freqMap.get(s) || 0) + 1);
+      });
+      const sorted = Array.from(freqMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      profile.top_values = sorted.map(([value, count]) => ({ value, count }));
+    } else if (colType === "Date") {
+      const dates = nonNullValues.map(v => new Date(String(v))).filter(d => !isNaN(d.getTime()));
+      if (dates.length > 0) {
+        dates.sort((a, b) => a.getTime() - b.getTime());
+        profile.earliest = dates[0].toISOString().split("T")[0];
+        profile.latest = dates[dates.length - 1].toISOString().split("T")[0];
+        profile.date_range_days = Math.round((dates[dates.length - 1].getTime() - dates[0].getTime()) / (1000 * 60 * 60 * 24));
+      }
+    }
+
+    return profile;
+  });
+
+  const sampleRows = dataRows.slice(0, 10);
+  return { total_rows: totalRows, total_columns: totalColumns, columns, sample_rows: sampleRows, headers };
+}
+
 export function registerChatRoutes(app: Express): void {
   app.get("/api/conversations", async (_req: Request, res: Response) => {
     try {
@@ -515,16 +766,33 @@ export function registerChatRoutes(app: Express): void {
       const originalUserMessage = userContent;
 
       if (req.file) {
-        const { text: excelContent, fieldNames, hasDataRows } = parseExcelBuffer(req.file.buffer, req.file.originalname);
-        userContent = userContent ? `${userContent}\n\n${excelContent}` : excelContent;
-        extractedFieldNames = fieldNames;
+        let fileContent: { text: string; fieldNames: string[]; hasDataRows: boolean };
 
-        if (hasDataRows && isInsightsRequest(originalUserMessage)) {
+        if (isPdf(req.file.originalname, req.file.mimetype)) {
+          fileContent = await parsePdfBuffer(req.file.buffer, req.file.originalname);
+        } else {
+          fileContent = parseExcelBuffer(req.file.buffer, req.file.originalname);
+        }
+
+        userContent = userContent ? `${userContent}\n\n${fileContent.text}` : fileContent.text;
+        extractedFieldNames = fileContent.fieldNames;
+
+        if (fileContent.hasDataRows && isInsightsRequest(originalUserMessage)) {
           insightsMode = true;
-          const profiledData = profileExcelData(req.file.buffer, req.file.originalname);
-          if (profiledData) {
-            profiledDataText = formatProfiledDataForPrompt(profiledData, req.file.originalname);
-            profiledColumns = profiledData.columns;
+          if (isPdf(req.file.originalname, req.file.mimetype)) {
+            const rawText = await extractPdfText(req.file.buffer);
+            const pdfLines = rawText.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+            const profiledData = profilePdfData(pdfLines);
+            if (profiledData) {
+              profiledDataText = formatProfiledDataForPrompt(profiledData, req.file.originalname);
+              profiledColumns = profiledData.columns;
+            }
+          } else {
+            const profiledData = profileExcelData(req.file.buffer, req.file.originalname);
+            if (profiledData) {
+              profiledDataText = formatProfiledDataForPrompt(profiledData, req.file.originalname);
+              profiledColumns = profiledData.columns;
+            }
           }
         }
       }
