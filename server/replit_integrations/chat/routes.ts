@@ -470,7 +470,7 @@ function getImageMediaType(mimetype: string): "image/png" | "image/jpeg" | "imag
   return "image/jpeg";
 }
 
-const MAX_IMAGE_BYTES = 4.5 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 3.5 * 1024 * 1024;
 
 async function compressImageBuffer(
   buffer: Buffer,
@@ -480,7 +480,7 @@ async function compressImageBuffer(
     return { buffer, mediaType: getImageMediaType(mimetype) };
   }
 
-  console.log(`[image] Compressing image: ${(buffer.length / 1024 / 1024).toFixed(1)}MB → target <4.5MB`);
+  console.log(`[image] Compressing image: ${(buffer.length / 1024 / 1024).toFixed(1)}MB → target <3.5MB (≈4.7MB base64)`);
 
   let compressed = await sharp(buffer)
     .resize(2048, 2048, { fit: "inside", withoutEnlargement: true })
@@ -965,8 +965,19 @@ export function registerChatRoutes(app: Express): void {
       if (req.file) {
         if (isImage(req.file.originalname, req.file.mimetype)) {
           const compressed = await compressImageBuffer(req.file.buffer, req.file.mimetype);
+          const base64Str = compressed.buffer.toString("base64");
+          const base64SizeMB = (base64Str.length / (1024 * 1024)).toFixed(1);
+          console.log(`[image] Final base64 size: ${base64SizeMB}MB`);
+          if (base64Str.length > 5 * 1024 * 1024) {
+            res.setHeader("Content-Type", "text/event-stream");
+            res.setHeader("Cache-Control", "no-cache");
+            res.setHeader("Connection", "keep-alive");
+            res.write(`data: ${JSON.stringify({ type: "error", content: "The uploaded image is too large to process even after compression. Please upload a smaller or lower-resolution image (under 4 MB recommended)." })}\n\n`);
+            res.write("data: [DONE]\n\n");
+            return res.end();
+          }
           imageContent = {
-            base64: compressed.buffer.toString("base64"),
+            base64: base64Str,
             mediaType: compressed.mediaType,
           };
           const imageDesc = `**Uploaded Image: ${req.file.originalname}**\n\n[Image uploaded for analysis — data will be extracted by AI vision]`;

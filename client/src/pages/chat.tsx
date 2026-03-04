@@ -994,6 +994,16 @@ export default function ChatPage() {
                   setSessionFieldNames(data.fieldNames);
                   if (file) setUploadedFileName(file.name);
                 }
+                if (data.type === "error") {
+                  setIsStreaming(false);
+                  setStreamingContent("");
+                  toast({
+                    title: language === "ar" ? "خطأ" : "Error",
+                    description: data.content || (language === "ar" ? "حدث خطأ أثناء معالجة الصورة" : "An error occurred while processing the image"),
+                    variant: "destructive",
+                  });
+                  return;
+                }
                 if (data.content) {
                   accumulated += data.content;
                   setStreamingContent(accumulated);
