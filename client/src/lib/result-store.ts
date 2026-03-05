@@ -690,7 +690,7 @@ export function generateResultExcel(rows: ResultRow[], includedAnalyses: Analysi
     XLSX.utils.book_append_sheet(wb, ws, ANALYSIS_SHEET_NAMES[analysis]);
   }
 
-  if (wb.SheetNames.length === 0 && (!dataModel) && (!piiScan)) {
+  if (wb.SheetNames.length === 0 && (!dataModel) && (!piiScan) && (!dqAnalysis)) {
     const headers = ["Field Name"];
     const keys = ["field_name"];
     for (const analysis of orderedAnalyses) {
