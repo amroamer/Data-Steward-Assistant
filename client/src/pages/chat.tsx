@@ -433,13 +433,51 @@ function detectAnalysisTag(userContent: string, assistantContent?: string, t?: T
   const tr = t || translations.en;
   const combined = `${userContent} ${assistantContent || ""}`.toLowerCase();
   const userOnly = userContent.toLowerCase();
+
+  // 1. Unambiguous JSON structure markers in the AI response (checked first — very precise)
   if (combined.includes("report_title") && combined.includes("key_insights")) return tr.tagInsights;
-  if (combined.includes("insights report") || combined.includes("give me insights") || combined.includes("analyze this data") || combined.includes("explore this dataset") || combined.includes("key findings")) return tr.tagInsights;
-  if (userOnly.includes("quality") || userOnly.includes("dq rule") || combined.includes("dq-") || combined.includes("rule_layer") || combined.includes("dq_dimension")) return tr.tagDataQuality;
-  if (combined.includes("classification") || combined.includes("classify")) return tr.tagDataClassification;
-  if (combined.includes("scan_summary") || userOnly.includes("pii") || userOnly.includes("pdpl") || userOnly.includes("privacy scan") || userOnly.includes("personal data") || userOnly.includes("sensitive data")) return tr.tagPiiScan;
-  if (combined.includes("data model") || combined.includes("star schema") || combined.includes("dimensional model") || combined.includes("analytical model") || combined.includes("fact_tables")) return tr.tagDataModel;
-  if (combined.includes("business definition") || combined.includes("business def")) return tr.tagBusinessDefs;
+  if (combined.includes("scan_summary")) return tr.tagPiiScan;
+  if (combined.includes("fact_table_name") || (combined.includes("fact_tables") && combined.includes("dimension_tables"))) return tr.tagDataModel;
+  if (combined.includes("dq_dimension") || combined.includes("rule_layer")) return tr.tagDataQuality;
+
+  // 2. User intent only — based on what the user typed, not the AI response
+  if (
+    userOnly.includes("insight") || userOnly.includes("رؤى") ||
+    userOnly.includes("analyze this data") || userOnly.includes("analyse this data") ||
+    userOnly.includes("data report") || userOnly.includes("key findings") ||
+    userOnly.includes("summarize this data") || userOnly.includes("explore this dataset") ||
+    userOnly.includes("what does this data") || userOnly.includes("tell me about this data") ||
+    userOnly.includes("تحليل البيانات")
+  ) return tr.tagInsights;
+
+  if (
+    userOnly.includes("quality") || userOnly.includes("dq rule") || userOnly.includes(" dq ") ||
+    userOnly.startsWith("dq ") || userOnly.includes("جودة") || userOnly.includes("validation rule") ||
+    userOnly.includes("quality check") || userOnly.includes("quality rules")
+  ) return tr.tagDataQuality;
+
+  if (
+    userOnly.includes("pii") || userOnly.includes("pdpl") || userOnly.includes("privacy scan") ||
+    userOnly.includes("personal data") || userOnly.includes("sensitive data") ||
+    userOnly.includes("بيانات شخصية") || userOnly.includes("detect personal") ||
+    userOnly.includes("scan for") || userOnly.includes("sensitive information")
+  ) return tr.tagPiiScan;
+
+  if (
+    userOnly.includes("classif") || userOnly.includes("تصنيف")
+  ) return tr.tagDataClassification;
+
+  if (
+    userOnly.includes("data model") || userOnly.includes("star schema") ||
+    userOnly.includes("dimensional model") || userOnly.includes("analytical model") ||
+    userOnly.includes("نموذج بيانات") || userOnly.includes("نموذج تحليلي")
+  ) return tr.tagDataModel;
+
+  if (
+    userOnly.includes("definition") || userOnly.includes("تعريف") ||
+    userOnly.includes("business def") || userOnly.includes("business term")
+  ) return tr.tagBusinessDefs;
+
   return null;
 }
 
@@ -1033,6 +1071,7 @@ export default function ChatPage() {
     setIsInsightsMode(false);
     setProfiledColumns([]);
     profiledColumnsRef.current = [];
+    setActivityLog([]);
   };
 
   const processAIResponse = (content: string, messageId?: number) => {
@@ -1697,7 +1736,7 @@ export default function ChatPage() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-0">
+                <div className="space-y-3">
                   {threads.map((thread, idx) => {
                     const isCollapsed = collapsedThreads.has(idx);
                     const isLastThread = idx === threads.length - 1;
@@ -2052,7 +2091,7 @@ function ThreadCard({
 
   return (
     <div
-      className="rounded-xl bg-white shadow-sm mb-3 overflow-hidden animate-slide-up"
+      className="rounded-xl bg-white shadow-md overflow-hidden animate-slide-up"
       style={{
         borderLeft: isRtl ? "none" : `3px solid ${borderColor}`,
         borderRight: isRtl ? `3px solid ${borderColor}` : "none",
