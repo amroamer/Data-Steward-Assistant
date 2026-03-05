@@ -408,6 +408,9 @@ type AgentStatus = "idle" | "thinking" | "executing" | "done";
 interface ThinkingStep {
   label: string;
   status: "done" | "active" | "pending";
+  estimatedSeconds?: number;
+  startedAt?: number;
+  completedAt?: number;
 }
 
 const SHEET_TAG_COLORS: Record<string, string> = {
@@ -481,23 +484,49 @@ function formatTimestamp(date: Date | string): string {
 
 function inferStepsForCommand(content: string, t: Translation): ThinkingStep[] {
   const lower = content.toLowerCase();
-  const steps: string[] = [t.stepReadingFile, t.stepProfilingData];
-  if (lower.includes("quality") || lower.includes("dq") || lower.includes("جودة")) {
-    steps.push(t.stepGenerating, t.stepExecuting, t.stepSaving);
-  } else if (lower.includes("classification") || lower.includes("تصنيف")) {
-    steps.push(t.stepGenerating, t.stepSaving);
-  } else if (lower.includes("definition") || lower.includes("تعريف")) {
-    steps.push(t.stepGenerating, t.stepSaving);
-  } else if (lower.includes("model") || lower.includes("نموذج") || lower.includes("star schema")) {
-    steps.push(t.stepGenerating, t.stepSaving);
-  } else if (lower.includes("pii") || lower.includes("بيانات شخصية") || lower.includes("privacy")) {
-    steps.push(t.stepGenerating, t.stepSaving);
-  } else if (lower.includes("insight") || lower.includes("رؤى")) {
-    steps.push(t.stepGenerating, t.stepSaving);
+  const isDq = lower.includes("quality") || lower.includes("dq") || lower.includes("جودة");
+  const isClassification = lower.includes("classification") || lower.includes("تصنيف");
+  const isDefinition = lower.includes("definition") || lower.includes("تعريف");
+  const isModel = lower.includes("model") || lower.includes("نموذج") || lower.includes("star schema");
+  const isPii = lower.includes("pii") || lower.includes("بيانات شخصية") || lower.includes("privacy");
+  const isInsight = lower.includes("insight") || lower.includes("رؤى");
+
+  type StepDef = { label: string; est: number };
+  const stepDefs: StepDef[] = [
+    { label: t.stepReadingFile, est: 2 },
+    { label: t.stepProfilingData, est: 3 },
+  ];
+
+  if (isDq) {
+    stepDefs.push(
+      { label: t.stepGenerating, est: 45 },
+      { label: t.stepExecuting, est: 45 },
+      { label: t.stepSaving, est: 5 },
+    );
+  } else if (isClassification || isDefinition || isModel) {
+    stepDefs.push(
+      { label: t.stepGenerating, est: 25 },
+      { label: t.stepSaving, est: 5 },
+    );
+  } else if (isPii) {
+    stepDefs.push(
+      { label: t.stepGenerating, est: 30 },
+      { label: t.stepSaving, est: 5 },
+    );
+  } else if (isInsight) {
+    stepDefs.push(
+      { label: t.stepGenerating, est: 40 },
+      { label: t.stepSaving, est: 5 },
+    );
   } else {
-    steps.push(t.stepGenerating);
+    stepDefs.push({ label: t.stepGenerating, est: 20 });
   }
-  return steps.map(label => ({ label, status: "done" as const }));
+
+  return stepDefs.map(({ label, est }) => ({
+    label,
+    status: "done" as const,
+    estimatedSeconds: est,
+  }));
 }
 
 function stripExcelContent(content: string): { displayText: string; fileName: string | null } {
@@ -794,6 +823,7 @@ export default function ChatPage() {
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
   const [completedStepsForMessage, setCompletedStepsForMessage] = useState<Record<number, ThinkingStep[]>>({});
+  const [timeTick, setTimeTick] = useState<number>(Date.now());
   const [mobileOutputsOpen, setMobileOutputsOpen] = useState(false);
 
   const [deletingConvId, setDeletingConvId] = useState<number | null>(null);
@@ -872,6 +902,12 @@ export default function ChatPage() {
     resetResultState();
     setCollapsedThreads(new Set());
   }, [activeConversationId]);
+
+  useEffect(() => {
+    if (agentStatus !== "executing") return;
+    const interval = setInterval(() => setTimeTick(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [agentStatus]);
 
   useEffect(() => {
     if (!activeConversation?.messages) return;
@@ -972,9 +1008,11 @@ export default function ChatPage() {
   }, []);
 
   const getThinkingStepsForCommand = useCallback((content: string): ThinkingStep[] => {
+    const now = Date.now();
     return inferStepsForCommand(content, t).map((step, i) => ({
       ...step,
       status: i === 0 ? "active" as const : "pending" as const,
+      ...(i === 0 ? { startedAt: now } : {}),
     }));
   }, [t]);
 
@@ -1199,10 +1237,13 @@ export default function ChatPage() {
                   setThinkingSteps(prev => {
                     const activeIdx = prev.findIndex(s => s.status === "active");
                     if (activeIdx >= 0 && activeIdx < prev.length - 1 && accumulated.length > (activeIdx + 1) * 500) {
-                      return prev.map((s, i) => ({
-                        ...s,
-                        status: i <= activeIdx ? "done" as const : i === activeIdx + 1 ? "active" as const : s.status,
-                      }));
+                      const now = Date.now();
+                      return prev.map((s, i) => {
+                        if (i < activeIdx) return s;
+                        if (i === activeIdx) return { ...s, status: "done" as const, completedAt: s.completedAt ?? now };
+                        if (i === activeIdx + 1) return { ...s, status: "active" as const, startedAt: s.startedAt ?? now };
+                        return s;
+                      });
                     }
                     return prev;
                   });
@@ -1211,7 +1252,14 @@ export default function ChatPage() {
                   setIsStreaming(false);
                   setStreamingContent("");
                   setIsInsightsMode(false);
-                  setThinkingSteps(prev => prev.map(s => ({ ...s, status: "done" as const })));
+                  setThinkingSteps(prev => {
+                    const now = Date.now();
+                    return prev.map(s => ({
+                      ...s,
+                      status: "done" as const,
+                      ...(s.status === "active" && !s.completedAt ? { completedAt: now } : {}),
+                    }));
+                  });
                   setAgentStatus("done");
 
                   const detectedInsights = detectInsightsJSON(accumulated);
@@ -1674,6 +1722,7 @@ export default function ChatPage() {
                         liveSteps={thinkingSteps}
                         completedSteps={thread.assistantMsg ? completedStepsForMessage[thread.assistantMsg.id] : undefined}
                         streamingContent={isActiveStreaming ? streamingContent : ""}
+                        timeTick={isActiveStreaming ? timeTick : undefined}
                         summaryOverride={thread.assistantMsg ? summaryOverrides[thread.assistantMsg.id] : undefined}
                         onDownloadResult={(resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis) ? handleDownloadResult : undefined}
                         dataModel={thread.assistantMsg ? (dataModels[thread.assistantMsg.id] || undefined) : undefined}
@@ -1960,14 +2009,14 @@ function OutputsPanel({
 
 function ThreadCard({
   thread, idx, isCollapsed, onToggle, tag, isRtl, t, lang,
-  isActiveStreaming, liveSteps, completedSteps, streamingContent,
+  isActiveStreaming, liveSteps, completedSteps, streamingContent, timeTick,
   summaryOverride, onDownloadResult, dataModel, dqAnalysis, insightsReport,
   allInsightsReports, profiledColumns = [], uploadedFileName, onAskFollowUp,
 }: {
   thread: ThreadPair; idx: number; isCollapsed: boolean; onToggle: () => void;
   tag: string | null; isRtl: boolean; t: Translation; lang: Lang;
   isActiveStreaming: boolean; liveSteps: ThinkingStep[]; completedSteps?: ThinkingStep[];
-  streamingContent: string; summaryOverride?: string; onDownloadResult?: () => void;
+  streamingContent: string; timeTick?: number; summaryOverride?: string; onDownloadResult?: () => void;
   dataModel?: DataModelJSON | null; dqAnalysis?: DqAnalysisResult | null;
   insightsReport?: InsightsReport | null;
   allInsightsReports?: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
@@ -2077,37 +2126,83 @@ function ThreadCard({
           {/* Agent steps */}
           {stepsToShow.length > 0 && (
             <div className="px-4 py-3 border-t" style={{ borderColor: "#E5E7EB" }}>
-              <div className="flex items-center gap-2 mb-2.5">
-                {isDone ? (
-                  <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "#2E7D32" }} />
-                ) : (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "#E65100" }} />
-                )}
-                <span className="text-[11px] font-semibold" style={{ color: isDone ? "#2E7D32" : "#E65100" }}>
-                  {isDone ? t.agentCompleted : t.agentWorking}
-                </span>
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="flex items-center gap-2">
+                  {isDone ? (
+                    <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "#2E7D32" }} />
+                  ) : (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "#E65100" }} />
+                  )}
+                  <span className="text-[11px] font-semibold" style={{ color: isDone ? "#2E7D32" : "#E65100" }}>
+                    {isDone ? t.agentCompleted : t.agentWorking}
+                  </span>
+                </div>
+                {isDone && (() => {
+                  const totalMs = stepsToShow.reduce((sum, s) => {
+                    if (s.startedAt && s.completedAt) return sum + (s.completedAt - s.startedAt);
+                    return sum;
+                  }, 0);
+                  if (totalMs > 0) {
+                    return (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ color: "#0D2E5C", backgroundColor: "#EFF6FF" }}>
+                        Total: {Math.round(totalMs / 1000)}s
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
               <div className="space-y-1.5 ml-5">
-                {stepsToShow.map((step, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    {(step.status === "done" || isDone) ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#2E7D32" }} />
-                    ) : step.status === "active" ? (
-                      <Loader2 className="w-3.5 h-3.5 flex-shrink-0 animate-spin" style={{ color: "#E65100" }} />
-                    ) : (
-                      <Circle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#D1D5DB" }} />
-                    )}
-                    <span
-                      className="text-[11px]"
-                      style={{
-                        color: (step.status === "done" || isDone) ? "#2E7D32" : step.status === "active" ? "#E65100" : "#9CA3AF",
-                        fontWeight: step.status === "active" && !isDone ? 600 : 400,
-                      }}
-                    >
-                      {step.label}
-                    </span>
-                  </div>
-                ))}
+                {stepsToShow.map((step, i) => {
+                  const effectivelyDone = step.status === "done" || isDone;
+                  const isActive = step.status === "active" && !isDone;
+                  const elapsedSec = isActive && step.startedAt && timeTick
+                    ? Math.max(0, Math.floor((timeTick - step.startedAt) / 1000))
+                    : null;
+                  const doneSec = effectivelyDone && step.startedAt && step.completedAt
+                    ? Math.round((step.completedAt - step.startedAt) / 1000)
+                    : null;
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      {effectivelyDone ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#2E7D32" }} />
+                      ) : isActive ? (
+                        <Loader2 className="w-3.5 h-3.5 flex-shrink-0 animate-spin" style={{ color: "#E65100" }} />
+                      ) : (
+                        <Circle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#D1D5DB" }} />
+                      )}
+                      <span
+                        className="text-[11px] flex-1"
+                        style={{
+                          color: effectivelyDone ? "#2E7D32" : isActive ? "#E65100" : "#9CA3AF",
+                          fontWeight: isActive ? 600 : 400,
+                        }}
+                      >
+                        {step.label}
+                      </span>
+                      {effectivelyDone && doneSec !== null && (
+                        <span className="text-[10px] font-medium" style={{ color: "#6B7280" }}>
+                          {doneSec}s
+                        </span>
+                      )}
+                      {isActive && elapsedSec !== null && step.estimatedSeconds && (
+                        <span className="text-[10px] font-medium tabular-nums" style={{ color: "#E65100" }}>
+                          {elapsedSec}s / ~{step.estimatedSeconds}s
+                        </span>
+                      )}
+                      {isActive && elapsedSec !== null && !step.estimatedSeconds && (
+                        <span className="text-[10px] font-medium tabular-nums" style={{ color: "#E65100" }}>
+                          {elapsedSec}s
+                        </span>
+                      )}
+                      {!effectivelyDone && !isActive && step.estimatedSeconds && (
+                        <span className="text-[10px]" style={{ color: "#D1D5DB" }}>
+                          ~{step.estimatedSeconds}s
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
