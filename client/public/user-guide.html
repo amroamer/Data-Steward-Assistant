@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZATCA Data Owner Agent — User Guide</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #F4F6F9;
+      color: #1A1A2E;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* Cover */
+    .cover {
+      background: linear-gradient(135deg, #0D2E5C 0%, #1A4B8C 60%, #0094D3 100%);
+      border-radius: 16px;
+      padding: 56px 48px;
+      margin-bottom: 40px;
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+    .cover::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 280px; height: 280px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+    }
+    .cover::after {
+      content: '';
+      position: absolute;
+      bottom: -40px; left: -40px;
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      background: rgba(81,186,180,0.15);
+    }
+    .cover-badge {
+      display: inline-block;
+      background: rgba(81,186,180,0.25);
+      color: #51BAB4;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 100px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(81,186,180,0.4);
+    }
+    .cover h1 {
+      font-size: 36px;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 12px;
+    }
+    .cover p {
+      font-size: 15px;
+      color: rgba(255,255,255,0.75);
+      max-width: 500px;
+      margin-bottom: 24px;
+    }
+    .cover-meta {
+      display: flex;
+      gap: 24px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+    }
+    .cover-meta span { display: flex; align-items: center; gap: 6px; }
+
+    /* Sections */
+    .section {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #2563EB;
+      margin-bottom: 6px;
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #0D2E5C;
+      margin-bottom: 16px;
+    }
+
+    h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1A1A2E;
+      margin-top: 24px;
+      margin-bottom: 8px;
+    }
+
+    p { margin-bottom: 12px; color: #374151; }
+    p:last-child { margin-bottom: 0; }
+
+    ul, ol {
+      padding-left: 20px;
+      margin-bottom: 12px;
+      color: #374151;
+    }
+    li { margin-bottom: 6px; }
+
+    /* Feature cards */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-top: 20px;
+    }
+    @media (max-width: 600px) { .feature-grid { grid-template-columns: 1fr; } }
+
+    .feature-card {
+      border-radius: 10px;
+      padding: 20px;
+      border: 1px solid #E5E7EB;
+    }
+    .feature-card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .feature-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .feature-card h3 {
+      font-size: 13px;
+      font-weight: 700;
+      margin: 0;
+      color: #0D2E5C;
+    }
+    .feature-card p {
+      font-size: 12px;
+      color: #6B7280;
+      margin: 0;
+    }
+
+    /* Trigger pills */
+    .trigger-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .trigger-pill {
+      background: #F0F4FF;
+      color: #2563EB;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 100px;
+      border: 1px solid #DBEAFE;
+      font-family: 'Courier New', monospace;
+    }
+
+    /* Layer cards for DQ */
+    .layer-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+    @media (max-width: 600px) { .layer-grid { grid-template-columns: 1fr; } }
+
+    .layer-card {
+      padding: 16px;
+      border-radius: 8px;
+    }
+    .layer-card .layer-num {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .layer-card h4 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .layer-card p {
+      font-size: 12px;
+      margin: 0;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+    th {
+      background: #0D2E5C;
+      color: white;
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    th:first-child { border-radius: 8px 0 0 0; }
+    th:last-child { border-radius: 0 8px 0 0; }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #F3F4F6;
+      color: #374151;
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: #F9FAFB; }
+
+    /* Panel layout cards */
+    .panel-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+    @media (max-width: 600px) { .panel-grid { grid-template-columns: 1fr; } }
+
+    .panel-card {
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+    .panel-card .panel-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .panel-card h4 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .panel-card p {
+      font-size: 11px;
+      margin: 0;
+    }
+
+    /* Info box */
+    .info-box {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-top: 16px;
+      font-size: 13px;
+      color: #1D4ED8;
+    }
+    .info-box strong { font-weight: 600; }
+
+    .tip-box {
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-top: 12px;
+      font-size: 13px;
+      color: #166534;
+    }
+
+    /* Quick ref table */
+    code {
+      font-family: 'Courier New', monospace;
+      background: #F3F4F6;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #374151;
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: #F3F4F6;
+      margin: 20px 0;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      color: #9CA3AF;
+      font-size: 12px;
+      margin-top: 40px;
+    }
+
+    @media print {
+      body { background: white; }
+      .page { max-width: 100%; padding: 20px; }
+      .cover { border-radius: 0; }
+      .section { box-shadow: none; border: 1px solid #E5E7EB; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- Cover -->
+    <div class="cover">
+      <div class="cover-badge">Official Documentation</div>
+      <h1>ZATCA Data Owner Agent<br>User Guide</h1>
+      <p>Your AI-powered assistant for data governance — covering data classification, business definitions, quality rules, PII detection, analytical models, and data insights.</p>
+      <div class="cover-meta">
+        <span>&#128197; March 2026</span>
+        <span>&#128196; Version 1.0</span>
+        <span>&#127462;&#127464; English</span>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+      <div class="section-label">Introduction</div>
+      <h2>What Is the ZATCA Data Owner Agent?</h2>
+      <p>The ZATCA Data Owner Agent is an AI-powered chat application designed for data governance professionals. It connects to Claude (Anthropic's AI model) and lets you upload a data file — Excel, PDF, Word, or image — describe what you need in plain language, and receive structured, downloadable outputs aligned with Saudi SDAIA NDMO regulations and international data governance standards.</p>
+      <p>It is built for data owners, data stewards, and data governance teams who need to quickly produce compliant documentation, quality rules, and analysis without manual effort.</p>
+      <div class="info-box">
+        <strong>Key principle:</strong> Upload a file, type your request in plain English or Arabic, and download a professional Excel report — no technical setup required.
+      </div>
+    </div>
+
+    <!-- Interface Layout -->
+    <div class="section">
+      <div class="section-label">Interface</div>
+      <h2>The 3-Panel Command Center</h2>
+      <p>The application is divided into three panels that work together as your AI command center.</p>
+      <div class="panel-grid">
+        <div class="panel-card" style="background:#EFF6FF; border:1px solid #BFDBFE;">
+          <div class="panel-label" style="color:#2563EB;">Left Panel</div>
+          <h4 style="color:#0D2E5C;">Sidebar</h4>
+          <p style="color:#374151;">ZATCA branding, real-time agent status (Idle / Thinking / Executing / Done), full list of past sessions, and the New Session button.</p>
+        </div>
+        <div class="panel-card" style="background:#F0FDF4; border:1px solid #BBF7D0;">
+          <div class="panel-label" style="color:#2E7D32;">Center Panel</div>
+          <h4 style="color:#0D2E5C;">Work Area</h4>
+          <p style="color:#374151;">Capabilities dashboard on first load. Active conversations show as collapsible command cards with live progress tracking. Command console at the bottom.</p>
+        </div>
+        <div class="panel-card" style="background:#FFF7ED; border:1px solid #FED7AA;">
+          <div class="panel-label" style="color:#D97706;">Right Panel</div>
+          <h4 style="color:#0D2E5C;">Outputs & Activity</h4>
+          <p style="color:#374151;">Live result.xlsx download button, color-coded sheet tracker, and a chronological activity timeline for the current session.</p>
+        </div>
+      </div>
+
+      <h3>Command Console</h3>
+      <p>Located at the bottom of the center panel. Type your request in the text field, attach a file using the paperclip icon, switch between English and Arabic using the language toggle, then click <strong>Execute</strong>.</p>
+
+      <h3>Agent Status</h3>
+      <p>The status pill in the top-left sidebar updates in real time:</p>
+      <ul>
+        <li><strong>Idle</strong> — waiting for your command</li>
+        <li><strong>Thinking</strong> — reading your request and planning the analysis</li>
+        <li><strong>Executing</strong> — running the AI analysis</li>
+        <li><strong>Done</strong> — analysis complete, results saved</li>
+      </ul>
+    </div>
+
+    <!-- Features Overview -->
+    <div class="section">
+      <div class="section-label">Capabilities</div>
+      <h2>The Six Core Features</h2>
+      <p>The agent supports six distinct analysis types. Each produces a structured output displayed in the center panel and saved as a sheet in your downloadable <code>result.xlsx</code> file.</p>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-card-header">
+            <div class="feature-icon" style="background:#EFF6FF;">&#127919;</div>
+            <div>
+              <h3>Data Classification</h3>
+              <p>Saudi SDAIA NDMO standards</p>
+            </div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-header">
+            <div class="feature-icon" style="background:#F0FDF4;">&#128218;</div>
+            <div>
+              <h3>Business Definitions</h3>
+              <p>Plain-language field definitions</p>
+            </div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-header">
+            <div class="feature-icon" style="background:#FFF7ED;">&#9989;</div>
+            <div>
+              <h3>Data Quality Rules</h3>
+              <p>4-layer technical &amp; business rules</p>
+            </div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-header">
+            <div class="feature-icon" style="background:#FDF4FF;">&#11088;</div>
+            <div>
+              <h3>Analytical Data Model</h3>
+              <p>Star schema with DDL generation</p>
+            </div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-header">
+            <div class="feature-icon" style="background:#FFF1F2;">&#128274;</div>
+            <div>
+              <h3>PII Detection</h3>
+              <p>PDPL compliance scanning</p>
+            </div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card-header">
+            <div class="feature-icon" style="background:#F0F9FF;">&#128202;</div>
+            <div>
+              <h3>Data Insights Report</h3>
+              <p>Statistical profiling &amp; recommendations</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature 1: Data Classification -->
+    <div class="section">
+      <div class="section-label">Feature 1</div>
+      <h2>&#127919; Data Classification</h2>
+      <p>Assigns every field in your dataset a sensitivity classification level following Saudi SDAIA NDMO data governance standards.</p>
+
+      <h3>How to trigger it</h3>
+      <div class="trigger-list">
+        <span class="trigger-pill">give me data classification</span>
+        <span class="trigger-pill">classify each field</span>
+        <span class="trigger-pill">classify data fields</span>
+        <span class="trigger-pill">data classification for all fields</span>
+      </div>
+
+      <h3>What you get</h3>
+      <ul>
+        <li><strong>Sensitivity level</strong> for each field: Public, Internal, Confidential, Restricted, or Top Secret</li>
+        <li><strong>Justification</strong> explaining why each level was assigned</li>
+        <li><strong>Regulatory notes</strong> linking to relevant NDMO guidelines</li>
+      </ul>
+
+      <h3>Output format</h3>
+      <p>A formatted table in the center thread card, plus a <strong>Classification</strong> sheet added to <code>result.xlsx</code>.</p>
+
+      <div class="tip-box">
+        <strong>Tip:</strong> Upload your Excel or PDF file first, then ask for classification. The agent will analyze every field in the file automatically.
+      </div>
+    </div>
+
+    <!-- Feature 2: Business Definitions -->
+    <div class="section">
+      <div class="section-label">Feature 2</div>
+      <h2>&#128218; Business Definitions</h2>
+      <p>Generates clear, professional business definitions for every field in your dataset — turning technical column names into documented business terminology.</p>
+
+      <h3>How to trigger it</h3>
+      <div class="trigger-list">
+        <span class="trigger-pill">give me business definitions</span>
+        <span class="trigger-pill">define all fields</span>
+        <span class="trigger-pill">business definitions for all fields</span>
+        <span class="trigger-pill">generate business definitions</span>
+      </div>
+
+      <h3>What you get per field</h3>
+      <ul>
+        <li><strong>Business Name</strong> — a plain-language label (not the raw column name)</li>
+        <li><strong>Definition</strong> — a full sentence describing what the field represents in a business context</li>
+        <li><strong>Data Type</strong> and expected format</li>
+        <li><strong>Example values</strong> to illustrate the field</li>
+        <li><strong>Business rules</strong> — any known constraints or validation logic</li>
+      </ul>
+
+      <h3>Output format</h3>
+      <p>A formatted table in the center thread, plus a <strong>Business Definitions</strong> sheet in <code>result.xlsx</code>.</p>
+    </div>
+
+    <!-- Feature 3: DQ Rules -->
+    <div class="section">
+      <div class="section-label">Feature 3</div>
+      <h2>&#9989; Data Quality Rules — 4 Layers</h2>
+      <p>The most comprehensive feature. The agent generates a complete set of data quality rules covering four distinct layers, using two sequential AI calls to ensure full depth without token limits.</p>
+
+      <h3>How to trigger it</h3>
+      <div class="trigger-list">
+        <span class="trigger-pill">give me data quality rules</span>
+        <span class="trigger-pill">generate DQ rules</span>
+        <span class="trigger-pill">data quality rules for all fields</span>
+        <span class="trigger-pill">quality check</span>
+        <span class="trigger-pill">validation rules</span>
+      </div>
+
+      <h3>The 4 Layers</h3>
+      <div class="layer-grid">
+        <div class="layer-card" style="background:#EFF6FF; border:1px solid #BFDBFE;">
+          <div class="layer-num" style="color:#2563EB;">Layer 1</div>
+          <h4 style="color:#1D4ED8;">Technical Rules</h4>
+          <p style="color:#374151;">Nullability, data type validation, maximum length, encoding format, date format patterns.</p>
+        </div>
+        <div class="layer-card" style="background:#F0FDF4; border:1px solid #BBF7D0;">
+          <div class="layer-num" style="color:#2E7D32;">Layer 2</div>
+          <h4 style="color:#166534;">Logical Rules</h4>
+          <p style="color:#374151;">Range checks, valid value lists, regular expression patterns, referential integrity.</p>
+        </div>
+        <div class="layer-card" style="background:#FFF7ED; border:1px solid #FED7AA;">
+          <div class="layer-num" style="color:#D97706;">Layer 3</div>
+          <h4 style="color:#92400E;">Business Rules</h4>
+          <p style="color:#374151;">Domain-specific validity, ZATCA compliance rules, regulatory constraints, business logic.</p>
+        </div>
+        <div class="layer-card" style="background:#FDF4FF; border:1px solid #E9D5FF;">
+          <div class="layer-num" style="color:#7C3AED;">Layer 4</div>
+          <h4 style="color:#5B21B6;">Cross-Field &amp; Logic Warnings</h4>
+          <p style="color:#374151;">Rules spanning multiple fields, conditional dependencies, data design warnings.</p>
+        </div>
+      </div>
+
+      <h3>How the 2-Call Split works</h3>
+      <p>To handle large datasets (30+ fields), the agent splits the analysis into two AI calls that run one after the other. You will see "Part 1/2..." then "Part 2/2..." progress indicators in the center panel. The results are automatically merged and presented as one complete report.</p>
+
+      <h3>Output format</h3>
+      <ul>
+        <li>A donut chart showing rule counts by severity (Critical / High / Medium / Low)</li>
+        <li>A summary card with totals by rule type</li>
+        <li>Three sheets in <code>result.xlsx</code>: Technical Rules, Business Rules, Cross-Field Rules</li>
+      </ul>
+
+      <div class="info-box">
+        <strong>No file?</strong> If you ask for DQ rules without uploading a new file, the agent automatically extracts field names from your previous conversation to generate the rules.
+      </div>
+    </div>
+
+    <!-- Feature 4: Analytical Data Model -->
+    <div class="section">
+      <div class="section-label">Feature 4</div>
+      <h2>&#11088; Analytical Data Model</h2>
+      <p>Designs a dimensional (star schema) data model from your dataset, complete with an interactive diagram and ready-to-run DDL SQL scripts.</p>
+
+      <h3>How to trigger it</h3>
+      <div class="trigger-list">
+        <span class="trigger-pill">give me an analytical data model</span>
+        <span class="trigger-pill">build a star schema</span>
+        <span class="trigger-pill">create a dimensional model</span>
+        <span class="trigger-pill">analytical model for my data</span>
+      </div>
+
+      <h3>What you get</h3>
+      <ul>
+        <li><strong>Fact tables</strong> identified from business measures and transactional data</li>
+        <li><strong>Dimension tables</strong> for descriptive attributes (time, location, customer, product, etc.)</li>
+        <li><strong>Relationships</strong> between tables with cardinality defined</li>
+        <li><strong>Interactive SVG diagram</strong> — a clickable star schema rendered directly in the thread card</li>
+        <li><strong>DDL SQL script</strong> — full <code>CREATE TABLE</code> statements with primary keys, foreign keys, data types, and comments</li>
+      </ul>
+
+      <h3>Output format</h3>
+      <p>The diagram is shown in the center panel. A <strong>Data Model</strong> sheet is added to <code>result.xlsx</code>, and you can download the DDL script as a separate <code>.sql</code> file directly from the card.</p>
+    </div>
+
+    <!-- Feature 5: PII Detection -->
+    <div class="section">
+      <div class="section-label">Feature 5</div>
+      <h2>&#128274; PII Detection (PDPL Compliance)</h2>
+      <p>Scans every field in your dataset against Saudi Arabia's Personal Data Protection Law (PDPL) and international PII standards to identify privacy risks and compliance gaps.</p>
+
+      <h3>How to trigger it</h3>
+      <div class="trigger-list">
+        <span class="trigger-pill">detect PII</span>
+        <span class="trigger-pill">run PII scan</span>
+        <span class="trigger-pill">scan for sensitive data</span>
+        <span class="trigger-pill">PII analysis</span>
+        <span class="trigger-pill">find personal data</span>
+        <span class="trigger-pill">PDPL check</span>
+      </div>
+
+      <h3>What you get per field</h3>
+      <ul>
+        <li><strong>PII Classification:</strong> PII / Sensitive PII / Non-PII</li>
+        <li><strong>PII Category:</strong> Name, National ID, Financial, Health, Location, Biometric, Contact, etc.</li>
+        <li><strong>Risk Level:</strong> Critical / High / Medium / Low</li>
+        <li><strong>PDPL Article reference</strong> where applicable</li>
+        <li><strong>Compliance recommendation</strong> — encryption, masking, access control, retention policy</li>
+      </ul>
+
+      <h3>Output format</h3>
+      <p>A scan summary card showing total PII fields found by category, plus a <strong>PII Scan</strong> sheet in <code>result.xlsx</code>.</p>
+    </div>
+
+    <!-- Feature 6: Data Insights -->
+    <div class="section">
+      <div class="section-label">Feature 6</div>
+      <h2>&#128202; Data Insights Report</h2>
+      <p>Profiles your uploaded dataset column by column and produces a comprehensive analytical report with executive summary, key findings, and actionable recommendations.</p>
+
+      <h3>How to trigger it</h3>
+      <div class="trigger-list">
+        <span class="trigger-pill">generate data insight report</span>
+        <span class="trigger-pill">give me insights</span>
+        <span class="trigger-pill">analyze this data</span>
+        <span class="trigger-pill">data insights</span>
+        <span class="trigger-pill">insights on this data</span>
+        <span class="trigger-pill">data report</span>
+      </div>
+
+      <h3>What the report contains</h3>
+      <ul>
+        <li><strong>Executive Summary</strong> — total rows, columns, overall completeness percentage, high-level narrative</li>
+        <li><strong>Key Insights</strong> — up to 10 findings covering distributions, anomalies, correlations, trends, and data quality issues</li>
+        <li><strong>Recommendations</strong> — up to 8 actionable suggestions, each with a priority (High / Medium / Low) and effort estimate</li>
+        <li><strong>Column Profiles</strong> — per-column statistics: min/max, mean, null rate, unique count, top values</li>
+        <li><strong>Data Quality Flags</strong> — automated warnings for missing data, outliers, duplicates, format inconsistencies</li>
+      </ul>
+
+      <h3>Output format</h3>
+      <p>A standalone, fully styled Excel report — separate from <code>result.xlsx</code> — with all sections organized across multiple sheets. Download it directly from the agent response card.</p>
+
+      <div class="tip-box">
+        <strong>Important:</strong> This feature requires a file upload in the same message. Attach your Excel, PDF, or CSV alongside your insights request.
+      </div>
+    </div>
+
+    <!-- File Formats -->
+    <div class="section">
+      <div class="section-label">File Support</div>
+      <h2>Supported File Formats</h2>
+      <p>Attach any of the following file types to your command using the paperclip icon in the command console.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Format</th>
+            <th>Extensions</th>
+            <th>How it's processed</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Excel</strong></td>
+            <td><code>.xlsx</code>, <code>.xls</code></td>
+            <td>Field names and data rows are extracted. Column statistics are profiled for the Insights Report.</td>
+          </tr>
+          <tr>
+            <td><strong>CSV</strong></td>
+            <td><code>.csv</code></td>
+            <td>Parsed as tabular data — same processing as Excel.</td>
+          </tr>
+          <tr>
+            <td><strong>PDF</strong></td>
+            <td><code>.pdf</code></td>
+            <td>Text is extracted. Table structures are detected where possible.</td>
+          </tr>
+          <tr>
+            <td><strong>Word</strong></td>
+            <td><code>.docx</code>, <code>.doc</code></td>
+            <td>Text is extracted and treated the same as PDF.</td>
+          </tr>
+          <tr>
+            <td><strong>Image</strong></td>
+            <td><code>.png</code>, <code>.jpg</code>, <code>.jpeg</code>, <code>.gif</code>, <code>.webp</code></td>
+            <td>Claude's vision model reads the image directly. Files over 4.5 MB are auto-compressed before sending.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Cumulative Results -->
+    <div class="section">
+      <div class="section-label">Result Management</div>
+      <h2>Cumulative result.xlsx</h2>
+      <p>You can run multiple analyses in a single session. Each completed analysis adds a new sheet to the same <code>result.xlsx</code> file. For example:</p>
+      <ol>
+        <li>Upload your file and ask for <strong>Data Classification</strong> → Classification sheet added</li>
+        <li>Ask for <strong>Business Definitions</strong> → Business Definitions sheet added</li>
+        <li>Ask for <strong>DQ Rules</strong> → Three DQ sheets added</li>
+        <li>Ask for <strong>PII Detection</strong> → PII Scan sheet added</li>
+      </ol>
+      <p>One download from the right-hand Outputs panel gives you everything from the session in a single organized file.</p>
+
+      <h3>Sheet Tracker</h3>
+      <p>The right panel shows color-coded tags for every sheet currently inside <code>result.xlsx</code>, so you can see at a glance what's been generated.</p>
+
+      <div class="info-box">
+        <strong>Starting a new file:</strong> If you upload a new file after already running analyses, the agent will prompt you to confirm — keeping your existing results or resetting and starting fresh with the new file.
+      </div>
+    </div>
+
+    <!-- Language Support -->
+    <div class="section">
+      <div class="section-label">Localization</div>
+      <h2>English and Arabic Support</h2>
+      <p>The entire interface supports both English (left-to-right) and Arabic (right-to-left). Click the language toggle button in the command console to switch.</p>
+      <ul>
+        <li>All UI labels, buttons, and messages switch to the selected language</li>
+        <li>The 3-panel layout flips direction for proper RTL display in Arabic</li>
+        <li>The AI understands requests written in Arabic and responds accordingly</li>
+        <li>You can also type trigger phrases in Arabic (e.g., <code>رؤى البيانات</code>, <code>تصنيف البيانات</code>)</li>
+      </ul>
+    </div>
+
+    <!-- Mobile -->
+    <div class="section">
+      <div class="section-label">Mobile Use</div>
+      <h2>Mobile &amp; Touch Devices</h2>
+      <p>The application adapts automatically on smaller screens:</p>
+      <ul>
+        <li>The left sidebar becomes a slide-in drawer, accessible from a menu button</li>
+        <li>The right outputs panel becomes a slide-in drawer accessible from the bottom</li>
+        <li>A <strong>camera capture button</strong> appears on touch devices — tap it to photograph a document or spreadsheet and send it directly for analysis</li>
+      </ul>
+    </div>
+
+    <!-- Quick Reference -->
+    <div class="section">
+      <div class="section-label">Quick Reference</div>
+      <h2>Example Commands</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Example phrases you can type</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Data Classification</strong></td>
+            <td>
+              "give me data classification for each field"<br>
+              "classify all fields in this file"<br>
+              "do the data classification"
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Business Definitions</strong></td>
+            <td>
+              "give me business definitions for all fields"<br>
+              "generate business definitions"<br>
+              "define the fields in this Excel"
+            </td>
+          </tr>
+          <tr>
+            <td><strong>DQ Rules</strong></td>
+            <td>
+              "generate data quality rules"<br>
+              "give me DQ rules for all fields"<br>
+              "create validation rules"
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Data Model</strong></td>
+            <td>
+              "give me an analytical data model"<br>
+              "build a star schema for this data"<br>
+              "create a dimensional model"
+            </td>
+          </tr>
+          <tr>
+            <td><strong>PII Detection</strong></td>
+            <td>
+              "detect PII"<br>
+              "run a PII scan"<br>
+              "find all personal data fields"<br>
+              "PDPL compliance check"
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Data Insights</strong></td>
+            <td>
+              "generate data insight report"<br>
+              "give me insights on this data"<br>
+              "analyze this data and give me insights"<br>
+              "data insights report"
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>ZATCA Data Owner Agent &mdash; User Guide &mdash; Version 1.0 &mdash; March 2026</p>
+      <p style="margin-top:4px;">Powered by Claude (Anthropic) &middot; Built for Saudi SDAIA NDMO Compliance</p>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -209,6 +209,7 @@ const translations = {
     completedAt: "Completed:",
     followUp: "Ask Follow-up",
     excelFile: "Excel File:",
+    downloadUserGuide: "Download User Guide",
   },
   ar: {
     newChat: "وكيل مالك بيانات جديد",
@@ -320,6 +321,7 @@ const translations = {
     completedAt: "اكتمل:",
     followUp: "متابعة",
     excelFile: "ملف Excel:",
+    downloadUserGuide: "تنزيل دليل المستخدم",
   },
 } as const;
 
@@ -806,6 +808,16 @@ function SidebarContent({
             )}
           </>
         )}
+        <a
+          href="/user-guide.html"
+          download="ZATCA_Data_Owner_Agent_User_Guide.html"
+          className="flex items-center justify-center gap-2 w-full rounded-md text-white text-[12px] font-medium py-1.5 transition-opacity hover:opacity-80"
+          style={{ backgroundColor: "#51BAB4" }}
+          data-testid="link-download-user-guide"
+        >
+          <BookOpen className="w-3.5 h-3.5 flex-shrink-0" />
+          {t.downloadUserGuide}
+        </a>
         <Button
           onClick={handleNewChat}
           className="w-full justify-center gap-2 font-medium text-white ripple-button"
