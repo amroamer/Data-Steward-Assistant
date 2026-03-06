@@ -2358,6 +2358,7 @@ export default function ChatPage() {
               { id: "data-management", icon: Database, labelKey: "agentDataMgmt", descKey: "agentDataMgmtDesc", color: "#0094D3" },
               { id: "data-model", icon: Layers, labelKey: "agentDataModel", descKey: "agentDataModelDesc", color: "#774896" },
               { id: "insights", icon: Brain, labelKey: "agentInsights", descKey: "agentInsightsDesc", color: "#067647" },
+              { id: "nudge", icon: Target, labelKey: "agentNudge", descKey: "agentDataMgmtDesc", color: "#7C3AED" },
             ] as const).map((tab) => (
               <button
                 key={tab.id}
@@ -2380,26 +2381,6 @@ export default function ChatPage() {
                 <span>{t[tab.labelKey] as string}</span>
               </button>
             ))}
-            <div className="w-px h-5 bg-gray-200 mx-1 flex-shrink-0" />
-            <button
-              onClick={() => {
-                if (agentMode !== "nudge") {
-                  setAgentMode("nudge");
-                  setActiveConversationId(null);
-                  resetResultState(true);
-                  setCollapsedThreads(new Set());
-                }
-              }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-              style={{
-                backgroundColor: agentMode === "nudge" ? "#7C3AED" : "transparent",
-                color: agentMode === "nudge" ? "white" : "#7C3AED",
-              }}
-              data-testid="tab-nudge-agent"
-            >
-              <Target className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>{t.nudgeAgent}</span>
-            </button>
           </div>
         )}
 
