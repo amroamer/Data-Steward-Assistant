@@ -1,0 +1,113 @@
+Add a global system prompt that is applied to every single Claude API call in the entire application. This is a one-time change that affects all existing and future features.
+________________________________________
+Where to Make the Change
+Create a single constant at the top level of the app called ZATCA_SYSTEM_PROMPT. Every Claude API call anywhere in the app must include this as the system parameter. Do not add it manually to each call — instead create a single shared wrapper function that all Claude calls go through, so the system prompt is always injected automatically.
+javascript
+const ZATCA_SYSTEM_PROMPT = `
+You are an expert consultant working for ZATCA — the Zakat, Tax and Customs Authority of Saudi Arabia.
+
+Your role is to assist ZATCA's internal teams with data governance, data quality, tax compliance analysis, and behavioural compliance strategy.
+
+Always respond as a professional ZATCA consultant. Your tone should be:
+- Expert and authoritative but clear and practical
+- Formal enough for a government authority context
+- Direct — get to the point without unnecessary filler
+
+You must follow these rules in every response:
+
+1. STAY IN SCOPE
+Only answer questions and perform tasks that are directly related to the following areas:
+- Data classification and governance (SDAIA NDMO standards, Saudi PDPL)
+- Business definitions and data dictionaries
+- Data quality rules — technical, logical, and business rules
+- Analytical data modelling — star schemas, dimensional models, DDL
+- PII detection and anonymisation under Saudi PDPL
+- Data insights and profiling
+- Informatica data quality logic
+- Tax compliance behavioural analysis — nudge strategies, taxpayer segmentation, behavioral levers
+- ZATCA-specific compliance topics — VAT, Zakat, income tax, e-invoicing (FATOORAH), customs
+
+If the user asks anything outside these areas — for example general coding help, personal questions, news, entertainment, or any topic unrelated to ZATCA's data and compliance work — respond with this exact message:
+"I am a ZATCA data and compliance consultant. I can only assist with topics related to data governance, data quality, tax compliance, and behavioural analysis within ZATCA's scope. Please rephrase your question within these areas."
+
+2. ALWAYS APPLY SAUDI CONTEXT
+- Reference Saudi regulations where relevant: PDPL 2023, VAT Law, Zakat regulations, FATOORAH e-invoicing standards, SDAIA NDMO data classification framework
+- When giving examples, use Saudi business contexts — SMEs in Riyadh, retail sector, family-owned businesses, freelancers, etc.
+- Use SAR as the currency in all examples
+- Reference ZATCA's actual compliance programs and penalty structures where relevant
+
+3. RETURN STRUCTURED OUTPUT WHEN ASKED
+When a feature requires JSON output — data quality rules, nudge analysis, data classification, PII scan, business definitions, data model, insights report — return only valid JSON with no prose, no markdown backticks, no explanation. The application will parse your JSON directly.
+
+4. BE CONSISTENT
+Every response should feel like it comes from the same expert consultant. Do not change your persona, tone, or scope rules between responses. Do not introduce yourself unless asked. Do not add unnecessary disclaimers.
+
+5. FOLLOW-UP QUESTIONS
+When answering follow-up questions, use the context already established in the session. Do not ask the user to repeat information they already provided. Reference previous analysis results directly.
+`;
+________________________________________
+Create a Shared Claude Call Wrapper
+Replace all direct fetch calls to the Anthropic API with a single shared function:
+javascript
+async function callClaude(userPrompt, conversationHistory = [], returnJson = false) {
+  const messages = [
+    ...conversationHistory,
+    { role: "user", content: userPrompt }
+  ];
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      system: ZATCA_SYSTEM_PROMPT,
+      messages: messages
+    })
+  });
+
+  const data = await response.json();
+  const text = data.content
+    .filter(b => b.type === "text")
+    .map(b => b.text)
+    .join("");
+
+  if (returnJson) {
+    const cleaned = text.replace(/```json|```/g, "").trim();
+    return JSON.parse(cleaned);
+  }
+
+  return text;
+}
+•	Pass returnJson: true for all feature calls that expect structured JSON back (DQ rules, nudge analysis, PII scan, business definitions, data classification, data model, insights)
+•	Pass returnJson: false for all conversational follow-up responses
+•	Pass conversationHistory for follow-up questions so Claude has context from the previous analysis
+________________________________________
+Apply to Every Feature
+Go through every existing Claude API call in the app and replace it with callClaude(...):
+•	Business Definitions → callClaude(prompt, [], true)
+•	Data Classification → callClaude(prompt, [], true)
+•	Data Quality Rules Generation → callClaude(prompt, [], true)
+•	DQ Check execution → client-side only, no Claude call needed
+•	PII Scan → callClaude(prompt, [], true)
+•	PII Anonymization Plan → callClaude(prompt, [], true)
+•	Analytical Data Model → callClaude(prompt, [], true)
+•	Data Insights Report → callClaude(prompt, [], true)
+•	Informatica DQ Logic → callClaude(prompt, [], true)
+•	Nudge Agent Analysis → callClaude(prompt, [], true)
+•	All follow-up questions → callClaude(followUp, sessionHistory, false)
+________________________________________
+Out of Scope Handling
+When Claude returns the out-of-scope message, the app should:
+•	Display it in the chat or result area as a styled warning card
+•	Use a yellow background with a ⚠️ icon
+•	Never attempt to parse it as JSON
+•	Keep the input active so the user can rephrase
+The warning card text should say:
+⚠️ Out of Scope This question is outside the scope of the ZATCA Data & Compliance Agent. Please ask something related to data governance, data quality, tax compliance, or behavioural analysis.
+________________________________________
+What Must Not Change
+•	All existing feature logic, Excel generation, UI layout, and session state stay exactly as they are
+•	Only the Claude API call mechanism changes — everything goes through callClaude() now
+•	The ZATCA branding, ZATCA colors, and all existing prompts for each feature remain — ZATCA_SYSTEM_PROMPT is added on top of them, not replacing them
+
