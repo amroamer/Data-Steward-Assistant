@@ -582,7 +582,7 @@ export default function UseCasesPage() {
             <span>{isRtl ? "مدعوم بالذكاء الاصطناعي · مبني لمتطلبات المملكة العربية السعودية" : "AI-Powered · Built for Saudi Regulatory Standards"}</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
-            {isRtl ? "ماذا يمكن لوكيل البيانات والتحليلات أن يفعل؟" : "What can the Data & Analytics agent do?"}
+            {isRtl ? "ماذا يمكن لوكيل البيانات والتحليلات أن يفعل؟" : "What can the Data & Analytics Agent do?"}
           </h1>
           <p className="text-xl text-blue-100 max-w-2xl mx-auto mb-8">
             {isRtl
@@ -675,7 +675,7 @@ export default function UseCasesPage() {
             data-testid="button-open-agent-footer"
           >
             <ExternalLink className="w-4 h-4" />
-            {isRtl ? "فتح وكيل البيانات والتحليلات" : "Open Data & Analytics agent"}
+            {isRtl ? "فتح وكيل البيانات والتحليلات" : "Open Data & Analytics Agent"}
           </button>
         </div>
       </div>

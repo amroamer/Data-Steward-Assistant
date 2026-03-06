@@ -1,4 +1,4 @@
-# Progress Tracker — ZATCA Data & Analytics agent
+# Progress Tracker — ZATCA Data & Analytics Agent
 
 Track all feature development, fixes, and backlog items. Updated as work progresses.
 
@@ -141,7 +141,7 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 
 | Date | Change |
 |---|---|
-| 2026-03-06 | **App Renaming** — changed app name from "Data Owner Agent" to "Data & Analytics agent" across UI, metadata, and docs |
+| 2026-03-06 | **App Renaming** — changed app name from "Data Owner Agent" to "Data & Analytics Agent" across UI, metadata, and docs |
 | 2026-03-06 | **Favicon** — replaced with official ZATCA logo (`ZATCA-o.png`, 310×310 PNG) downloaded directly from zatca.gov.sa; no HTML changes needed |
 | 2026-03-06 | **Use Cases Page** — static `/use-cases` route; 14 use case cards with filter tabs (All/Data Management/Compliance/Analytics/Insights); click-to-open modals with user story, example input, styled HTML/CSS output previews; "Launch Agent" CTA pre-fills `?prompt=&mode=` URL params; chat.tsx reads params on mount and clears them; Use Cases link in sidebar (EN + AR/RTL) |
 | 2026-03-06 | **Informatica Output** — backend system prompt, trigger detection, frontend detection/state/streaming, Informatica mini-table in ThreadCard, `informatica_output` Excel sheet, EN+AR translations, orange tag, Informatica feature card |
