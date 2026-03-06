@@ -1,0 +1,340 @@
+Update the existing Data Insights Report page. Do not create a new page. Expand the current insights feature so that when a user uploads an Excel file, the app automatically runs three levels of analysis — Descriptive, Diagnostic, and Analytical — and displays everything on screen as well as in a downloadable Excel file.
+
+Step 1 — File Reading & Profiling
+When the user uploads an Excel file, profile the data in JavaScript before sending anything to Claude:
+
+Total rows and columns
+For each column: data type, null count, null percentage, unique value count
+For numeric columns: min, max, mean, median, standard deviation
+For text columns: top 10 most frequent values and their counts
+For date columns: earliest date, latest date, range in days
+Duplicate row detection: count rows where all fields are identical
+Store the full dataset in memory for client-side calculations
+Send only the statistical profile and a 10-row sample to Claude — never the full raw dataset
+
+
+Step 2 — Claude Analysis
+Send the profiled data to Claude using the shared callClaude() wrapper with returnJson: true.
+The prompt to Claude should say:
+You are a senior ZATCA data analyst. The user has uploaded a dataset. Based on the statistical profile and sample provided, generate a comprehensive data insights report covering three levels of analysis: Descriptive, Diagnostic, and Analytical. Return ONLY valid JSON with this exact structure — no prose, no markdown:
+
+{
+  "report_title": "...",
+  "dataset_context": "...",
+
+  "descriptive": {
+    "summary": {
+      "total_rows": 0,
+      "total_columns": 0,
+      "duplicate_rows": 0,
+      "overall_completeness_pct": 0
+    },
+    "field_profiles": [
+      {
+        "field_name": "...",
+        "data_type": "...",
+        "null_count": 0,
+        "null_pct": 0,
+        "unique_count": 0,
+        "top_values": ["..."],
+        "min": "...",
+        "max": "...",
+        "average": "...",
+        "data_type_consistent": true,
+        "insight": "..."
+      }
+    ],
+    "date_range": {
+      "earliest": "...",
+      "latest": "...",
+      "span_days": 0,
+      "date_field_used": "..."
+    },
+    "completeness_scorecard": [
+      {
+        "field_name": "...",
+        "completeness_pct": 0,
+        "status": "Good | Acceptable | Poor"
+      }
+    ]
+  },
+
+  "diagnostic": {
+    "correlations": [
+      {
+        "field_a": "...",
+        "field_b": "...",
+        "relationship": "...",
+        "strength": "Strong | Moderate | Weak",
+        "business_meaning": "..."
+      }
+    ],
+    "outliers": [
+      {
+        "field_name": "...",
+        "outlier_description": "...",
+        "affected_rows_estimate": 0,
+        "possible_cause": "..."
+      }
+    ],
+    "skewness": [
+      {
+        "field_name": "...",
+        "distribution_shape": "Normal | Right-Skewed | Left-Skewed | Bimodal | Flat",
+        "implication": "..."
+      }
+    ],
+    "trends": [
+      {
+        "field_name": "...",
+        "trend_type": "YoY | MoM | Quarterly",
+        "direction": "Increasing | Decreasing | Stable | Volatile",
+        "observation": "..."
+      }
+    ],
+    "cohort_comparison": [
+      {
+        "cohort_field": "...",
+        "cohorts_identified": ["..."],
+        "key_difference": "...",
+        "business_implication": "..."
+      }
+    ],
+    "funnel_dropoff": [
+      {
+        "stage": "...",
+        "records_in": 0,
+        "records_out": 0,
+        "dropoff_pct": 0,
+        "likely_cause": "..."
+      }
+    ],
+    "cross_field_violations": [
+      {
+        "fields_involved": ["..."],
+        "violation_description": "...",
+        "affected_rows_estimate": 0,
+        "severity": "High | Medium | Low"
+      }
+    ],
+    "concentration_report": [
+      {
+        "field_name": "...",
+        "top_10pct_contribution": "...",
+        "observation": "..."
+      }
+    ]
+  },
+
+  "analytical": {
+    "segments": [
+      {
+        "segment_name": "...",
+        "defining_characteristics": ["..."],
+        "estimated_size_pct": 0,
+        "business_meaning": "..."
+      }
+    ],
+    "contribution_analysis": [
+      {
+        "field_name": "...",
+        "top_contributors": ["..."],
+        "contribution_pct": 0,
+        "insight": "..."
+      }
+    ],
+    "lineage_quality": [
+      {
+        "field_name": "...",
+        "error_propagation_risk": "High | Medium | Low",
+        "downstream_impact": "...",
+        "recommendation": "..."
+      }
+    ],
+    "time_series_decomposition": [
+      {
+        "field_name": "...",
+        "trend": "...",
+        "seasonality": "...",
+        "noise_level": "High | Medium | Low",
+        "insight": "..."
+      }
+    ]
+  },
+
+  "executive_summary": {
+    "headline_finding": "...",
+    "top_3_insights": ["..."],
+    "biggest_risk": "...",
+    "immediate_action": "..."
+  }
+}
+
+Step 3 — Display Results On Screen
+After Claude responds, display everything directly in the center panel as three collapsible sections. Each section can be expanded or collapsed by clicking its header. All sections are expanded by default.
+
+Executive Summary Banner
+At the very top before all sections show a prominent executive summary banner:
+
+Headline Finding — large bold text
+Top 3 Insights — numbered list
+Biggest Risk — red highlighted text
+Immediate Action — green highlighted call-to-action
+
+Style the banner with ZATCA dark navy background (#0D2E5C), white text, and a gold left border accent (#F59E0B).
+
+Section 1 — Descriptive: What Happened?
+Collapsible section header styled in ZATCA blue.
+Show a summary bar with four stat tiles:
+
+📋 Total Rows: N
+📊 Total Columns: N
+🔁 Duplicate Rows: N
+✅ Overall Completeness: N%
+
+Then show three sub-sections:
+Field Profiles Table — one row per field:
+| Field Name | Data Type | Null % | Unique Count | Min | Max | Average | Top Values | Consistent? | Insight |
+
+Null % color coded: 0% → green, 1–10% → yellow, >10% → red
+Consistent column: ✅ green or ❌ red
+
+Completeness Scorecard — horizontal progress bar per field showing completeness percentage:
+
+Green if ≥ 90%
+Yellow if 70–89%
+Red if below 70%
+Show the percentage number at the end of each bar
+
+Date Range Card — simple card showing earliest date, latest date, span in days, and which field was used
+
+Section 2 — Diagnostic: Why Did It Happen?
+Collapsible section header styled in ZATCA blue.
+Show each diagnostic finding as its own styled sub-card inside this section:
+Correlations — table showing:
+| Field A | Field B | Relationship | Strength | Business Meaning |
+
+Strength color coded: Strong → dark blue bold, Moderate → blue, Weak → grey
+
+Outliers — table showing:
+| Field Name | Outlier Description | Estimated Affected Rows | Possible Cause |
+
+Highlight entire row in light red if affected rows is above 100
+
+Distribution Shape — table showing:
+| Field Name | Distribution Shape | Implication |
+
+Distribution shape shown as a tag with distinct color per shape type
+
+Trends — table showing:
+| Field Name | Trend Type | Direction | Observation |
+
+Direction shown with icons: Increasing → ↑ green, Decreasing → ↓ red, Stable → → grey, Volatile → ⚡ orange
+
+Cohort Comparison — table showing:
+| Cohort Field | Cohorts Found | Key Difference | Business Implication |
+Funnel Drop-off — visual stepped funnel:
+
+Each stage shown as a bar narrowing downward
+Records in and records out shown on each stage
+Drop-off percentage shown in red if above 20%
+Likely cause shown below each stage
+
+Cross-field Violations — table showing:
+| Fields Involved | Violation Description | Estimated Affected Rows | Severity |
+
+Severity color coded: High → red, Medium → orange, Low → yellow
+
+Concentration Report — table showing:
+| Field Name | Top 10% Contribution | Observation |
+
+Top 10% contribution shown as a bold percentage
+
+
+Section 3 — Analytical: What Does It Mean?
+Collapsible section header styled in ZATCA blue.
+Show each as a styled sub-card:
+Segments — one card per segment showing:
+
+Segment name as bold header
+Defining characteristics as tag chips
+Estimated size as a percentage badge
+Business meaning as paragraph text
+
+Contribution Analysis — table showing:
+| Field Name | Top Contributors | Contribution % | Insight |
+
+Contribution % shown as a colored bar inside the cell
+
+Data Lineage Quality — table showing:
+| Field Name | Error Propagation Risk | Downstream Impact | Recommendation |
+
+Error propagation risk color coded: High → red, Medium → orange, Low → green
+
+Time Series Decomposition — table showing:
+| Field Name | Trend | Seasonality | Noise Level | Insight |
+
+Noise level color coded: High → red, Medium → yellow, Low → green
+
+
+Step 4 — Generate Excel File
+After displaying on screen generate insights_report_[timestamp].xlsx using SheetJS with these sheets:
+Sheet 1: executive_summary
+
+Formatted two-column key-value layout
+headline_finding, top_3_insights, biggest_risk, immediate_action, total_rows, total_columns, duplicate_rows, overall_completeness_pct
+ZATCA blue header (1A4B8C), white bold text
+biggest_risk row: red background, white bold text
+immediate_action row: green background, white bold text
+
+Sheet 2: descriptive_field_profiles
+
+One row per field with all profile columns
+Null % color coded: 0% → green fill, 1–10% → yellow fill, >10% → red fill
+data_type_consistent: YES in green bold or NO in red bold
+Auto-width, freeze header
+
+Sheet 3: completeness_scorecard
+
+One row per field
+Columns: field_name, completeness_pct, status
+Status color coded: Good → green fill, Acceptable → yellow fill, Poor → red fill
+Sort by completeness_pct ascending — worst fields first
+Auto-width, freeze header
+
+Sheet 4: diagnostic_correlations
+
+One row per correlation
+Strength color coded: Strong → dark blue, Moderate → blue, Weak → grey
+Auto-width, freeze header
+
+Sheet 5: diagnostic_findings
+
+Combined sheet with all remaining diagnostic findings
+Each block separated by a bold ZATCA blue section header row
+Blocks in order: Outliers, Distribution Shape, Trends, Cohort Comparison, Funnel Drop-off, Cross-field Violations, Concentration Report
+Severity and risk columns color coded throughout
+Auto-width, freeze header, wrap text enabled
+
+Sheet 6: analytical_insights
+
+Combined sheet with all analytical findings
+Each block separated by a bold ZATCA blue section header row
+Blocks in order: Segments, Contribution Analysis, Lineage Quality, Time Series Decomposition
+Risk columns color coded throughout
+Auto-width, freeze header, wrap text enabled
+
+Apply alternating row shading (EBF2FB) and ZATCA blue headers (1A4B8C) with white bold text across all sheets.
+
+Step 5 — Download Button
+Show a "📥 Download Insights Report" button in ZATCA green (#2E7D32) below all three sections.
+This file is always standalone — never merge with result.xlsx. Add a comment at the top of the insights component: // INSIGHTS REPORT: Standalone file only. Never write to result.xlsx.
+
+Step 6 — Follow-up Questions
+After the report is displayed keep the input active. If the user types follow-up questions like:
+
+"Tell me more about the outliers in the amount field"
+"Which segment should I focus on first?"
+"Explain the funnel drop-off findings"
+
+Send the question to Claude using callClaude() with the stored insights JSON as context. Display the answer as a short prose response card — no tables, no raw JSON shown in the chat.
