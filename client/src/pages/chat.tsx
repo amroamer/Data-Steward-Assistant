@@ -679,6 +679,7 @@ function SidebarContent({
   editTitle,
   setEditTitle,
   handleSaveRename,
+  agentMode,
 }: {
   t: Translation;
   conversations: Conversation[];
@@ -701,6 +702,7 @@ function SidebarContent({
   editTitle: string;
   setEditTitle: (t: string) => void;
   handleSaveRename: (id: number) => void;
+  agentMode: "data-management" | "data-model" | "insights";
 }) {
   const statusConfig = STATUS_COLORS[agentStatus];
   const statusLabel = agentStatus === "idle" ? t.agentIdle : agentStatus === "thinking" ? t.agentThinking : agentStatus === "executing" ? t.agentExecuting : t.agentDone;
@@ -1663,6 +1665,7 @@ export default function ChatPage() {
     editTitle,
     setEditTitle,
     handleSaveRename,
+    agentMode,
   };
 
   return (
