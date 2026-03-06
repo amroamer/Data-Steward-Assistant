@@ -12,7 +12,13 @@ const anthropic = new Anthropic({
   baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
 });
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ 
+  storage: multer.memoryStorage(), 
+  limits: { 
+    fileSize: 10 * 1024 * 1024,
+    fieldSize: 50 * 1024 * 1024
+  } 
+});
 
 const ZATCA_SYSTEM_PROMPT = `You are an expert consultant working for ZATCA — the Zakat, Tax and Customs Authority of Saudi Arabia.
 
