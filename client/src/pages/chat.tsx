@@ -107,6 +107,9 @@ type Lang = "en" | "ar";
 const translations = {
   en: {
     newChat: "New Data Owner Agent",
+    newChatDataManagement: "New Data Management Agent",
+    newChatDataModel: "New Analytical Data Model Agent",
+    newChatInsights: "New Insight Report Agent",
     noConversations: "No conversations yet",
     deleteSession: "Delete this session?",
     yesDelete: "Yes, Delete",
@@ -231,6 +234,9 @@ const translations = {
   },
   ar: {
     newChat: "وكيل مالك بيانات جديد",
+    newChatDataManagement: "وكيل إدارة البيانات الجديد",
+    newChatDataModel: "وكيل النموذج التحليلي الجديد",
+    newChatInsights: "وكيل تقرير الرؤى الجديد",
     noConversations: "لا توجد محادثات بعد",
     deleteSession: "حذف هذه الجلسة؟",
     yesDelete: "نعم، حذف",
@@ -894,7 +900,7 @@ function SidebarContent({
           data-testid="button-new-chat"
         >
           <Plus className="w-4 h-4" />
-          {t.newChat}
+          {agentMode === "data-model" ? t.newChatDataModel : agentMode === "insights" ? t.newChatInsights : t.newChatDataManagement}
         </Button>
       </div>
     </div>
