@@ -5,12 +5,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ChatPage from "@/pages/chat";
 import UseCasesPage from "@/pages/use-cases";
+import NudgePage from "@/pages/nudge";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={ChatPage} />
       <Route path="/use-cases" component={UseCasesPage} />
+      <Route path="/nudge" component={NudgePage} />
     </Switch>
   );
 }

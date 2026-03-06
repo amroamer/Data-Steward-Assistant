@@ -137,11 +137,32 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 
 ---
 
+### AI Analysis — Nudge Agent
+- ✅ Standalone `/nudge` page — behavioural economics + tax compliance tool
+- ✅ First-load view: 3 info cards (Diagnose / Segment / Map Levers) + non-clickable example scenarios
+- ✅ Animated 6-step loading checklist (Reading → Diagnosing → Segmenting → Mapping → Building → Generating)
+- ✅ Summary banner: 5 stat tiles on ZATCA navy background
+- ✅ Section A — Diagnosis Card: primary root cause (highlighted), intentional badge, secondary causes, emotional drivers, friction points, rationale
+- ✅ Section B — Taxpayer Segments: styled table with color-coded Risk Level and Receptiveness
+- ✅ Section C — Behavioral Levers: sub-cards per lever, yellow message box, priority badges
+- ✅ Section D — Intervention Plan: numbered sequence, quick wins (green checks), KPIs, large Est. Lift
+- ✅ Error handling: invalid JSON → "Something went wrong. Please try rephrasing your scenario."
+- ✅ Excel export to `nudge_report_[timestamp].xlsx` (5 sheets: executive_summary, diagnosis, population_segments, behavioral_levers, intervention_plan); ZATCA blue headers, color-coded cells
+- ✅ Follow-up Q&A: prose answers below results using previously generated JSON as context
+- ✅ NEVER reads/writes `result.xlsx` — fully isolated
+- ✅ EN + AR translations with RTL layout
+- ✅ Sidebar link "Nudge Agent" / "وكيل التحفيز" in chat.tsx
+- ✅ Backend `POST /api/nudge` route: main analysis + follow-up support
+- ✅ 4 Nudge use case cards on `/use-cases` page with "Nudge Agent" filter tab; "Launch Nudge Agent" CTA navigates to `/nudge?scenario=<encoded>`
+
+---
+
 ## Recently Completed (Last Session)
 
 | Date | Change |
 |---|---|
+| 2026-03-06 | **Nudge Agent** — new `/nudge` page; `POST /api/nudge` backend; 4-section structured results; `nudge_report_[timestamp].xlsx` export; follow-up Q&A; error handling; EN+AR/RTL; sidebar link; 4 use case cards added to `/use-cases` |
 | 2026-03-06 | **App Renaming** — changed app name from "Data Owner Agent" to "Data & Analytics Agent" across UI, metadata, and docs |
 | 2026-03-06 | **Favicon** — replaced with official ZATCA logo (`ZATCA-o.png`, 310×310 PNG) downloaded directly from zatca.gov.sa; no HTML changes needed |
-| 2026-03-06 | **Use Cases Page** — static `/use-cases` route; 14 use case cards with filter tabs (All/Data Management/Compliance/Analytics/Insights); click-to-open modals with user story, example input, styled HTML/CSS output previews; "Launch Agent" CTA pre-fills `?prompt=&mode=` URL params; chat.tsx reads params on mount and clears them; Use Cases link in sidebar (EN + AR/RTL) |
+| 2026-03-06 | **Use Cases Page** — extended to 18 cards; added "Nudge Agent" filter tab; "Launch Nudge Agent" CTA for nudge cards navigates to `/nudge?scenario=<encoded>`; original 14 cards unchanged |
 | 2026-03-06 | **Informatica Output** — backend system prompt, trigger detection, frontend detection/state/streaming, Informatica mini-table in ThreadCard, `informatica_output` Excel sheet, EN+AR translations, orange tag, Informatica feature card |

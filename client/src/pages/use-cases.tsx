@@ -4,12 +4,12 @@ import {
   ShieldCheck, BookOpen, CheckCircle, Cpu, BookMarked,
   ScanEye, Lock, Globe, Database, Code2, GitBranch,
   BarChart3, AlertTriangle, FileText, X, ArrowLeft,
-  ChevronRight, ExternalLink, LayoutGrid,
+  ChevronRight, ExternalLink, LayoutGrid, Target, Users, TrendingUp, Bell,
 } from "lucide-react";
 
 type Lang = "en" | "ar";
-type Category = "all" | "data-management" | "compliance" | "analytics" | "insights";
-type AgentMode = "data-management" | "data-model" | "insights";
+type Category = "all" | "data-management" | "compliance" | "analytics" | "insights" | "nudge";
+type AgentMode = "data-management" | "data-model" | "insights" | "nudge";
 
 interface UseCase {
   id: number;
@@ -267,12 +267,84 @@ const USE_CASES: UseCase[] = [
   },
 ];
 
+const NUDGE_USE_CASES: UseCase[] = [
+  {
+    id: 15,
+    icon: Bell,
+    color: "#7C3AED",
+    bgColor: "#F5F3FF",
+    category: "nudge",
+    agentMode: "nudge",
+    title: { en: "Late VAT Filers", ar: "متأخرو تقديم ضريبة القيمة المضافة" },
+    description: { en: "Diagnose and nudge SMEs consistently filing VAT returns late every quarter", ar: "تشخيص ونج المنشآت الصغيرة والمتوسطة التي تتأخر في تقديم إقرارات ضريبة القيمة المضافة" },
+    role: { en: "Compliance Officer", ar: "مسؤول الامتثال" },
+    userStory: {
+      en: "As a Compliance Officer, I want to understand why SMEs consistently file VAT returns late so that I can design targeted behavioural nudges to improve filing rates before penalties are issued.",
+      ar: "بوصفي مسؤول امتثال، أريد فهم سبب تأخر المنشآت الصغيرة والمتوسطة في تقديم إقرارات ضريبة القيمة المضافة حتى أتمكن من تصميم تدخلات سلوكية مستهدفة لتحسين معدلات التقديم.",
+    },
+    exampleInput: ["SMEs filing VAT returns late every quarter"],
+    prompt: "SMEs filing VAT returns late every quarter",
+  },
+  {
+    id: 16,
+    icon: Users,
+    color: "#0891B2",
+    bgColor: "#ECFEFF",
+    category: "nudge",
+    agentMode: "nudge",
+    title: { en: "Zakat Non-Payers", ar: "غير مسددي الزكاة" },
+    description: { en: "Segment and design interventions for family businesses not paying Zakat on time", ar: "تقسيم وتصميم تدخلات لشركات العائلة التي لا تسدد الزكاة في الوقت المحدد" },
+    role: { en: "Tax Analyst", ar: "محلل ضريبي" },
+    userStory: {
+      en: "As a Tax Analyst, I want a behavioural profile of family businesses that miss Zakat deadlines so that I can recommend the most effective channels and messages to increase compliance.",
+      ar: "بوصفي محللًا ضريبيًا، أريد ملفًا سلوكيًا لشركات العائلة التي تفوّت مواعيد الزكاة حتى أتمكن من التوصية بأكثر القنوات والرسائل فعالية لزيادة الامتثال.",
+    },
+    exampleInput: ["Family businesses not paying Zakat on time"],
+    prompt: "Family businesses not paying Zakat on time",
+  },
+  {
+    id: 17,
+    icon: TrendingUp,
+    color: "#059669",
+    bgColor: "#ECFDF5",
+    category: "nudge",
+    agentMode: "nudge",
+    title: { en: "Income Underreporters", ar: "من يُقرّون بدخل أقل من الحقيقي" },
+    description: { en: "Map behavioral levers for freelancers underreporting income to ZATCA", ar: "رسم خريطة الرافعات السلوكية للمستقلين الذين يُقرّون بدخل أقل" },
+    role: { en: "Risk Manager", ar: "مدير المخاطر" },
+    userStory: {
+      en: "As a Risk Manager, I want to identify the psychological drivers behind freelancer income underreporting so that I can design low-friction compliance pathways that feel easy rather than punitive.",
+      ar: "بوصفي مدير مخاطر، أريد تحديد الدوافع النفسية وراء إقرار المستقلين بدخل أقل من الحقيقي حتى أتمكن من تصميم مسارات امتثال سهلة بدلاً من العقابية.",
+    },
+    exampleInput: ["Freelancers underreporting income"],
+    prompt: "Freelancers underreporting income",
+  },
+  {
+    id: 18,
+    icon: Target,
+    color: "#DC2626",
+    bgColor: "#FEF2F2",
+    category: "nudge",
+    agentMode: "nudge",
+    title: { en: "Reminder-Ignorers", ar: "متجاهلو رسائل التذكير" },
+    description: { en: "Design effective nudges for retail businesses ignoring ZATCA reminder notices", ar: "تصميم تدخلات فعّالة للشركات التجارية التي تتجاهل رسائل تذكير ZATCA" },
+    role: { en: "Communications Lead", ar: "مسؤول الاتصالات" },
+    userStory: {
+      en: "As a Communications Lead, I want to understand why retail businesses consistently ignore our reminder notices so that I can redesign communication timing, channels, and message framing to break through.",
+      ar: "بوصفي مسؤول اتصالات، أريد فهم سبب تجاهل الشركات التجارية لرسائل التذكير حتى أتمكن من إعادة تصميم توقيت الاتصال وقنواته وأسلوب الرسائل.",
+    },
+    exampleInput: ["Retail businesses ignoring reminder notices"],
+    prompt: "Retail businesses ignoring reminder notices",
+  },
+];
+
 const CATEGORY_LABELS: Record<Category, Record<Lang, string>> = {
   all: { en: "All Use Cases", ar: "جميع حالات الاستخدام" },
   "data-management": { en: "Data Management", ar: "إدارة البيانات" },
   compliance: { en: "Compliance & Privacy", ar: "الامتثال والخصوصية" },
   analytics: { en: "Analytics", ar: "التحليلات" },
   insights: { en: "Insights", ar: "الرؤى" },
+  nudge: { en: "Nudge Agent", ar: "وكيل التحفيز" },
 };
 
 const CATEGORY_COLORS: Record<Exclude<Category, "all">, string> = {
@@ -280,6 +352,7 @@ const CATEGORY_COLORS: Record<Exclude<Category, "all">, string> = {
   compliance: "#C62828",
   analytics: "#2E7D32",
   insights: "#1A4B8C",
+  nudge: "#7C3AED",
 };
 
 function OutputPreview({ id, isRtl }: { id: number; isRtl: boolean }) {
@@ -521,8 +594,40 @@ function OutputPreview({ id, isRtl }: { id: number; isRtl: boolean }) {
     </div>
   );
 
+  if (id >= 15 && id <= 18) return (
+    <div className="space-y-3">
+      <div className="rounded-xl p-3 grid grid-cols-3 gap-2" style={{ backgroundColor: "#0D2E5C" }}>
+        {[["Root Cause","Process complexity"],["Segments","3"],["Levers","4"]].map(([l,v]) => (
+          <div key={l} className="text-center">
+            <div className="text-white font-bold text-sm">{v}</div>
+            <div className="text-white/60 text-[10px]">{l}</div>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+        <div className="text-[10px] font-bold text-yellow-700 uppercase tracking-wider mb-1.5">Nudge Message (example)</div>
+        <div className="text-[11px] text-gray-700 italic">"94% of businesses in your sector filed on time last quarter. File now in under 5 minutes — your deadline is in 3 days."</div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-lg p-2.5 bg-green-50 border border-green-100">
+          <div className="text-[10px] font-bold text-green-600 mb-1">Quick Wins</div>
+          <div className="text-[11px] text-gray-700">• Deadline reminders via WhatsApp<br/>• Social norms messaging</div>
+        </div>
+        <div className="rounded-lg p-2.5 bg-blue-50 border border-blue-100">
+          <div className="text-[10px] font-bold text-blue-600 mb-1">Est. Compliance Lift</div>
+          <div className="text-2xl font-bold text-blue-700">+18%</div>
+        </div>
+      </div>
+      <div className="text-center text-[10px] font-medium px-3 py-2 rounded-lg bg-purple-50 border border-purple-100 text-purple-700">
+        Outputs to <span className="font-mono">nudge_report_[timestamp].xlsx</span>
+      </div>
+    </div>
+  );
+
   return null;
 }
+
+const ALL_USE_CASES = [...USE_CASES, ...NUDGE_USE_CASES];
 
 export default function UseCasesPage() {
   const [lang, setLang] = useState<Lang>("en");
@@ -531,18 +636,23 @@ export default function UseCasesPage() {
   const [, navigate] = useLocation();
 
   const isRtl = lang === "ar";
-  const selectedCase = USE_CASES.find(u => u.id === selectedId) ?? null;
+  const selectedCase = ALL_USE_CASES.find(u => u.id === selectedId) ?? null;
 
   const filtered = activeCategory === "all"
-    ? USE_CASES
-    : USE_CASES.filter(u => u.category === activeCategory);
+    ? ALL_USE_CASES
+    : ALL_USE_CASES.filter(u => u.category === activeCategory);
 
   const handleLaunch = (uc: UseCase) => {
-    const params = new URLSearchParams({ prompt: uc.prompt, mode: uc.agentMode });
-    navigate(`/?${params.toString()}`);
+    if (uc.agentMode === "nudge") {
+      const params = new URLSearchParams({ scenario: uc.prompt });
+      navigate(`/nudge?${params.toString()}`);
+    } else {
+      const params = new URLSearchParams({ prompt: uc.prompt, mode: uc.agentMode });
+      navigate(`/?${params.toString()}`);
+    }
   };
 
-  const CATEGORIES: Category[] = ["all", "data-management", "compliance", "analytics", "insights"];
+  const CATEGORIES: Category[] = ["all", "data-management", "compliance", "analytics", "insights", "nudge"];
 
   return (
     <div className="min-h-screen bg-gray-50 font-main" dir={isRtl ? "rtl" : "ltr"}>
@@ -611,7 +721,7 @@ export default function UseCasesPage() {
               >
                 {CATEGORY_LABELS[cat][lang]}
                 <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeCategory === cat ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500"}`}>
-                  {cat === "all" ? USE_CASES.length : USE_CASES.filter(u => u.category === cat).length}
+                  {cat === "all" ? ALL_USE_CASES.length : ALL_USE_CASES.filter(u => u.category === cat).length}
                 </span>
               </button>
             ))}
@@ -740,7 +850,7 @@ export default function UseCasesPage() {
                   <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{isRtl ? "معاينة المخرجات" : "Sample Output Preview"}</p>
                   <div className="flex items-center gap-1 px-2 py-0.5 rounded border border-gray-200 bg-gray-50">
                     <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    <span className="text-[9px] text-gray-500">result.xlsx</span>
+                    <span className="text-[9px] text-gray-500">{selectedCase.category === "nudge" ? "nudge_report_[timestamp].xlsx" : "result.xlsx"}</span>
                   </div>
                 </div>
                 <OutputPreview id={selectedCase.id} isRtl={isRtl} />
@@ -763,7 +873,9 @@ export default function UseCasesPage() {
                 data-testid={`button-launch-agent-${selectedCase.id}`}
               >
                 <ExternalLink className="w-4 h-4" />
-                {isRtl ? "تشغيل الوكيل" : "Launch Agent"}
+                {selectedCase.category === "nudge"
+                  ? (isRtl ? "تشغيل وكيل التحفيز" : "Launch Nudge Agent")
+                  : (isRtl ? "تشغيل الوكيل" : "Launch Agent")}
               </button>
             </div>
           </div>

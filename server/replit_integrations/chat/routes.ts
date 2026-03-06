@@ -1624,4 +1624,127 @@ export function registerChatRoutes(app: Express): void {
       }
     }
   });
+
+  const NUDGE_SYSTEM_PROMPT = `You are a senior behavioural economist and tax compliance expert specialising in ZATCA (Saudi tax authority) compliance — VAT, Zakat, income tax, and e-invoicing.
+
+The user will describe a tax non-compliance scenario. You must analyse it and return ONLY a JSON object with no explanation, no prose, no markdown — just the raw JSON.
+
+Return this exact structure:
+{
+  "use_case": "...",
+  "use_case_category": "Filing | Payment | Reporting | Registration | Invoicing",
+  "severity": "Critical | High | Medium | Low",
+
+  "diagnosis": {
+    "primary_root_cause": "...",
+    "secondary_root_causes": ["..."],
+    "is_intentional": true or false,
+    "emotional_drivers": ["..."],
+    "friction_points": ["..."],
+    "rationale": "..."
+  },
+
+  "segments": [
+    {
+      "id": "SEG-001",
+      "name": "...",
+      "archetype": "...",
+      "population_pct": 0,
+      "risk_level": "Critical | High | Medium | Low",
+      "main_barrier": "...",
+      "receptiveness": "High | Medium | Low",
+      "best_channel": "WhatsApp | SMS | Email | Portal | Letter",
+      "best_timing": "..."
+    }
+  ],
+
+  "levers": [
+    {
+      "id": "LEV-001",
+      "type": "Social Norms | Loss Aversion | Simplification | Commitment Device | Deterrence | Salience | Feedback Loop",
+      "name": "...",
+      "target_segments": ["SEG-001"],
+      "message_text": "...",
+      "channel": "...",
+      "timing": "...",
+      "expected_impact": "...",
+      "implementation_effort": "Low | Medium | High",
+      "priority": "High | Medium | Low"
+    }
+  ],
+
+  "intervention_plan": {
+    "recommended_sequence": ["LEV-001", "LEV-002"],
+    "quick_wins": ["..."],
+    "kpis": ["..."],
+    "estimated_lift": "..."
+  }
+}`;
+
+  app.post("/api/nudge", async (req: Request, res: Response) => {
+    try {
+      const { scenario, followUpQuestion, previousJson } = req.body as {
+        scenario?: string;
+        followUpQuestion?: string;
+        previousJson?: object;
+      };
+
+      if (followUpQuestion && previousJson) {
+        const followUpMessages = [
+          {
+            role: "user" as const,
+            content: `Here is the previously generated compliance analysis JSON:\n${JSON.stringify(previousJson, null, 2)}\n\nFollow-up question: ${followUpQuestion}\n\nPlease answer in concise prose only. No tables, no JSON, no markdown headers.`,
+          },
+        ];
+        const followUpResponse = await anthropic.messages.create({
+          model: "claude-sonnet-4-6",
+          max_tokens: 2000,
+          system: NUDGE_SYSTEM_PROMPT,
+          messages: followUpMessages,
+        });
+        const followUpText = followUpResponse.content
+          .filter((b) => b.type === "text")
+          .map((b) => (b as { type: "text"; text: string }).text)
+          .join("");
+        return res.json({ ok: true, followUp: followUpText });
+      }
+
+      if (!scenario) {
+        return res.status(400).json({ ok: false, error: "scenario_required" });
+      }
+
+      const messages = [
+        {
+          role: "user" as const,
+          content: `Analyse this tax non-compliance scenario and return ONLY the raw JSON object as specified:\n\n${scenario}`,
+        },
+      ];
+
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 8000,
+        system: NUDGE_SYSTEM_PROMPT,
+        messages,
+      });
+
+      const rawText = response.content
+        .filter((b) => b.type === "text")
+        .map((b) => (b as { type: "text"; text: string }).text)
+        .join("");
+
+      const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
+
+      let parsed: object;
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        return res.json({ ok: false, error: "invalid_json" });
+      }
+
+      return res.json({ ok: true, data: parsed });
+    } catch (error) {
+      console.error("Error in /api/nudge:", error);
+      return res.status(500).json({ ok: false, error: "server_error" });
+    }
+  });
 }

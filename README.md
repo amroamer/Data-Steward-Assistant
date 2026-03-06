@@ -60,12 +60,25 @@ Upload any Excel dataset and receive a comprehensive insights report: executive 
 Generate Informatica-compatible metadata for each data field: field descriptions, data quality rules, Informatica Expression Language SQL statements, SDAIA data classifications (with rationale and handling rules), and format types. Results are exported to a dedicated `informatica_output` sheet in `result.xlsx`.
 
 ### 8. Use Cases Page (`/use-cases`)
-A static, fully-browsable catalog of 14 real tasks the agent can perform. Accessible from the sidebar or at `/use-cases`. Features:
-- Filter tabs: All | Data Management | Compliance & Privacy | Analytics | Insights
+A static, fully-browsable catalog of 18 real tasks the agent can perform. Accessible from the sidebar or at `/use-cases`. Features:
+- Filter tabs: All | Data Management | Compliance & Privacy | Analytics | Insights | Nudge Agent
 - Card grid with color-coded category badges and icons
 - Modal per use case: user story, example input fields, styled HTML/CSS output preview
-- "Launch Agent" CTA — navigates to chat with the prompt pre-filled and agent mode pre-selected via `?prompt=&mode=` URL params
+- "Launch Agent" / "Launch Nudge Agent" CTA — navigates to the appropriate agent with prompt/scenario pre-filled via URL params
 - Full EN + AR translations with RTL layout toggle
+
+### 9. Nudge Agent (`/nudge`)
+A standalone behavioural economics tool for ZATCA tax compliance professionals. Takes a free-form compliance scenario, calls Claude as a senior behavioural economist, and produces structured 4-section results:
+- **First-load view**: 3 info cards (Diagnose / Segment / Map Levers) + example scenarios text block
+- **Animated loading steps**: 6-step progress checklist (Reading → Diagnosing → Segmenting → Mapping → Building → Generating)
+- **4 result sections**: Diagnosis | Taxpayer Segments | Behavioral Levers | Intervention Plan
+- **Summary banner**: 5 stat tiles (Root Cause, Segments, Levers, Quick Wins, Est. Lift) — ZATCA navy background
+- **Lever messages**: word-for-word nudge text displayed in yellow highlight boxes
+- **Excel export**: `nudge_report_[timestamp].xlsx` with 5 sheets (executive_summary, diagnosis, population_segments, behavioral_levers, intervention_plan); ZATCA blue headers, color-coded cells, auto-width
+- **Follow-up Q&A**: keep asking questions about the generated report
+- **Error handling**: invalid JSON → "Something went wrong. Please try rephrasing your scenario."
+- **Isolated from result.xlsx** — never reads or writes to the main agent's result file
+- Full EN + AR translations with RTL layout; sidebar link from main agent
 
 ---
 

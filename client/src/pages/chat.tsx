@@ -241,6 +241,7 @@ const translations = {
     agentDataModelDesc: "Design star schema & generate DDL scripts",
     previewFile: "Preview file",
     useCases: "Use Cases",
+    nudgeAgent: "Nudge Agent",
   },
   ar: {
     newChat: "وكيل مالك بيانات جديد",
@@ -372,6 +373,7 @@ const translations = {
     agentDataModelDesc: "تصميم مخطط نجمي وإنشاء سكريبتات DDL",
     previewFile: "معاينة الملف",
     useCases: "حالات الاستخدام",
+    nudgeAgent: "وكيل التحفيز",
   },
 } as const;
 
@@ -764,14 +766,24 @@ function SidebarContent({
           <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusConfig.bg }} />
           {statusLabel}
         </div>
-        <Link
-          href="/use-cases"
-          className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-white/50 hover:text-white/90 hover:bg-white/10 transition-all"
-          data-testid="link-use-cases"
-        >
-          <LayoutGrid className="w-3.5 h-3.5" />
-          {t.useCases}
-        </Link>
+        <div className="flex gap-1 mt-2">
+          <Link
+            href="/use-cases"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-white/50 hover:text-white/90 hover:bg-white/10 transition-all"
+            data-testid="link-use-cases"
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            {t.useCases}
+          </Link>
+          <Link
+            href="/nudge"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-white/50 hover:text-white/90 hover:bg-white/10 transition-all"
+            data-testid="link-nudge-agent"
+          >
+            <Brain className="w-3.5 h-3.5" />
+            {t.nudgeAgent}
+          </Link>
+        </div>
       </div>
       <div className="border-t border-white/10" />
       <ScrollArea className="flex-1">
