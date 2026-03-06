@@ -69,7 +69,7 @@ A static, fully-browsable catalog of 18 real tasks the agent can perform. Access
 
 ### 9. User Guide (`/user-guide`)
 A fully-browsable in-app documentation page covering all agent capabilities. Accessible via the header bar (next to Use Cases and the language toggle). Features:
-- 8 collapsible sections: Getting Started, Data Management, Analytical Model, Insights Agent, Nudge Agent, File Uploads, Exporting Results, Language & Accessibility
+- 9 collapsible sections: Getting Started, Data Management, Analytical Model, Informatica Output, Insights Agent, Nudge Agent, File Uploads, Exporting Results, Language & Accessibility
 - Each section contains 2–5 how-to entries with plain-language descriptions
 - Full EN + AR translations with RTL layout toggle
 - Same visual style as Use Cases page (dark navy header, gradient hero, accordion cards)

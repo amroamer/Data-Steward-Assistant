@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import {
   ArrowLeft, BookOpen, Database, Layers, Brain, Target,
   FileSpreadsheet, FileText, Globe, Upload, Download,
-  ShieldCheck, CheckCircle, BarChart3, ScanEye,
+  ShieldCheck, CheckCircle, BarChart3, ScanEye, Code2,
   ChevronDown, ChevronRight,
 } from "lucide-react";
 
@@ -76,6 +76,26 @@ const t = {
           {
             heading: "DDL SQL Scripts",
             body: "Full CREATE TABLE DDL scripts are generated for every fact and dimension table, including data types, primary keys, foreign key relationships, and NOT NULL constraints. Ready to run in your data warehouse.",
+          },
+        ],
+      },
+      {
+        id: "informatica-output",
+        icon: Code2,
+        color: "#F57C00",
+        title: "Informatica Output",
+        content: [
+          {
+            heading: "What is Informatica Output?",
+            body: "Available in Data Management mode. Generates Informatica-compatible metadata for every field: field description, data quality rules, Informatica Expression Language (IEL) SQL statements, SDAIA data classifications (with rationale and handling rules), and format types. Use it when you need to feed metadata directly into Informatica ETL pipelines without manually writing transformation logic.",
+          },
+          {
+            heading: "How to trigger it",
+            body: "Switch to the Data Management tab. Upload your Excel file or paste field names, then ask 'generate Informatica output' or 'create Informatica metadata'. The agent will return a structured block containing all fields in Informatica-ready format.",
+          },
+          {
+            heading: "Exporting the result",
+            body: "Informatica output is exported to a dedicated informatica_output sheet in result.xlsx. It is part of the cumulative output file and will be included alongside any other sheets (Classifications, DQ Rules, etc.) generated in the same session.",
           },
         ],
       },
@@ -168,6 +188,10 @@ const t = {
           {
             heading: "nudge_report_[timestamp].xlsx",
             body: "The Nudge Agent exports to a separate file named with a timestamp. This file is completely isolated from result.xlsx and contains 5 dedicated sheets for the nudge analysis.",
+          },
+          {
+            heading: "insights_report_[timestamp].xlsx",
+            body: "The Insights Agent exports to a separate standalone file named with a timestamp. This file contains 6 dedicated sheets: executive_summary, descriptive_field_profiles, completeness_scorecard, diagnostic_correlations, diagnostic_findings, and analytical_insights. It is completely isolated from result.xlsx and is never combined with it. Download it via the green 'Download Insights Report' button inside the Insights Agent response.",
           },
         ],
       },
@@ -287,6 +311,26 @@ const t = {
         ],
       },
       {
+        id: "informatica-output",
+        icon: Code2,
+        color: "#F57C00",
+        title: "مخرجات Informatica",
+        content: [
+          {
+            heading: "ما هي مخرجات Informatica؟",
+            body: "متاحة في وضع إدارة البيانات. تُولّد بيانات وصفية متوافقة مع Informatica لكل حقل: وصف الحقل، قواعد جودة البيانات، تعبيرات SQL بلغة Informatica Expression Language (IEL)، تصنيفات SDAIA للبيانات (مع المبررات وقواعد المعالجة)، وأنواع التنسيق. استخدمها عند الحاجة إلى تغذية البيانات الوصفية مباشرةً في خطوط ETL الخاصة بـ Informatica دون كتابة منطق التحويل يدويًا.",
+          },
+          {
+            heading: "كيفية تفعيلها",
+            body: "انتقل إلى تبويب إدارة البيانات. حمّل ملف Excel أو الصق أسماء الحقول، ثم اطلب 'توليد مخرجات Informatica' أو 'إنشاء بيانات Informatica الوصفية'. سيعيد الوكيل كتلة منظمة تحتوي على جميع الحقول بصيغة جاهزة لـ Informatica.",
+          },
+          {
+            heading: "تصدير النتائج",
+            body: "تُصدَّر مخرجات Informatica إلى ورقة مخصصة باسم informatica_output في ملف result.xlsx. وهي جزء من ملف الإخراج التراكمي وستُضمَّن جنبًا إلى جنب مع أي أوراق أخرى (تصنيفات، قواعد الجودة، إلخ) تم إنشاؤها في نفس الجلسة.",
+          },
+        ],
+      },
+      {
         id: "insights-agent",
         icon: Brain,
         color: "#067647",
@@ -367,6 +411,10 @@ const t = {
           {
             heading: "nudge_report_[timestamp].xlsx",
             body: "يُصدر وكيل التحفيز إلى ملف منفصل بختم زمني. هذا الملف معزول تمامًا عن result.xlsx.",
+          },
+          {
+            heading: "insights_report_[timestamp].xlsx",
+            body: "يُصدر وكيل الرؤى إلى ملف مستقل بختم زمني. يحتوي هذا الملف على 6 أوراق مخصصة: executive_summary وdescriptive_field_profiles وcompleteness_scorecard وdiagnostic_correlations وdiagnostic_findings وanalytical_insights. معزول تمامًا عن result.xlsx ولا يُدمج معه أبدًا. قم بتنزيله عبر زر 'تنزيل تقرير الرؤى' الأخضر داخل رد وكيل الرؤى.",
           },
         ],
       },
