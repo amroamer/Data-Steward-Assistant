@@ -1,0 +1,188 @@
+First Load — Before User Types Anything
+Show three info cards in the center panel:
+
+🔍 Diagnose Non-Compliance — "Find out why taxpayers are not complying"
+👥 Segment Taxpayers — "Group non-compliant taxpayers by behavior profile"
+🎯 Map Behavioral Levers — "Get the right intervention for each group"
+
+Below the cards show a simple text block (not clickable buttons) with example scenarios the user can type:
+Examples you can try:
+- SMEs filing VAT returns late every quarter
+- Family businesses not paying Zakat on time
+- Freelancers underreporting income
+- Retail businesses ignoring reminder notices
+- First-time registrants missing their first deadline
+
+The Command Input
+At the bottom of the center panel show a text input box where the user types their compliance scenario in free-form natural language. A simple "Analyse" button submits it.
+
+What Happens After User Submits
+Show a loading indicator with these steps checking off one by one:
+✅ Reading your scenario
+✅ Diagnosing root causes
+⚙️ Segmenting taxpayer population...
+○  Mapping behavioral levers
+○  Building intervention plan
+○  Generating report
+
+Step 1 — Send to Claude
+Send the user's scenario to Claude with this system prompt:
+You are a senior behavioural economist and tax compliance expert specialising in ZATCA (Saudi tax authority) compliance — VAT, Zakat, income tax, and e-invoicing.
+
+The user will describe a tax non-compliance scenario. You must analyse it and return ONLY a JSON object with no explanation, no prose, no markdown — just the raw JSON.
+
+Return this exact structure:
+{
+  "use_case": "...",
+  "use_case_category": "Filing | Payment | Reporting | Registration | Invoicing",
+  "severity": "Critical | High | Medium | Low",
+
+  "diagnosis": {
+    "primary_root_cause": "...",
+    "secondary_root_causes": ["..."],
+    "is_intentional": true or false,
+    "emotional_drivers": ["..."],
+    "friction_points": ["..."],
+    "rationale": "..."
+  },
+
+  "segments": [
+    {
+      "id": "SEG-001",
+      "name": "...",
+      "archetype": "...",
+      "population_pct": 0,
+      "risk_level": "Critical | High | Medium | Low",
+      "main_barrier": "...",
+      "receptiveness": "High | Medium | Low",
+      "best_channel": "WhatsApp | SMS | Email | Portal | Letter",
+      "best_timing": "..."
+    }
+  ],
+
+  "levers": [
+    {
+      "id": "LEV-001",
+      "type": "Social Norms | Loss Aversion | Simplification | Commitment Device | Deterrence | Salience | Feedback Loop",
+      "name": "...",
+      "target_segments": ["SEG-001"],
+      "message_text": "...",
+      "channel": "...",
+      "timing": "...",
+      "expected_impact": "...",
+      "implementation_effort": "Low | Medium | High",
+      "priority": "High | Medium | Low"
+    }
+  ],
+
+  "intervention_plan": {
+    "recommended_sequence": ["LEV-001", "LEV-002"],
+    "quick_wins": ["..."],
+    "kpis": ["..."],
+    "estimated_lift": "..."
+  }
+}
+Parse the JSON response from Claude and use it to render the results on screen and generate the Excel file.
+
+Step 2 — Display Results On Screen
+After Claude responds, show the results directly in the center panel as structured visual sections — not as a chat bubble, not as raw JSON. The user should be able to read everything on screen without downloading anything.
+Display four sections one after another, each in its own card:
+
+Section A — Diagnosis Card
+A card with header: 🔍 Why is this happening?
+Show inside the card:
+
+Primary Root Cause — large bold text, ZATCA blue background highlight
+Is it intentional? — Yes or No badge (red for Yes, green for No)
+Secondary Root Causes — simple tag chips
+Emotional Drivers — bullet list
+Friction Points — bullet list
+Rationale — paragraph text in italic
+
+
+Section B — Taxpayer Segments Card
+A card with header: 👥 Who are we dealing with?
+Show a styled table inside the card with one row per segment:
+| Segment Name | Archetype | Population % | Risk Level | Main Barrier | Receptiveness | Best Channel | Best Timing |
+Color code the Risk Level column: Critical → red, High → orange, Medium → yellow, Low → green
+Color code the Receptiveness column: High → green, Medium → yellow, Low → red
+
+Section C — Behavioral Levers Card
+A card with header: 🎯 What should we do?
+Show one sub-card per lever. Each sub-card shows:
+
+Lever name and type as a header
+Target Segments — tags showing which segments this lever targets
+The actual message text — displayed in a highlighted yellow box, large enough to read clearly. This is the most important thing to show — the word-for-word message the taxpayer would receive
+Channel and Timing on one line
+Expected Impact and Implementation Effort on one line
+Priority badge — High (red), Medium (orange), Low (green)
+
+
+Section D — Intervention Plan Card
+A card with header: 📋 Intervention Plan
+Show inside the card:
+
+Recommended Sequence — numbered list of lever names in order
+Quick Wins — green checkmark bullet list
+KPIs to Track — simple bullet list
+Estimated Compliance Lift — large bold number with a % sign, shown prominently
+
+
+Step 3 — Summary Banner
+Above all four sections show a summary banner with five stat tiles:
+
+🔍 Root Cause: [value]
+👥 Segments: [count]
+🎯 Levers: [count]
+⚡ Quick Wins: [count]
+📈 Est. Lift: [value]
+
+Style the banner with ZATCA dark blue background and white text.
+
+Step 4 — Generate Excel File
+After displaying the results on screen, also generate a downloadable Excel file called nudge_report_[timestamp].xlsx using SheetJS.
+The Excel file has five sheets:
+Sheet 1: executive_summary
+
+Two-column key-value layout
+Show: use case, category, severity, primary root cause, is intentional, estimated lift, KPIs
+Header row: ZATCA blue background, white bold text
+
+Sheet 2: diagnosis
+
+Two-column key-value layout
+Show all diagnosis fields: primary root cause, secondary root causes, emotional drivers, friction points, rationale
+Primary root cause row: ZATCA blue background white bold text to make it stand out
+
+Sheet 3: population_segments
+
+One row per segment
+Columns: id, name, archetype, population_pct, risk_level, main_barrier, receptiveness, best_channel, best_timing
+Color code risk_level and receptiveness cells same as on screen
+
+Sheet 4: behavioral_levers
+
+One row per lever
+Columns: id, type, name, target_segments, message_text, channel, timing, expected_impact, implementation_effort, priority
+message_text column: light yellow background, wrap text enabled — this is the actual nudge message
+priority column: color coded High → red, Medium → orange, Low → green
+
+Sheet 5: intervention_plan
+
+Two-column key-value layout
+Show: recommended sequence, quick wins, KPIs, estimated lift
+
+All sheets: ZATCA blue headers, white bold text, auto-width columns, freeze header row.
+
+Step 5 — Download Button
+Show a "📥 Download Nudge Report" button in ZATCA green below the four result sections. Clicking it downloads the generated Excel file.
+
+Step 6 — Follow-up Questions
+After the results are displayed, keep the input box active at the bottom. If the user types a follow-up question like:
+
+"What message should I send to chronic non-filers?"
+"Which lever has the strongest evidence?"
+"What should I present to leadership?"
+
+Send the follow-up question to Claude along with the previously generated JSON as context. Display Claude's answer as a simple text response card below the results — short prose only, no tables, no JSON.
