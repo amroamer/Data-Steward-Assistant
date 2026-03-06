@@ -59,6 +59,9 @@ Upload any Excel dataset and receive a three-level insights report generated in 
 ### 7. Informatica Output
 Generate Informatica-compatible metadata for each data field: field descriptions, data quality rules, Informatica Expression Language SQL statements, SDAIA data classifications (with rationale and handling rules), and format types. Results are exported to a dedicated `informatica_output` sheet in `result.xlsx`.
 
+### 7a. Reference Documents (multi-file context injection)
+Upload multiple PDF or TXT files via the "📎 Reference Documents" section in the left sidebar. All uploaded documents are automatically injected as background context into every Data Management Claude API call (classification, DQ rules, business definitions, PII detection, Informatica output). Documents are session-persistent and can be removed individually. Only PDF and TXT files under 10 MB are supported. Rule 6 in `ZATCA_SYSTEM_PROMPT` instructs Claude to prioritize reference document content and cite documents by name when directly relevant.
+
 ### 8. Use Cases Page (`/use-cases`)
 A static, fully-browsable catalog of 18 real tasks the agent can perform. Accessible via the header bar (next to the language toggle) or at `/use-cases`. Features:
 - Filter tabs: All | Data Management | Compliance & Privacy | Analytics | Insights | Nudge Agent

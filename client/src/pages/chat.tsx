@@ -451,6 +451,13 @@ const translations = {
     nudgeInfoCard2Desc: "Group non-compliers by their behaviour",
     nudgeInfoCard3: "Map Behavioural Levers",
     nudgeInfoCard3Desc: "Get the right intervention for each group",
+    refDocHeader: "📎 Reference Documents",
+    addDocument: "Add Document",
+    noDocsLoaded: "No documents loaded",
+    docsActive: (n: number) => `${n} document(s) active`,
+    refDocTypeError: "Only PDF and TXT files are supported",
+    refDocSizeError: "File too large. Max 10 MB",
+    refDocDupeError: "This file is already loaded",
   },
   ar: {
     newChat: "وكيل مالك بيانات جديد",
@@ -652,6 +659,13 @@ const translations = {
     nudgeInfoCard2Desc: "تجميع غير الممتثلين حسب سلوكهم",
     nudgeInfoCard3: "رسم خريطة الرافعات السلوكية",
     nudgeInfoCard3Desc: "احصل على التدخل المناسب لكل مجموعة",
+    refDocHeader: "📎 المستندات المرجعية",
+    addDocument: "إضافة مستند",
+    noDocsLoaded: "لا توجد مستندات محملة",
+    docsActive: (n: number) => `${n} مستند(ات) نشط`,
+    refDocTypeError: "يُدعم PDF وTXT فقط",
+    refDocSizeError: "الملف كبير جدًا. الحد الأقصى 10 ميجابايت",
+    refDocDupeError: "هذا الملف محمل بالفعل",
   },
 } as const;
 
@@ -1035,6 +1049,11 @@ function SidebarContent({
   setEditTitle,
   handleSaveRename,
   agentMode,
+  referenceDocuments,
+  refDocError,
+  onAddDocument,
+  onRemoveDocument,
+  refDocInputRef,
 }: {
   t: Translation;
   conversations: Conversation[];
@@ -1058,6 +1077,11 @@ function SidebarContent({
   setEditTitle: (t: string) => void;
   handleSaveRename: (id: number) => void;
   agentMode: "data-management" | "data-model" | "insights" | "nudge";
+  referenceDocuments: Array<{ id: string; filename: string; fileType: "pdf" | "text"; sizeKb: number }>;
+  refDocError: string | null;
+  onAddDocument: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemoveDocument: (id: string) => void;
+  refDocInputRef: React.RefObject<HTMLInputElement>;
 }) {
   const statusConfig = STATUS_COLORS[agentStatus];
   const statusLabel = agentStatus === "idle" ? t.agentIdle : agentStatus === "thinking" ? t.agentThinking : agentStatus === "executing" ? t.agentExecuting : t.agentDone;
@@ -1094,6 +1118,69 @@ function SidebarContent({
         </div>
       </div>
       <div className="border-t border-white/10" />
+
+      <div className="px-3 pt-3 pb-2 border-b border-white/10">
+        <p className="text-[10px] font-semibold text-white/50 uppercase tracking-wide mb-2" data-testid="text-ref-doc-header">
+          {t.refDocHeader}
+        </p>
+        <input
+          ref={refDocInputRef}
+          type="file"
+          accept=".pdf,.txt,text/plain,application/pdf"
+          multiple
+          className="hidden"
+          onChange={onAddDocument}
+          data-testid="input-ref-doc-file"
+        />
+        <button
+          onClick={() => refDocInputRef.current?.click()}
+          className="w-full text-[11px] py-1.5 rounded border border-dashed border-white/30 text-white/60 hover:text-white hover:border-white/60 transition-colors"
+          data-testid="button-add-document"
+        >
+          + {t.addDocument}
+        </button>
+        {refDocError && (
+          <p className="mt-1 text-[10px] text-red-400" data-testid="text-ref-doc-error">{refDocError}</p>
+        )}
+        <div
+          className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+          style={{
+            backgroundColor: referenceDocuments.length > 0 ? "#06764720" : "#ffffff10",
+            color: referenceDocuments.length > 0 ? "#4ADE80" : "rgba(255,255,255,0.35)",
+          }}
+          data-testid="status-ref-docs"
+        >
+          <span>{referenceDocuments.length > 0 ? "🟢" : "🔘"}</span>
+          <span>{referenceDocuments.length > 0 ? t.docsActive(referenceDocuments.length) : t.noDocsLoaded}</span>
+        </div>
+        {referenceDocuments.length > 0 && (
+          <div className="mt-2 space-y-1" data-testid="list-ref-docs">
+            {referenceDocuments.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex items-center gap-1.5 px-2 py-1 rounded"
+                style={{ backgroundColor: "#ffffff08" }}
+                data-testid={`ref-doc-item-${doc.id}`}
+              >
+                <FileText className="w-3 h-3 flex-shrink-0 text-white/50" />
+                <span className="flex-1 min-w-0 text-[10px] text-white/70 truncate" title={doc.filename}>
+                  {doc.filename.length > 22 ? doc.filename.slice(0, 22) + "…" : doc.filename}
+                </span>
+                <span className="text-[9px] text-white/35 flex-shrink-0">{doc.sizeKb} KB</span>
+                <button
+                  onClick={() => onRemoveDocument(doc.id)}
+                  className="flex-shrink-0 text-white/35 hover:text-red-400 transition-colors text-[11px] leading-none"
+                  data-testid={`button-remove-doc-${doc.id}`}
+                  title="Remove"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-0.5">
           {conversationsLoading ? (
@@ -1319,6 +1406,17 @@ export default function ChatPage() {
   const [editTitle, setEditTitle] = useState("");
   const [outputsPanelCollapsed, setOutputsPanelCollapsed] = useState(false);
   const [agentMode, setAgentMode] = useState<"insights" | "data-management" | "data-model" | "nudge">("data-management");
+  const [referenceDocuments, setReferenceDocuments] = useState<Array<{
+    id: string;
+    filename: string;
+    fileType: "pdf" | "text";
+    content: string;
+    sizeKb: number;
+    uploadedAt: string;
+  }>>([]);
+  const [refDocError, setRefDocError] = useState<string | null>(null);
+  const refDocInputRef = useRef<HTMLInputElement>(null);
+  const refDocErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [nudgeReports, setNudgeReports] = useState<Record<number, NudgeReport>>({});
   const [textInputMode, setTextInputMode] = useState(false);
   const [pastedText, setPastedText] = useState("");
@@ -1781,6 +1879,14 @@ export default function ChatPage() {
       if (file) {
         formData.append("file", file);
       }
+      if (agentMode === "data-management" && referenceDocuments.length > 0) {
+        const refDocsPayload = referenceDocuments.map(d => ({
+          filename: d.filename,
+          fileType: d.fileType,
+          content: d.content,
+        }));
+        formData.append("refDocs", JSON.stringify(refDocsPayload));
+      }
 
       const response = await fetch(`/api/conversations/${conversationId}/messages`, {
         method: "POST",
@@ -2038,6 +2144,47 @@ export default function ChatPage() {
     },
   });
 
+  const showRefDocError = (msg: string) => {
+    setRefDocError(msg);
+    if (refDocErrorTimerRef.current) clearTimeout(refDocErrorTimerRef.current);
+    refDocErrorTimerRef.current = setTimeout(() => setRefDocError(null), 4000);
+  };
+
+  const handleAddDocument = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (refDocInputRef.current) refDocInputRef.current.value = "";
+    for (const file of files) {
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      const isTxt = file.type === "text/plain" || file.name.toLowerCase().endsWith(".txt");
+      if (!isPdf && !isTxt) { showRefDocError(t.refDocTypeError); continue; }
+      if (file.size > 10 * 1024 * 1024) { showRefDocError(t.refDocSizeError); continue; }
+      if (referenceDocuments.some(d => d.filename === file.name)) { showRefDocError(t.refDocDupeError); continue; }
+      const reader = new FileReader();
+      const docId = Math.random().toString(36).slice(2, 8);
+      const sizeKb = Math.round(file.size / 1024);
+      const uploadedAt = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      if (isPdf) {
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.split(",")[1] ?? dataUrl;
+          setReferenceDocuments(prev => [...prev, { id: docId, filename: file.name, fileType: "pdf", content: base64, sizeKb, uploadedAt }]);
+          setRefDocError(null);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        reader.onload = () => {
+          setReferenceDocuments(prev => [...prev, { id: docId, filename: file.name, fileType: "text", content: reader.result as string, sizeKb, uploadedAt }]);
+          setRefDocError(null);
+        };
+        reader.readAsText(file);
+      }
+    }
+  };
+
+  const handleRemoveDocument = (id: string) => {
+    setReferenceDocuments(prev => prev.filter(d => d.id !== id));
+  };
+
   const handleSaveRename = (id: number) => {
     if (editTitle.trim()) {
       renameConversation.mutate({ id, title: editTitle.trim() });
@@ -2121,6 +2268,11 @@ export default function ChatPage() {
     setEditTitle,
     handleSaveRename,
     agentMode,
+    referenceDocuments,
+    refDocError,
+    onAddDocument: handleAddDocument,
+    onRemoveDocument: handleRemoveDocument,
+    refDocInputRef,
   };
 
   return (

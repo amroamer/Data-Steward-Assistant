@@ -57,6 +57,10 @@ const t = {
             heading: "PII Detection (PDPL)",
             body: "Scan your dataset for personal and sensitive information against Saudi PDPL categories and international PII patterns. Ask 'detect PII' or 'scan for sensitive data'. Each flagged column gets a risk level (High/Medium/Low), legal basis reference, PDPL article, and recommended handling. Output exports to a PII Scan sheet.",
           },
+          {
+            heading: "Reference Documents (session-wide context)",
+            body: "Upload one or more PDF or TXT files in the '📎 Reference Documents' section at the top of the left sidebar. Each document is automatically injected as background context into every Data Management Claude call — data classification, business definitions, DQ rules, PII detection, and Informatica output. Useful for internal data governance policies, data dictionaries, regulatory circulars, or ZATCA standards documents. Click ✕ next to any document to remove it. Only PDF and TXT files under 10 MB are supported.",
+          },
         ],
       },
       {
@@ -287,6 +291,10 @@ const t = {
           {
             heading: "الكشف عن البيانات الشخصية (PDPL)",
             body: "افحص بياناتك بحثًا عن المعلومات الشخصية والحساسة وفق فئات نظام حماية البيانات الشخصية السعودي. اطلب 'الكشف عن البيانات الشخصية'. كل عمود مُبلَّغ عنه يحصل على مستوى المخاطرة وأساسه القانوني ومادة النظام المعنية.",
+          },
+          {
+            heading: "المستندات المرجعية (سياق على مستوى الجلسة)",
+            body: "حمّل ملفًا أو أكثر من PDF أو TXT في قسم '📎 المستندات المرجعية' في الجزء العلوي من الشريط الجانبي الأيسر. يُحقن كل مستند تلقائيًا كسياق خلفي في كل استدعاء لـ Claude في وضع إدارة البيانات — تصنيف البيانات، التعريفات التجارية، قواعد الجودة، الكشف عن البيانات الشخصية، ومخرجات Informatica. مفيد لسياسات حوكمة البيانات الداخلية، قواميس البيانات، التعميمات التنظيمية، أو وثائق معايير زاتكا. انقر ✕ بجانب أي مستند لإزالته. تُدعم ملفات PDF وTXT فقط بحجم لا يتجاوز 10 ميجابايت.",
           },
         ],
       },

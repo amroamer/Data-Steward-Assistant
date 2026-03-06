@@ -53,7 +53,10 @@ When a feature requires JSON output — data quality rules, nudge analysis, data
 Every response should feel like it comes from the same expert consultant. Do not change your persona, tone, or scope rules between responses. Do not introduce yourself unless asked. Do not add unnecessary disclaimers.
 
 5. FOLLOW-UP QUESTIONS
-When answering follow-up questions, use the context already established in the session. Do not ask the user to repeat information they already provided. Reference previous analysis results directly.`;
+When answering follow-up questions, use the context already established in the session. Do not ask the user to repeat information they already provided. Reference previous analysis results directly.
+
+6. REFERENCE DOCUMENTS
+If one or more reference documents have been provided at the start of this conversation, always consider their contents when generating any analysis or recommendation. If the documents contain definitions, policies, standards, or rules that are relevant to the user's request, prioritize them over general knowledge. If the user asks a question that is directly answered by a reference document, cite the document by name explicitly in your response.`;
 
 function buildSystemPrompt(featurePrompt: string): string {
   return ZATCA_SYSTEM_PROMPT.trim() + "\n\n---\n\n" + featurePrompt.trim();
@@ -1614,7 +1617,7 @@ export function registerChatRoutes(app: Express): void {
       await chatStorage.createMessage(conversationId, "user", userContent);
 
       const allMessages = await chatStorage.getMessagesByConversation(conversationId);
-      const chatMessages = allMessages.map((m) => ({
+      let chatMessages = allMessages.map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       }));
@@ -1657,6 +1660,45 @@ export function registerChatRoutes(app: Express): void {
       }
 
       if (isInformaticaRequest(originalUserMessage)) informaticaMode = true;
+
+      const refDocsRaw = req.body.refDocs as string | undefined;
+      if (refDocsRaw) {
+        try {
+          const refDocs = JSON.parse(refDocsRaw) as Array<{ filename: string; fileType: string; content: string }>;
+          const injectedMessages: any[] = [];
+          for (const doc of refDocs) {
+            if (doc.fileType === "pdf") {
+              injectedMessages.push({
+                role: "user",
+                content: [
+                  {
+                    type: "document",
+                    source: { type: "base64", media_type: "application/pdf", data: doc.content },
+                    cache_control: { type: "ephemeral" },
+                  },
+                  {
+                    type: "text",
+                    text: `This is a reference document called "${doc.filename}". Use it as background context for all your responses. Always consider its contents when generating analysis, rules, classifications, or recommendations.`,
+                  },
+                ],
+              });
+            } else {
+              injectedMessages.push({
+                role: "user",
+                content: `Reference document "${doc.filename}":\n\n${doc.content}`,
+              });
+            }
+            injectedMessages.push({
+              role: "assistant",
+              content: `Understood. I have read "${doc.filename}" and will use it as context in all my responses.`,
+            });
+          }
+          chatMessages = [...injectedMessages, ...chatMessages];
+          console.log(`[refDocs] Injected ${refDocs.length} reference document(s) into chatMessages`);
+        } catch (e) {
+          console.warn("[refDocs] Failed to parse reference documents:", e);
+        }
+      }
 
       const dqSplitMode = !insightsMode && !informaticaMode && !imageContent && isDqRequest(originalUserMessage) &&
         (req.file != null || extractedFieldNames.length > 0 || dqFieldNames.length > 0);
