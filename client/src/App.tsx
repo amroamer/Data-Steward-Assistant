@@ -1,11 +1,10 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ChatPage from "@/pages/chat";
 import UseCasesPage from "@/pages/use-cases";
-import NudgePage from "@/pages/nudge";
 import UserGuidePage from "@/pages/user-guide";
 
 function Router() {
@@ -13,7 +12,7 @@ function Router() {
     <Switch>
       <Route path="/" component={ChatPage} />
       <Route path="/use-cases" component={UseCasesPage} />
-      <Route path="/nudge" component={NudgePage} />
+      <Route path="/nudge"><Redirect to="/" /></Route>
       <Route path="/user-guide" component={UserGuidePage} />
     </Switch>
   );

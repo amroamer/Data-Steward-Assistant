@@ -111,19 +111,19 @@ const t = {
           },
           {
             heading: "How to use it",
-            body: "Click 'Nudge Agent' in the agent tabs at the top. Type your compliance scenario in the input box and click 'Analyse'. The agent runs a 6-step analysis covering diagnosis, population segmentation, behavioural levers, and an intervention plan.",
+            body: "Click the 'Nudge Agent' tab in the agent mode bar at the top to switch to Nudge mode. Type your compliance scenario into the command console at the bottom (e.g. 'SMEs filing VAT returns late') and press Enter or click the send button. Sessions are saved in the sidebar like any other agent mode.",
           },
           {
             heading: "Understanding the results",
-            body: "Results are structured into 4 sections: (A) Diagnosis — root causes, emotional drivers, friction points; (B) Taxpayer Segments — risk level and receptiveness per group; (C) Behavioral Levers — word-for-word nudge messages in yellow boxes; (D) Intervention Plan — numbered sequence, quick wins, KPIs, and estimated compliance lift.",
+            body: "Results appear inline in the thread view, structured into 4 sections: (A) Diagnosis — root causes, emotional drivers, friction points; (B) Taxpayer Segments — risk level and receptiveness per group; (C) Behavioral Levers — word-for-word nudge messages in yellow boxes; (D) Intervention Plan — numbered sequence, quick wins, KPIs, and estimated compliance lift.",
           },
           {
             heading: "Follow-up questions",
-            body: "After results appear, you can ask follow-up questions (e.g. 'what digital channels work best for segment 2?') in the follow-up input below the results. The agent answers using your generated report as context.",
+            body: "After results appear, type a follow-up message in the same command console (e.g. 'what digital channels work best for segment 2?'). Each message starts a new nudge analysis thread within the same session.",
           },
           {
             heading: "Export",
-            body: "Click 'Download Nudge Report' to export results to nudge_report_[timestamp].xlsx with 5 sheets: executive_summary, diagnosis, population_segments, behavioral_levers, intervention_plan.",
+            body: "Click 'Download Nudge Report' at the bottom of each result to export to nudge_report_[timestamp].xlsx with 5 sheets: executive_summary, diagnosis, population_segments, behavioral_levers, intervention_plan.",
           },
         ],
       },
@@ -314,15 +314,15 @@ const t = {
           },
           {
             heading: "كيفية الاستخدام",
-            body: "انقر على 'وكيل التحفيز' في تبويبات الوكيل أعلى الصفحة. اكتب سيناريو الامتثال في مربع الإدخال وانقر على 'تحليل'. يُجري الوكيل تحليلًا من 6 خطوات يشمل التشخيص والتقسيم والرافعات السلوكية وخطة التدخل.",
+            body: "انقر على تبويب 'وكيل التحفيز' في شريط أوضاع الوكيل أعلى الصفحة للتبديل إلى وضع التحفيز. اكتب سيناريو الامتثال في وحدة تحكم الأوامر أسفل الصفحة واضغط Enter أو انقر على زر الإرسال. تُحفظ الجلسات في الشريط الجانبي مثل أي وضع آخر.",
           },
           {
             heading: "فهم النتائج",
-            body: "النتائج مُنظَّمة في 4 أقسام: (أ) التشخيص — الأسباب الجذرية والدوافع العاطفية ونقاط الاحتكاك؛ (ب) شرائح دافعي الضرائب؛ (ج) الرافعات السلوكية — رسائل التحفيز الحرفية في مربعات صفراء؛ (د) خطة التدخل.",
+            body: "تظهر النتائج بشكل مضمّن في عرض الخيط، مُنظَّمة في 4 أقسام: (أ) التشخيص — الأسباب الجذرية والدوافع العاطفية ونقاط الاحتكاك؛ (ب) شرائح دافعي الضرائب؛ (ج) الرافعات السلوكية — رسائل التحفيز الحرفية في مربعات صفراء؛ (د) خطة التدخل.",
           },
           {
             heading: "التصدير",
-            body: "انقر على 'تنزيل تقرير التحفيز' لتصدير النتائج إلى nudge_report_[timestamp].xlsx بـ 5 أوراق عمل.",
+            body: "انقر على 'تنزيل تقرير التحفيز' في أسفل كل نتيجة لتصدير النتائج إلى nudge_report_[timestamp].xlsx بـ 5 أوراق عمل.",
           },
         ],
       },

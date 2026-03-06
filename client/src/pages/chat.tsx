@@ -66,6 +66,10 @@ import {
   Cpu,
   LayoutGrid,
   Target,
+  Users,
+  Search,
+  Zap,
+  TrendingUp,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -103,6 +107,7 @@ import {
   generateInsightsExcel,
 } from "@/lib/insights-store";
 import zatcaLogoPath from "@assets/zatca-logo.svg";
+import * as XLSX from "xlsx";
 import {
   Panel,
   PanelGroup,
@@ -110,6 +115,140 @@ import {
 } from "react-resizable-panels";
 
 type Lang = "en" | "ar";
+
+interface NudgeSegment {
+  id: string;
+  name: string;
+  archetype: string;
+  population_pct: number;
+  risk_level: "Critical" | "High" | "Medium" | "Low";
+  main_barrier: string;
+  receptiveness: "High" | "Medium" | "Low";
+  best_channel: string;
+  best_timing: string;
+}
+
+interface NudgeLever {
+  id: string;
+  type: string;
+  name: string;
+  target_segments: string[];
+  message_text: string;
+  channel: string;
+  timing: string;
+  expected_impact: string;
+  implementation_effort: "Low" | "Medium" | "High";
+  priority: "High" | "Medium" | "Low";
+}
+
+interface NudgeReport {
+  use_case: string;
+  use_case_category: string;
+  severity: "Critical" | "High" | "Medium" | "Low";
+  diagnosis: {
+    primary_root_cause: string;
+    secondary_root_causes: string[];
+    is_intentional: boolean;
+    emotional_drivers: string[];
+    friction_points: string[];
+    rationale: string;
+  };
+  segments: NudgeSegment[];
+  levers: NudgeLever[];
+  intervention_plan: {
+    recommended_sequence: string[];
+    quick_wins: string[];
+    kpis: string[];
+    estimated_lift: string;
+  };
+}
+
+function nudgeRiskColor(level: string): { bg: string; text: string } {
+  if (level === "Critical") return { bg: "#FEE2E2", text: "#991B1B" };
+  if (level === "High") return { bg: "#FFEDD5", text: "#C2410C" };
+  if (level === "Medium") return { bg: "#FEF9C3", text: "#854D0E" };
+  return { bg: "#DCFCE7", text: "#166534" };
+}
+
+function nudgePriorityColor(p: string): { bg: string; text: string } {
+  if (p === "High") return { bg: "#FEE2E2", text: "#991B1B" };
+  if (p === "Medium") return { bg: "#FFEDD5", text: "#C2410C" };
+  return { bg: "#DCFCE7", text: "#166534" };
+}
+
+function generateNudgeExcel(report: NudgeReport): void {
+  const wb = XLSX.utils.book_new();
+  const zatcaBlueFill = { fgColor: { rgb: "0D2E5C" } };
+  const whiteFont = { color: { rgb: "FFFFFF" }, bold: true };
+  const headerStyle = { fill: zatcaBlueFill, font: whiteFont, alignment: { horizontal: "left" } };
+
+  const applyHeaderStyle = (ws: XLSX.WorkSheet, range: string) => {
+    const r = XLSX.utils.decode_range(range);
+    for (let C = r.s.c; C <= r.e.c; C++) {
+      const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+      if (!ws[addr]) ws[addr] = { v: "", t: "s" };
+      ws[addr].s = headerStyle;
+    }
+  };
+
+  const ws1 = XLSX.utils.aoa_to_sheet([
+    ["Field", "Value"],
+    ["Use Case", report.use_case],
+    ["Category", report.use_case_category],
+    ["Severity", report.severity],
+    ["Primary Root Cause", report.diagnosis.primary_root_cause],
+    ["Is Intentional", report.diagnosis.is_intentional ? "Yes" : "No"],
+    ["Estimated Compliance Lift", report.intervention_plan.estimated_lift],
+    ["KPIs", report.intervention_plan.kpis.join("; ")],
+  ]);
+  ws1["!cols"] = [{ wch: 30 }, { wch: 60 }];
+  applyHeaderStyle(ws1, "A1:B1");
+  XLSX.utils.book_append_sheet(wb, ws1, "executive_summary");
+
+  const ws2 = XLSX.utils.aoa_to_sheet([
+    ["Field", "Value"],
+    ["Primary Root Cause", report.diagnosis.primary_root_cause],
+    ["Secondary Root Causes", report.diagnosis.secondary_root_causes.join("; ")],
+    ["Emotional Drivers", report.diagnosis.emotional_drivers.join("; ")],
+    ["Friction Points", report.diagnosis.friction_points.join("; ")],
+    ["Rationale", report.diagnosis.rationale],
+  ]);
+  ws2["!cols"] = [{ wch: 30 }, { wch: 80 }];
+  applyHeaderStyle(ws2, "A1:B1");
+  XLSX.utils.book_append_sheet(wb, ws2, "diagnosis");
+
+  const segHeaders = ["ID", "Name", "Archetype", "Population %", "Risk Level", "Main Barrier", "Receptiveness", "Best Channel", "Best Timing"];
+  const ws3 = XLSX.utils.aoa_to_sheet([
+    segHeaders,
+    ...report.segments.map(s => [s.id, s.name, s.archetype, s.population_pct, s.risk_level, s.main_barrier, s.receptiveness, s.best_channel, s.best_timing]),
+  ]);
+  ws3["!cols"] = segHeaders.map(() => ({ wch: 20 }));
+  applyHeaderStyle(ws3, `A1:${XLSX.utils.encode_col(segHeaders.length - 1)}1`);
+  XLSX.utils.book_append_sheet(wb, ws3, "population_segments");
+
+  const levHeaders = ["ID", "Type", "Name", "Target Segments", "Message Text", "Channel", "Timing", "Expected Impact", "Effort", "Priority"];
+  const ws4 = XLSX.utils.aoa_to_sheet([
+    levHeaders,
+    ...report.levers.map(l => [l.id, l.type, l.name, l.target_segments.join("; "), l.message_text, l.channel, l.timing, l.expected_impact, l.implementation_effort, l.priority]),
+  ]);
+  ws4["!cols"] = [{ wch: 10 }, { wch: 22 }, { wch: 30 }, { wch: 20 }, { wch: 50 }, { wch: 15 }, { wch: 20 }, { wch: 30 }, { wch: 22 }, { wch: 12 }];
+  applyHeaderStyle(ws4, `A1:${XLSX.utils.encode_col(levHeaders.length - 1)}1`);
+  XLSX.utils.book_append_sheet(wb, ws4, "behavioral_levers");
+
+  const ws5 = XLSX.utils.aoa_to_sheet([
+    ["Field", "Value"],
+    ["Recommended Sequence", report.intervention_plan.recommended_sequence.join(" → ")],
+    ["Quick Wins", report.intervention_plan.quick_wins.join("; ")],
+    ["KPIs to Track", report.intervention_plan.kpis.join("; ")],
+    ["Estimated Compliance Lift", report.intervention_plan.estimated_lift],
+  ]);
+  ws5["!cols"] = [{ wch: 30 }, { wch: 80 }];
+  applyHeaderStyle(ws5, "A1:B1");
+  XLSX.utils.book_append_sheet(wb, ws5, "intervention_plan");
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  XLSX.writeFile(wb, `nudge_report_${timestamp}.xlsx`);
+}
 
 const translations = {
   en: {
@@ -246,6 +385,72 @@ const translations = {
     previewFile: "Preview file",
     useCases: "Use Cases",
     nudgeAgent: "Nudge Agent",
+    newChatNudge: "New Nudge Agent",
+    agentNudge: "Nudge Agent",
+    agentNudgeDesc: "Behavioural economics for tax compliance",
+    cardNudgeFiling: "Late VAT Filing",
+    cardNudgeFilingDesc: "SMEs filing VAT returns late each quarter",
+    cardNudgeZakat: "Zakat Non-Payment",
+    cardNudgeZakatDesc: "Family businesses not paying Zakat on time",
+    cardNudgeUnderreport: "Income Under-Reporting",
+    cardNudgeUnderreportDesc: "Freelancers under-declaring taxable income",
+    cardNudgeAudit: "Audit Risk Avoidance",
+    cardNudgeAuditDesc: "Businesses ignoring compliance reminders",
+    nudgeHeroTitle: "What would you like to analyse today?",
+    nudgeHeroDesc: "Describe a tax non-compliance scenario in plain language. The agent will diagnose root causes, segment taxpayers, and design targeted behavioural interventions.",
+    nudgeScenarioLabel: "Scenario:",
+    nudgeSectionDiagnosis: "🔍 Why is this happening?",
+    nudgeSectionSegments: "👥 Who are we dealing with?",
+    nudgeSectionLevers: "🎯 What should we do?",
+    nudgeSectionPlan: "📋 Intervention Plan",
+    nudgeLabelPrimary: "Primary Root Cause",
+    nudgeLabelIntentional: "Intentional?",
+    nudgeLabelYes: "Yes",
+    nudgeLabelNo: "No",
+    nudgeLabelSecondary: "Secondary Root Causes",
+    nudgeLabelEmotional: "Emotional Drivers",
+    nudgeLabelFriction: "Friction Points",
+    nudgeLabelRationale: "Rationale",
+    nudgeColSegment: "Segment Name",
+    nudgeColArchetype: "Archetype",
+    nudgeColPop: "Population %",
+    nudgeColRisk: "Risk Level",
+    nudgeColBarrier: "Main Barrier",
+    nudgeColRec: "Receptiveness",
+    nudgeColChannel: "Best Channel",
+    nudgeColTiming: "Best Timing",
+    nudgeLabelMessage: "Nudge Message",
+    nudgeLabelChannelTiming: "Channel & Timing",
+    nudgeLabelImpact: "Expected Impact & Effort",
+    nudgeLabelPriority: "Priority",
+    nudgeLabelSeq: "Recommended Sequence",
+    nudgeLabelQuickWins: "Quick Wins",
+    nudgeLabelKpis: "KPIs to Track",
+    nudgeLabelLift: "Estimated Compliance Lift",
+    nudgeStatRootCause: "Root Cause",
+    nudgeStatSegments: "Segments",
+    nudgeStatLevers: "Levers",
+    nudgeStatQuickWins: "Quick Wins",
+    nudgeStatLift: "Est. Lift",
+    nudgeSeverity: "Severity",
+    nudgeDownload: "📥 Download Nudge Report",
+    nudgeErrorMsg: "Something went wrong. Please rephrase your scenario.",
+    nudgeAnalysing: "Analysing your scenario...",
+    nudgeSteps: ["Reading your scenario", "Diagnosing root causes", "Segmenting taxpayer population...", "Mapping behavioral levers", "Building intervention plan", "Generating report"],
+    nudgeExamplesTitle: "Example scenarios you can try:",
+    nudgeExamples: [
+      "SMEs filing VAT returns late every quarter",
+      "Family businesses not paying Zakat on time",
+      "Freelancers under-declaring income",
+      "Retail businesses ignoring reminder notices",
+      "New registrants missing their first deadline",
+    ],
+    nudgeInfoCard1: "Diagnose Non-Compliance",
+    nudgeInfoCard1Desc: "Discover why taxpayers are not complying",
+    nudgeInfoCard2: "Segment Taxpayers",
+    nudgeInfoCard2Desc: "Group non-compliers by their behaviour",
+    nudgeInfoCard3: "Map Behavioural Levers",
+    nudgeInfoCard3Desc: "Get the right intervention for each group",
   },
   ar: {
     newChat: "وكيل مالك بيانات جديد",
@@ -381,6 +586,72 @@ const translations = {
     previewFile: "معاينة الملف",
     useCases: "حالات الاستخدام",
     nudgeAgent: "وكيل التحفيز",
+    newChatNudge: "وكيل تحفيز جديد",
+    agentNudge: "وكيل التحفيز",
+    agentNudgeDesc: "الاقتصاد السلوكي للامتثال الضريبي",
+    cardNudgeFiling: "التأخر في إقرار ضريبة القيمة",
+    cardNudgeFilingDesc: "المنشآت الصغيرة المتأخرة في تقديم إقرارات ضريبة القيمة المضافة",
+    cardNudgeZakat: "عدم سداد الزكاة",
+    cardNudgeZakatDesc: "شركات العائلة التي لا تسدد الزكاة في الوقت المحدد",
+    cardNudgeUnderreport: "التقليل من الإبلاغ عن الدخل",
+    cardNudgeUnderreportDesc: "المستقلون الذين يُقرّون بدخل أقل من الحقيقي",
+    cardNudgeAudit: "تجنب مخاطر التدقيق",
+    cardNudgeAuditDesc: "الشركات التي تتجاهل رسائل التذكير بالامتثال",
+    nudgeHeroTitle: "ماذا تريد أن تحلل اليوم؟",
+    nudgeHeroDesc: "صف سيناريو عدم امتثال ضريبي بلغة طبيعية. سيشخّص الوكيل الأسباب الجذرية ويقسّم دافعي الضرائب ويصمّم تدخلات سلوكية مستهدفة.",
+    nudgeScenarioLabel: "السيناريو:",
+    nudgeSectionDiagnosis: "🔍 لماذا يحدث هذا؟",
+    nudgeSectionSegments: "👥 مع من نتعامل؟",
+    nudgeSectionLevers: "🎯 ماذا يجب أن نفعل؟",
+    nudgeSectionPlan: "📋 خطة التدخل",
+    nudgeLabelPrimary: "السبب الجذري الرئيسي",
+    nudgeLabelIntentional: "هل هو متعمد؟",
+    nudgeLabelYes: "نعم",
+    nudgeLabelNo: "لا",
+    nudgeLabelSecondary: "الأسباب الجذرية الثانوية",
+    nudgeLabelEmotional: "الدوافع العاطفية",
+    nudgeLabelFriction: "نقاط الاحتكاك",
+    nudgeLabelRationale: "المبرر",
+    nudgeColSegment: "اسم الشريحة",
+    nudgeColArchetype: "النمط",
+    nudgeColPop: "% السكان",
+    nudgeColRisk: "مستوى المخاطر",
+    nudgeColBarrier: "الحاجز الرئيسي",
+    nudgeColRec: "القابلية للتقبل",
+    nudgeColChannel: "أفضل قناة",
+    nudgeColTiming: "أفضل توقيت",
+    nudgeLabelMessage: "رسالة التحفيز",
+    nudgeLabelChannelTiming: "القناة والتوقيت",
+    nudgeLabelImpact: "الأثر المتوقع والجهد",
+    nudgeLabelPriority: "الأولوية",
+    nudgeLabelSeq: "التسلسل الموصى به",
+    nudgeLabelQuickWins: "الانتصارات السريعة",
+    nudgeLabelKpis: "مؤشرات الأداء للمتابعة",
+    nudgeLabelLift: "تحسين الامتثال المتوقع",
+    nudgeStatRootCause: "السبب الجذري",
+    nudgeStatSegments: "الشرائح",
+    nudgeStatLevers: "الرافعات",
+    nudgeStatQuickWins: "انتصارات سريعة",
+    nudgeStatLift: "التحسين المتوقع",
+    nudgeSeverity: "الخطورة",
+    nudgeDownload: "📥 تنزيل تقرير التحفيز",
+    nudgeErrorMsg: "حدث خطأ ما. يرجى إعادة صياغة السيناريو.",
+    nudgeAnalysing: "جارٍ تحليل السيناريو...",
+    nudgeSteps: ["قراءة السيناريو", "تشخيص الأسباب الجذرية", "تقسيم شريحة دافعي الضرائب...", "رسم خريطة الرافعات السلوكية", "بناء خطة التدخل", "إنشاء التقرير"],
+    nudgeExamplesTitle: "أمثلة يمكنك تجربتها:",
+    nudgeExamples: [
+      "المنشآت الصغيرة والمتوسطة التي تتأخر في تقديم إقرارات ضريبة القيمة المضافة",
+      "شركات العائلة التي لا تسدد الزكاة في الوقت المحدد",
+      "المستقلون الذين يُقرّون بدخل أقل من الحقيقي",
+      "الشركات التجارية التي تتجاهل رسائل التذكير",
+      "المسجلون الجدد الذين يفوّتون موعدهم الأول",
+    ],
+    nudgeInfoCard1: "تشخيص عدم الامتثال",
+    nudgeInfoCard1Desc: "اكتشف لماذا لا يمتثل دافعو الضرائب",
+    nudgeInfoCard2: "تقسيم دافعي الضرائب",
+    nudgeInfoCard2Desc: "تجميع غير الممتثلين حسب سلوكهم",
+    nudgeInfoCard3: "رسم خريطة الرافعات السلوكية",
+    nudgeInfoCard3Desc: "احصل على التدخل المناسب لكل مجموعة",
   },
 } as const;
 
@@ -395,6 +666,10 @@ const featureCardKeys: { titleKey: TranslationKey; descKey: TranslationKey }[] =
   { titleKey: "cardPiiDetection", descKey: "cardPiiDetectionDesc" },
   { titleKey: "cardInsights", descKey: "cardInsightsDesc" },
   { titleKey: "cardInformatica", descKey: "cardInformaticaDesc" },
+  { titleKey: "cardNudgeFiling", descKey: "cardNudgeFilingDesc" },
+  { titleKey: "cardNudgeZakat", descKey: "cardNudgeZakatDesc" },
+  { titleKey: "cardNudgeUnderreport", descKey: "cardNudgeUnderreportDesc" },
+  { titleKey: "cardNudgeAudit", descKey: "cardNudgeAuditDesc" },
 ];
 
 const FEATURE_CARDS = [
@@ -467,6 +742,46 @@ const FEATURE_CARDS = [
     bg: "bg-[#F57C00]/5",
     iconBg: "bg-[#F57C00]/10",
     agentMode: "data-management" as const,
+  },
+  {
+    icon: FileText,
+    title: "Late VAT Filing",
+    description: "SMEs filing VAT returns late each quarter",
+    prompt: "SMEs filing VAT returns late every quarter",
+    color: "text-[#7C3AED]",
+    bg: "bg-[#7C3AED]/5",
+    iconBg: "bg-[#7C3AED]/10",
+    agentMode: "nudge" as const,
+  },
+  {
+    icon: Users,
+    title: "Zakat Non-Payment",
+    description: "Family businesses not paying Zakat on time",
+    prompt: "Family businesses not paying Zakat on time",
+    color: "text-[#7C3AED]",
+    bg: "bg-[#7C3AED]/5",
+    iconBg: "bg-[#7C3AED]/10",
+    agentMode: "nudge" as const,
+  },
+  {
+    icon: TrendingUp,
+    title: "Income Under-Reporting",
+    description: "Freelancers under-declaring taxable income",
+    prompt: "Freelancers under-declaring taxable income",
+    color: "text-[#7C3AED]",
+    bg: "bg-[#7C3AED]/5",
+    iconBg: "bg-[#7C3AED]/10",
+    agentMode: "nudge" as const,
+  },
+  {
+    icon: Zap,
+    title: "Audit Risk Avoidance",
+    description: "Businesses ignoring compliance reminders",
+    prompt: "Retail businesses ignoring compliance reminder notices",
+    color: "text-[#7C3AED]",
+    bg: "bg-[#7C3AED]/5",
+    iconBg: "bg-[#7C3AED]/10",
+    agentMode: "nudge" as const,
   },
 ];
 
@@ -742,7 +1057,7 @@ function SidebarContent({
   editTitle: string;
   setEditTitle: (t: string) => void;
   handleSaveRename: (id: number) => void;
-  agentMode: "data-management" | "data-model" | "insights";
+  agentMode: "data-management" | "data-model" | "insights" | "nudge";
 }) {
   const statusConfig = STATUS_COLORS[agentStatus];
   const statusLabel = agentStatus === "idle" ? t.agentIdle : agentStatus === "thinking" ? t.agentThinking : agentStatus === "executing" ? t.agentExecuting : t.agentDone;
@@ -1003,7 +1318,8 @@ export default function ChatPage() {
   const [editingConvId, setEditingConvId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [outputsPanelCollapsed, setOutputsPanelCollapsed] = useState(false);
-  const [agentMode, setAgentMode] = useState<"insights" | "data-management" | "data-model">("data-management");
+  const [agentMode, setAgentMode] = useState<"insights" | "data-management" | "data-model" | "nudge">("data-management");
+  const [nudgeReports, setNudgeReports] = useState<Record<number, NudgeReport>>({});
   const [textInputMode, setTextInputMode] = useState(false);
   const [pastedText, setPastedText] = useState("");
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -1019,9 +1335,9 @@ export default function ChatPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const promptParam = params.get("prompt");
-    const modeParam = params.get("mode") as "data-management" | "data-model" | "insights" | null;
+    const modeParam = params.get("mode") as "data-management" | "data-model" | "insights" | "nudge" | null;
     if (promptParam) setInputValue(promptParam);
-    if (modeParam && ["data-management", "data-model", "insights"].includes(modeParam)) setAgentMode(modeParam);
+    if (modeParam && ["data-management", "data-model", "insights", "nudge"].includes(modeParam)) setAgentMode(modeParam);
     if (promptParam || modeParam) history.replaceState({}, "", window.location.pathname);
   }, []);
 
@@ -1379,6 +1695,76 @@ export default function ChatPage() {
     setAgentStatus("thinking");
     setThinkingSteps(getThinkingStepsForCommand(content));
     addActivityEntry("📤", `${t.commandLabel} ${content.substring(0, 40)}...`);
+
+    if (agentMode === "nudge") {
+      const userMsgId = Date.now();
+      const assistantMsgId = userMsgId + 1;
+
+      queryClient.setQueryData(
+        ["/api/conversations", conversationId],
+        (old: any) => {
+          const userMsg = { id: userMsgId, conversationId, role: "user", content: finalContent, createdAt: new Date().toISOString() };
+          return old
+            ? { ...old, messages: [...(old.messages || []), userMsg] }
+            : { id: conversationId, title: t.newAnalysis, messages: [userMsg] };
+        }
+      );
+
+      const nudgeStepsArr = t.nudgeSteps as string[];
+      let stepIdx = 0;
+      setThinkingSteps(nudgeStepsArr.map((label, i) => ({
+        label,
+        status: i === 0 ? "active" as const : "pending" as const,
+        startedAt: i === 0 ? Date.now() : undefined,
+      })));
+
+      const stepInterval = setInterval(() => {
+        stepIdx = Math.min(stepIdx + 1, nudgeStepsArr.length - 1);
+        setThinkingSteps(nudgeStepsArr.map((label, i) => ({
+          label,
+          status: i < stepIdx ? "done" as const : i === stepIdx ? "active" as const : "pending" as const,
+        })));
+      }, 900);
+
+      try {
+        const res = await fetch("/api/nudge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scenario: finalContent }),
+        });
+        clearInterval(stepInterval);
+        const json = await res.json();
+
+        if (json.ok && json.data) {
+          const nudgeReport = json.data as NudgeReport;
+          const summaryText = `__NUDGE_REPORT_ID_${assistantMsgId}__`;
+
+          queryClient.setQueryData(
+            ["/api/conversations", conversationId],
+            (old: any) => {
+              const assistantMsg = { id: assistantMsgId, conversationId, role: "assistant", content: summaryText, createdAt: new Date().toISOString() };
+              return old ? { ...old, messages: [...(old.messages || []), assistantMsg] } : old;
+            }
+          );
+
+          setNudgeReports(prev => ({ ...prev, [assistantMsgId]: nudgeReport }));
+          addActivityEntry("🎯", lang === "ar" ? "اكتمل تحليل التحفيز" : "Nudge analysis complete");
+          setAgentStatus("done");
+          setThinkingSteps(prev => prev.map(s => ({ ...s, status: "done" as const })));
+        } else {
+          toast({ title: t.toastError, description: t.nudgeErrorMsg as string, variant: "destructive" });
+          setAgentStatus("idle");
+        }
+      } catch {
+        clearInterval(stepInterval);
+        toast({ title: t.toastError, description: t.nudgeErrorMsg as string, variant: "destructive" });
+        setAgentStatus("idle");
+      } finally {
+        setIsStreaming(false);
+        setStreamingContent("");
+      }
+      return;
+    }
 
     queryClient.setQueryData(
       ["/api/conversations", conversationId],
@@ -1995,15 +2381,25 @@ export default function ChatPage() {
               </button>
             ))}
             <div className="w-px h-5 bg-gray-200 mx-1 flex-shrink-0" />
-            <Link
-              href="/nudge"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100"
-              style={{ color: "#7C3AED" }}
+            <button
+              onClick={() => {
+                if (agentMode !== "nudge") {
+                  setAgentMode("nudge");
+                  setActiveConversationId(null);
+                  resetResultState(true);
+                  setCollapsedThreads(new Set());
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{
+                backgroundColor: agentMode === "nudge" ? "#7C3AED" : "transparent",
+                color: agentMode === "nudge" ? "white" : "#7C3AED",
+              }}
               data-testid="tab-nudge-agent"
             >
               <Target className="w-3.5 h-3.5 flex-shrink-0" />
               <span>{t.nudgeAgent}</span>
-            </Link>
+            </button>
           </div>
         )}
 
@@ -2028,10 +2424,42 @@ export default function ChatPage() {
             <div className="max-w-4xl mx-auto w-full px-4 py-6">
               {!activeConversationId && messages.length === 0 && !isStreaming ? (
                 <div className="flex flex-col items-center justify-center pt-8">
-                  <h2 className="text-2xl font-bold mb-2 tracking-tight font-main" style={{ color: "#2563EB" }} data-testid="text-hero-title">{t.whatToDo}</h2>
+                  <h2 className="text-2xl font-bold mb-2 tracking-tight font-main" style={{ color: agentMode === "nudge" ? "#7C3AED" : "#2563EB" }} data-testid="text-hero-title">
+                    {agentMode === "nudge" ? t.nudgeHeroTitle as string : t.whatToDo}
+                  </h2>
                   <p className="text-center mb-8 max-w-md text-sm leading-relaxed" style={{ color: "#6B7280" }}>
-                    {agentMode === "insights" ? t.agentInsightsDesc : agentMode === "data-model" ? t.agentDataModelDesc : t.heroDescription}
+                    {agentMode === "nudge" ? t.nudgeHeroDesc as string : agentMode === "insights" ? t.agentInsightsDesc : agentMode === "data-model" ? t.agentDataModelDesc : t.heroDescription}
                   </p>
+                  {agentMode === "nudge" && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-3xl mb-8">
+                      {([
+                        { icon: Search, title: t.nudgeInfoCard1 as string, desc: t.nudgeInfoCard1Desc as string, color: "#2563EB" },
+                        { icon: Users, title: t.nudgeInfoCard2 as string, desc: t.nudgeInfoCard2Desc as string, color: "#067647" },
+                        { icon: Target, title: t.nudgeInfoCard3 as string, desc: t.nudgeInfoCard3Desc as string, color: "#7C3AED" },
+                      ]).map(({ icon: Icon, title, desc, color }, i) => (
+                        <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-3" style={{ backgroundColor: color + "18" }}>
+                            <Icon className="w-5 h-5" style={{ color }} />
+                          </div>
+                          <h3 className="font-bold text-gray-900 text-sm mb-1">{title}</h3>
+                          <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {agentMode === "nudge" && (
+                    <div className="bg-white rounded-xl border border-gray-200 p-5 mb-8 shadow-sm w-full max-w-3xl">
+                      <p className="text-sm font-semibold text-gray-600 mb-3">{t.nudgeExamplesTitle as string}</p>
+                      <ul className="space-y-1.5">
+                        {(t.nudgeExamples as string[]).map((ex, i) => (
+                          <li key={i} className="text-sm text-gray-500 flex items-start gap-2">
+                            <span className="text-gray-300 flex-shrink-0 mt-0.5">—</span>
+                            <button className="text-left hover:text-gray-700 transition-colors" onClick={() => { setInputValue(ex); textareaRef.current?.focus(); }}>{ex}</button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <div className={`grid grid-cols-2 ${isMobile ? "" : "lg:grid-cols-3"} gap-4 w-full max-w-4xl`}>
                     {FEATURE_CARDS.filter(c => c.agentMode === agentMode).map((card, cardIdx) => {
                       const globalIdx = FEATURE_CARDS.indexOf(card);
@@ -2099,6 +2527,7 @@ export default function ChatPage() {
                         profiledColumns={profiledColumns}
                         uploadedFileName={uploadedFileName}
                         onAskFollowUp={(text) => { setInputValue(text); textareaRef.current?.focus(); }}
+                        nudgeReport={thread.assistantMsg ? (nudgeReports[thread.assistantMsg.id] || undefined) : undefined}
                       />
                     );
                   })}
@@ -2504,11 +2933,231 @@ function OutputsPanel({
   );
 }
 
+function NudgeResultCard({ report, t }: { report: NudgeReport; t: Translation }) {
+  const riskBadge = (level: string) => {
+    const c = nudgeRiskColor(level);
+    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ backgroundColor: c.bg, color: c.text }}>{level}</span>;
+  };
+  const recBadge = (level: string) => {
+    const mapped = level === "High" ? "Low" : level === "Low" ? "High" : "Medium";
+    const c = nudgeRiskColor(mapped);
+    return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ backgroundColor: c.bg, color: c.text }}>{level}</span>;
+  };
+
+  return (
+    <div className="space-y-4 mt-2">
+      {/* Summary Banner */}
+      <div className="rounded-xl p-4 grid grid-cols-2 md:grid-cols-5 gap-3" style={{ backgroundColor: "#0D2E5C" }} data-testid="nudge-summary-banner">
+        {[
+          { label: t.nudgeStatRootCause as string, value: report.diagnosis.primary_root_cause.split(" ").slice(0, 4).join(" ") + "…" },
+          { label: t.nudgeStatSegments as string, value: String(report.segments.length) },
+          { label: t.nudgeStatLevers as string, value: String(report.levers.length) },
+          { label: t.nudgeStatQuickWins as string, value: String(report.intervention_plan.quick_wins.length) },
+          { label: t.nudgeStatLift as string, value: report.intervention_plan.estimated_lift },
+        ].map(({ label, value }, i) => (
+          <div key={i} className="text-center">
+            <div className="text-white font-bold text-lg leading-tight truncate">{value}</div>
+            <div className="text-white/60 text-[11px] mt-0.5">{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Section A — Diagnosis */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="nudge-section-diagnosis">
+        <div className="px-5 py-3 border-b border-gray-100" style={{ backgroundColor: "#F8FAFF" }}>
+          <h2 className="font-bold text-gray-800 text-sm">{t.nudgeSectionDiagnosis as string}</h2>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{t.nudgeLabelPrimary as string}</p>
+            <div className="px-4 py-3 rounded-lg font-semibold text-white text-sm" style={{ backgroundColor: "#2563EB" }}>{report.diagnosis.primary_root_cause}</div>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{t.nudgeLabelIntentional as string}</span>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold" style={report.diagnosis.is_intentional ? { backgroundColor: "#FEE2E2", color: "#991B1B" } : { backgroundColor: "#DCFCE7", color: "#166534" }}>
+              {report.diagnosis.is_intentional ? t.nudgeLabelYes as string : t.nudgeLabelNo as string}
+            </span>
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider ml-2">{t.nudgeSeverity as string}</span>
+            {riskBadge(report.severity)}
+          </div>
+          {report.diagnosis.secondary_root_causes?.length > 0 && (
+            <div>
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">{t.nudgeLabelSecondary as string}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {report.diagnosis.secondary_root_causes.map((c, i) => (
+                  <span key={i} className="px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-700 border border-blue-100">{c}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {report.diagnosis.emotional_drivers?.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">{t.nudgeLabelEmotional as string}</p>
+                <ul className="space-y-1">
+                  {report.diagnosis.emotional_drivers.map((d, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-gray-700"><span className="text-blue-400 flex-shrink-0">•</span>{d}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {report.diagnosis.friction_points?.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">{t.nudgeLabelFriction as string}</p>
+                <ul className="space-y-1">
+                  {report.diagnosis.friction_points.map((f, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-gray-700"><span className="text-orange-400 flex-shrink-0">•</span>{f}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          {report.diagnosis.rationale && (
+            <div>
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{t.nudgeLabelRationale as string}</p>
+              <p className="text-sm text-gray-600 italic">{report.diagnosis.rationale}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Section B — Segments */}
+      {report.segments?.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="nudge-section-segments">
+          <div className="px-5 py-3 border-b border-gray-100" style={{ backgroundColor: "#F8FAFF" }}>
+            <h2 className="font-bold text-gray-800 text-sm">{t.nudgeSectionSegments as string}</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-100" style={{ backgroundColor: "#F8FAFF" }}>
+                  {[t.nudgeColSegment, t.nudgeColArchetype, t.nudgeColPop, t.nudgeColRisk, t.nudgeColBarrier, t.nudgeColRec, t.nudgeColChannel, t.nudgeColTiming].map((h, i) => (
+                    <th key={i} className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wider text-[10px]">{h as string}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {report.segments.map((seg, i) => (
+                  <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-3 py-2.5 font-medium text-gray-800">{seg.name}</td>
+                    <td className="px-3 py-2.5 text-gray-600">{seg.archetype}</td>
+                    <td className="px-3 py-2.5 text-gray-600">{seg.population_pct}%</td>
+                    <td className="px-3 py-2.5">{riskBadge(seg.risk_level)}</td>
+                    <td className="px-3 py-2.5 text-gray-600 max-w-[160px] truncate">{seg.main_barrier}</td>
+                    <td className="px-3 py-2.5">{recBadge(seg.receptiveness)}</td>
+                    <td className="px-3 py-2.5 text-gray-600">{seg.best_channel}</td>
+                    <td className="px-3 py-2.5 text-gray-600">{seg.best_timing}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Section C — Levers */}
+      {report.levers?.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="nudge-section-levers">
+          <div className="px-5 py-3 border-b border-gray-100" style={{ backgroundColor: "#F8FAFF" }}>
+            <h2 className="font-bold text-gray-800 text-sm">{t.nudgeSectionLevers as string}</h2>
+          </div>
+          <div className="p-5 space-y-4">
+            {report.levers.map((lever, i) => {
+              const prio = nudgePriorityColor(lever.priority);
+              return (
+                <div key={i} className="border border-gray-100 rounded-xl p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{lever.type}</span>
+                      <h3 className="font-semibold text-gray-800 text-sm mt-0.5">{lever.name}</h3>
+                    </div>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0" style={{ backgroundColor: prio.bg, color: prio.text }}>{lever.priority}</span>
+                  </div>
+                  <div className="px-4 py-3 rounded-lg text-sm font-medium" style={{ backgroundColor: "#FEFCE8", borderLeft: "3px solid #EAB308" }}>
+                    {lever.message_text}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                    <div><p className="text-gray-400 font-bold uppercase tracking-wider mb-1">{t.nudgeLabelChannelTiming as string}</p><p className="text-gray-600">{lever.channel} · {lever.timing}</p></div>
+                    <div><p className="text-gray-400 font-bold uppercase tracking-wider mb-1">{t.nudgeLabelImpact as string}</p><p className="text-gray-600">{lever.expected_impact} · {lever.implementation_effort}</p></div>
+                    <div><p className="text-gray-400 font-bold uppercase tracking-wider mb-1">{t.nudgeLabelPrimary as string}</p><div className="flex flex-wrap gap-1">{lever.target_segments.map((s, j) => <span key={j} className="px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700">{s}</span>)}</div></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Section D — Intervention Plan */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="nudge-section-plan">
+        <div className="px-5 py-3 border-b border-gray-100" style={{ backgroundColor: "#F8FAFF" }}>
+          <h2 className="font-bold text-gray-800 text-sm">{t.nudgeSectionPlan as string}</h2>
+        </div>
+        <div className="p-5 space-y-4">
+          {report.intervention_plan.recommended_sequence?.length > 0 && (
+            <div>
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">{t.nudgeLabelSeq as string}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {report.intervention_plan.recommended_sequence.map((step, i) => (
+                  <span key={i} className="flex items-center gap-1.5">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-800 border border-blue-100">{step}</span>
+                    {i < report.intervention_plan.recommended_sequence.length - 1 && <span className="text-gray-300 text-xs">→</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {report.intervention_plan.quick_wins?.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">{t.nudgeLabelQuickWins as string}</p>
+                <ul className="space-y-1.5">
+                  {report.intervention_plan.quick_wins.map((w, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-700"><CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0 mt-0.5" />{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {report.intervention_plan.kpis?.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">{t.nudgeLabelKpis as string}</p>
+                <ul className="space-y-1.5">
+                  {report.intervention_plan.kpis.map((kpi, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-700"><Activity className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />{kpi}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          <div className="px-4 py-3 rounded-lg flex items-center gap-3" style={{ backgroundColor: "#0D2E5C10", borderLeft: "3px solid #0D2E5C" }}>
+            <TrendingUp className="w-4 h-4 flex-shrink-0" style={{ color: "#0D2E5C" }} />
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.nudgeLabelLift as string}</p>
+              <p className="text-sm font-semibold" style={{ color: "#0D2E5C" }}>{report.intervention_plan.estimated_lift}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Download */}
+      <button
+        onClick={() => generateNudgeExcel(report)}
+        className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
+        style={{ backgroundColor: "#2E7D32" }}
+        data-testid="button-download-nudge-report"
+      >
+        <Download className="w-4 h-4" />
+        {t.nudgeDownload as string}
+      </button>
+    </div>
+  );
+}
+
 function ThreadCard({
   thread, idx, isCollapsed, onToggle, tag, isRtl, t, lang,
   isActiveStreaming, liveSteps, completedSteps, streamingContent, timeTick,
   summaryOverride, onDownloadResult, dataModel, dqAnalysis, informaticaOutput, insightsReport,
-  allInsightsReports, profiledColumns = [], uploadedFileName, onAskFollowUp,
+  allInsightsReports, profiledColumns = [], uploadedFileName, onAskFollowUp, nudgeReport,
 }: {
   thread: ThreadPair; idx: number; isCollapsed: boolean; onToggle: () => void;
   tag: string | null; isRtl: boolean; t: Translation; lang: Lang;
@@ -2519,6 +3168,7 @@ function ThreadCard({
   allInsightsReports?: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
   profiledColumns?: BackendColumnProfile[]; uploadedFileName?: string | null;
   onAskFollowUp?: (text: string) => void;
+  nudgeReport?: NudgeReport | null;
 }) {
   const { userMsg, assistantMsg } = thread;
   const { displayText, fileName: attachedFile } = stripExcelContent(userMsg.content);
@@ -2531,6 +3181,7 @@ function ThreadCard({
   const hasInformatica = informaticaOutput != null;
   const hasInsights = insightsReport != null;
   const hasSummary = !!summaryOverride;
+  const hasNudge = nudgeReport != null;
 
   const isDone = !!assistantMsg && !isActiveStreaming;
   const stepsToShow = isActiveStreaming
@@ -2838,7 +3489,11 @@ function ThreadCard({
                 </div>
               )}
 
-              {!hasSummary && !hasDataModel && !hasDqAnalysis && !hasInsights && (() => {
+              {hasNudge && nudgeReport && (
+                <NudgeResultCard report={nudgeReport} t={t} />
+              )}
+
+              {!hasSummary && !hasDataModel && !hasDqAnalysis && !hasInsights && !hasNudge && (() => {
                 const hasStructuredJson = /```(?:json)?\s*[\s\S]*?"(?:analysis_summary|scan_summary|fact_tables|report_title|informatica_sql)"/.test(assistantMsg.content);
                 if (hasStructuredJson) {
                   return (

@@ -29,15 +29,27 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 - ✅ Mobile-responsive layout (sidebar and outputs become slide-in drawers)
 - ✅ RTL layout flip for Arabic language
 
-### 3-Agent Navigation
-- ✅ Agent mode tabs below header: Data Management / Analytical Model / Insights Agent
-- ✅ Active tab highlighted (navy bg, white text)
+### 4-Agent Navigation
+- ✅ Agent mode tabs below header: Data Management / Analytical Model / Insights Agent / **Nudge Agent**
+- ✅ Active tab highlighted (navy bg, white text); Nudge Agent tab uses purple accent (#7C3AED)
 - ✅ Feature cards and quick-action pills filtered by active agent mode
 - ✅ Switching agent mode clears active conversation and resets result state
 - ✅ Dynamic "New Session" button label per agent mode:
   - Data Management → "New Data Management Agent"
   - Analytical Model → "New Analytical Data Model Agent"
   - Insights Agent → "New Insight Report Agent"
+  - Nudge Agent → "New Nudge Agent"
+
+### Nudge Agent Integration (4th Mode)
+- ✅ `agentMode` type extended to include `"nudge"` in `chat.tsx`
+- ✅ Nudge Agent tab changed from `<Link href="/nudge">` to mode-switching `<button>` 
+- ✅ Empty-state hero for Nudge mode: 4 scenario feature cards + example prompts (EN + AR)
+- ✅ `sendMessage` nudge branch: POST to `/api/nudge`, animated loading steps, optimistic thread insertion
+- ✅ `nudgeReports` state (`Record<number, NudgeReport>`) persists parsed results keyed by assistant message ID
+- ✅ `NudgeResultCard` component inline in `chat.tsx`: Summary Banner, Diagnosis, Segments table, Levers, Intervention Plan
+- ✅ Excel export per thread: "Download Nudge Report" → `nudge_report_[timestamp].xlsx` (5 sheets)
+- ✅ Session persistence: nudge conversations saved to DB with `agentMode: "nudge"`, listed in sidebar
+- ✅ `/nudge` route redirects to `/` via wouter `<Redirect>`; standalone nudge page removed from routing
 
 ### Session Management
 - ✅ Per-agent-mode isolated session lists (DB-backed `agent_mode` column)

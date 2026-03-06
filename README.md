@@ -76,18 +76,16 @@ A fully-browsable in-app documentation page covering all agent capabilities. Acc
 - No backend required — purely static content rendered client-side
 - Replaced the old broken BookOpen download link (pointing to a non-existent `/user-guide.html`)
 
-### 10. Nudge Agent (`/nudge`)
-A standalone behavioural economics tool for ZATCA tax compliance professionals. Takes a free-form compliance scenario, calls Claude as a senior behavioural economist, and produces structured 4-section results:
-- **First-load view**: 3 info cards (Diagnose / Segment / Map Levers) + example scenarios text block
+### 10. Nudge Agent (4th Agent Mode — integrated in main chat)
+A behavioural economics tool for ZATCA tax compliance professionals, integrated as a 4th agent mode directly in `chat.tsx`. Navigating to `/nudge` redirects to `/`. Access via the **Nudge Agent** tab in the agent mode bar:
+- **Integrated mode**: same 3-panel layout, sidebar session persistence, command console, and thread view as other agent modes
+- **Empty-state feature cards**: 4 scenario examples (Non-Filing SMEs, Late VAT Payments, Low Zakat Declarations, Penalty Avoidance)
 - **Animated loading steps**: 6-step progress checklist (Reading → Diagnosing → Segmenting → Mapping → Building → Generating)
-- **4 result sections**: Diagnosis | Taxpayer Segments | Behavioral Levers | Intervention Plan
+- **Inline NudgeResultCard**: renders 4 sections within the thread — (A) Diagnosis (root causes, emotional drivers, friction points), (B) Taxpayer Segments table, (C) Behavioral Levers (yellow highlight boxes), (D) Intervention Plan
 - **Summary banner**: 5 stat tiles (Root Cause, Segments, Levers, Quick Wins, Est. Lift) — ZATCA navy background
-- **Lever messages**: word-for-word nudge text displayed in yellow highlight boxes
-- **Excel export**: `nudge_report_[timestamp].xlsx` with 5 sheets (executive_summary, diagnosis, population_segments, behavioral_levers, intervention_plan); ZATCA blue headers, color-coded cells, auto-width
-- **Follow-up Q&A**: keep asking questions about the generated report
-- **Error handling**: invalid JSON → "Something went wrong. Please try rephrasing your scenario."
-- **Isolated from result.xlsx** — never reads or writes to the main agent's result file
-- Full EN + AR translations with RTL layout; sidebar link from main agent
+- **Excel export**: "Download Nudge Report" button per thread → `nudge_report_[timestamp].xlsx` with 5 sheets
+- **Session persistence**: nudge conversations saved to DB with `agentMode: "nudge"`, listed in sidebar
+- Full EN + AR translations with RTL layout
 
 ---
 
