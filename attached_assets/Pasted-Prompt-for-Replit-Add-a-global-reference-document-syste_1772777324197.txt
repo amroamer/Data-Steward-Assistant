@@ -1,0 +1,164 @@
+Prompt for Replit:
+Add a global reference document system to the app. This allows a document to be uploaded once and automatically included in every Claude API call in data management agent page only 
+
+Where to Add the Upload UI
+Add a "Reference Document" section at the bottom of the left sidebar, above the session list. It should show:
+
+A small header: "📎 Reference Document"
+An upload button: "Upload Document" — accepts PDF and plain text files only
+Once a file is uploaded show: a file icon, the filename, file size, and a remove button (✕)
+A small status indicator: 🟢 "Active — included in all Claude calls" when a document is loaded, or 🔘 "No document loaded" when empty
+The document upload persists for the entire session — it does not reset when the user switches pages or starts a new chat
+
+
+How to Store the Document
+When the user uploads a document:
+
+If it is a PDF: convert it to base64 and store it in a top-level React state variable called referenceDocument
+If it is a plain text or txt file: read it as a string and store it the same way
+Store both the content and the metadata:
+
+javascriptconst [referenceDocument, setReferenceDocument] = useState({
+  filename: "",
+  fileType: "pdf | text",
+  content: "",        // base64 string for PDF, raw text for txt
+  uploadedAt: "",
+  sizeKb: 0
+});
+
+When the user clicks the remove button reset referenceDocument to null
+
+
+Update the Shared callClaude() Wrapper
+Update the existing callClaude() function so that every time it is called it automatically checks whether a reference document is loaded. If one is loaded it injects the document into the messages array before the user message.
+Replace the current callClaude() function with this updated version:
+javascriptasync function callClaude(userPrompt, conversationHistory = [], returnJson = false, referenceDocument = null) {
+
+  let messages = [...conversationHistory];
+
+  // If a reference document is loaded, inject it as the first user message
+  if (referenceDocument) {
+    if (referenceDocument.fileType === "pdf") {
+      messages = [
+        {
+          role: "user",
+          content: [
+            {
+              type: "document",
+              source: {
+                type: "base64",
+                media_type: "application/pdf",
+                data: referenceDocument.content
+              },
+              cache_control: { type: "ephemeral" }
+            },
+            {
+              type: "text",
+              text: `This is a reference document called "${referenceDocument.filename}". Use it as background context for all your responses in this session. Always consider its contents when generating analysis, rules, classifications, or recommendations.`
+            }
+          ]
+        },
+        { role: "assistant", content: "Understood. I have read the reference document and will consider its contents in all my responses." },
+        ...conversationHistory,
+        { role: "user", content: userPrompt }
+      ];
+    } else {
+      // Plain text document
+      messages = [
+        {
+          role: "user",
+          content: `This is a reference document called "${referenceDocument.filename}". Use it as background context for all your responses in this session. Always consider its contents when generating analysis, rules, classifications, or recommendations.\n\nDOCUMENT CONTENT:\n${referenceDocument.content}`
+        },
+        { role: "assistant", content: "Understood. I have read the reference document and will consider its contents in all my responses." },
+        ...conversationHistory,
+        { role: "user", content: userPrompt }
+      ];
+    }
+  } else {
+    messages = [
+      ...conversationHistory,
+      { role: "user", content: userPrompt }
+    ];
+  }
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      system: ZATCA_SYSTEM_PROMPT,
+      messages: messages
+    })
+  });
+
+  const data = await response.json();
+  const text = data.content
+    .filter(b => b.type === "text")
+    .map(b => b.text)
+    .join("");
+
+  if (returnJson) {
+    const cleaned = text.replace(/```json|```/g, "").trim();
+    return JSON.parse(cleaned);
+  }
+
+  return text;
+}
+```
+
+Pass `referenceDocument` from the global React state into every `callClaude()` call across the entire app.
+
+---
+
+**What the Reference Document Is For**
+
+The reference document is intended to give Claude additional organizational context that applies to all analyses. Examples of what a user might upload:
+
+- ZATCA internal data governance policy document
+- A data dictionary or glossary PDF
+- A regulatory circular from SDAIA or ZATCA
+- A specific tax law or compliance framework document
+- An internal data standards document
+
+Claude should use this document as background context — not as the primary input — when generating data quality rules, classifications, business definitions, nudge strategies, insights, or any other analysis.
+
+---
+
+**Update the ZATCA System Prompt**
+
+Add one line to the end of the existing `ZATCA_SYSTEM_PROMPT` constant:
+```
+6. REFERENCE DOCUMENT
+If a reference document has been provided at the start of this conversation, always consider its contents when generating any analysis or recommendation. If the document contains definitions, policies, standards, or rules that are relevant to the user's request, prioritize them over general knowledge. If the user asks a question that is directly answered by the reference document, cite it explicitly in your response.
+
+Passing the Reference Document to All Features
+Update every feature call across both pages to pass the reference document:
+javascript// Every callClaude call in the app should now include referenceDocument
+callClaude(prompt, [], true, referenceDocument)
+callClaude(followUp, sessionHistory, false, referenceDocument)
+This applies to all features without exception:
+
+Business Definitions
+Data Classification
+Data Quality Rules
+PII Scan
+PII Anonymization
+Informatica DQ Logic
+All follow-up questions on those pages
+
+
+Sidebar Visual Behavior
+
+When no document is loaded: the upload button is prominent with a dashed border
+When a document is loaded: show the filename truncated to 25 characters, file size in KB, upload timestamp, green active indicator, and a red ✕ remove button
+If the user tries to upload a file that is not PDF or TXT show an inline error: "Only PDF and TXT files are supported as reference documents"
+If the uploaded PDF is over 10MB show: "File too large. Please upload a document under 10MB"
+In Arabic mode translate all sidebar labels for this section using the existing translations object
+
+
+What Must Not Change
+
+The ZATCA_SYSTEM_PROMPT content stays exactly as it is — only rule number 6 is added at the end
+All existing feature logic, Excel generation, UI layout, session state, and page routing stays exactly as it is
+The reference document is optional — if no document is uploaded everything works exactly as before
