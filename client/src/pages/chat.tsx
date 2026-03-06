@@ -811,7 +811,7 @@ function SidebarContent({
                         </>
                       )}
                     </div>
-                    <div className="flex items-center gap-0.5 opacity-40 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <div className={`flex items-center gap-0.5 transition-opacity flex-shrink-0 ${activeConversationId === conv.id ? "opacity-80" : "opacity-50 group-hover:opacity-100"}`}>
                       <Button
                         size="icon"
                         variant="ghost"
