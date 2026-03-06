@@ -13,7 +13,7 @@ Preferred communication style: Simple, everyday language.
 ### Frontend — 3-Panel Command Center Layout
 - **Framework**: React 18 with TypeScript, using Vite for bundling.
 - **UI Layout**: Three-panel "AI Agent Command Center":
-  - **Left Sidebar** (240px fixed, dark navy `#0D2E5C`): ZATCA branding, agent status pill (Idle/Thinking/Executing/Done), session list with hover-reveal trash icons, "New Session" button.
+  - **Left Sidebar** (240px fixed, dark navy `#0D2E5C`): ZATCA branding, agent status pill (Idle/Thinking/Executing/Done), session list with rename (pencil) + delete (trash) icons (opacity-40, full opacity on hover), inline title editing on pencil click, "New Session" button.
   - **Center Panel** (flex-grow, `#F4F6F9` dot grid bg): Activity cards for user commands and agent responses, capabilities dashboard on first load, command console at bottom.
   - **Right Panel** (300px fixed, white bg): Live outputs section (result.xlsx download), sheet tracker (color-coded tags), activity timeline.
 - **UI/UX**: `shadcn/ui` components based on Radix UI and styled with Tailwind CSS. Custom CSS animations: `slide-up`, `pop-in`, `pulse-status`, `ripple-button`. Inter as primary font, Courier New for command console.
@@ -27,7 +27,13 @@ Preferred communication style: Simple, everyday language.
     - **Standalone Insights Report**: Generates comprehensive, styled Excel reports with executive summaries, key insights, column profiles, recommendations, and data quality flags.
     - **Agent Activity Cards**: Replace chat bubbles — `UserCommandCard` (blue left border, command label, timestamp), `AgentResponseCard` (green border when done, status badge, summary, metrics, download buttons, expand/collapse), `ThinkingProgressCard` (multi-step progress tracker during streaming).
     - **Capabilities Dashboard**: First-load view with 2x3 feature card grid, "Start" buttons that pre-fill the command console, and a drag-and-drop upload zone.
-    - **Command Console**: Dark navy (`#0D2E5C`) input bar with monospace font, Execute button (`#2E7D32`), file upload, language toggle. Quick action pills above when in active conversation.
+    - **Command Console**: Dark navy (`#0D2E5C`) input bar with monospace font, Execute button (`#2E7D32`), file upload (paperclip), text paste toggle (Type icon), language toggle, User Guide download (BookOpen icon). Quick action pills above when in active conversation, filtered by active agent mode.
+    - **3-Agent Navigation Bar**: Below top header — tabs for "Data Management" (Database icon), "Analytical Model" (Layers icon), "Insights Agent" (Brain icon). Active tab = navy bg, white text. Controls which feature cards and pills are shown.
+    - **Collapse Outputs Panel**: Header button (PanelRightClose/PanelRightOpen) toggles the right outputs panel. Panel disappears and center expands.
+    - **Text Paste Mode**: Type icon in command console reveals a textarea for pasting raw field names or CSV data, appended to message as `--- Pasted Data ---` block.
+    - **File Preview (ExcelPreview)**: Eye icon next to uploaded file name opens a full-screen modal with SheetJS-rendered table (first 200 rows, sheet tabs, sticky headers, alternating row colors).
+    - **Activity Tracker Fix**: `resetResultState()` no longer clears `activityLog`. Only conversation-switch and new-chat clear activity.
+    - **Rename Conversations**: PATCH `/api/conversations/:id` endpoint; pencil icon in sidebar triggers inline input; Enter/blur saves, Escape cancels.
     - **Feature Cards**: Clicking pre-fills command console textarea and focuses it (no longer auto-sends).
 - **ZATCA Branding**: Primary palette — green `#067647`, teal `#51BAB4`, blue `#0094D3`, purple `#774896`, dark blue `#1A4B8C`, gray `#575756`. Download buttons `#2E7D32`. Command center navy `#0D2E5C`. ZATCA blue accents `#2563EB`.
 

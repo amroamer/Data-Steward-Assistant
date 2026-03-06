@@ -40,6 +40,8 @@ import {
   Database,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   GripVertical,
   ScanEye,
   Globe,
@@ -57,6 +59,11 @@ import {
   AlertCircle,
   Folder,
   Tag,
+  Pencil,
+  Eye,
+  Type,
+  Brain,
+  Layers,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -82,6 +89,7 @@ import {
   generateDqAnalysisSummary,
 } from "@/lib/result-store";
 import DataModelDiagram from "@/components/DataModelDiagram";
+import ExcelPreview from "@/components/ExcelPreview";
 import {
   type InsightsReport,
   type BackendColumnProfile,
@@ -210,6 +218,18 @@ const translations = {
     followUp: "Ask Follow-up",
     excelFile: "Excel File:",
     downloadUserGuide: "Download User Guide",
+    renameConversation: "Rename",
+    collapseOutputs: "Hide Outputs",
+    expandOutputs: "Show Outputs",
+    pasteTextMode: "Paste text data",
+    pasteTextPlaceholder: "Paste field names or a data table here (e.g. column names, CSV rows)...",
+    agentInsights: "Insights Agent",
+    agentInsightsDesc: "Generate data insights reports from uploaded data",
+    agentDataMgmt: "Data Management",
+    agentDataMgmtDesc: "Classify, define, quality rules & PII detection",
+    agentDataModel: "Analytical Model",
+    agentDataModelDesc: "Design star schema & generate DDL scripts",
+    previewFile: "Preview file",
   },
   ar: {
     newChat: "وكيل مالك بيانات جديد",
@@ -322,6 +342,18 @@ const translations = {
     followUp: "متابعة",
     excelFile: "ملف Excel:",
     downloadUserGuide: "تنزيل دليل المستخدم",
+    renameConversation: "إعادة تسمية",
+    collapseOutputs: "إخفاء المخرجات",
+    expandOutputs: "إظهار المخرجات",
+    pasteTextMode: "لصق بيانات نصية",
+    pasteTextPlaceholder: "الصق أسماء الحقول أو جدول البيانات هنا...",
+    agentInsights: "وكيل الرؤى",
+    agentInsightsDesc: "إنشاء تقارير رؤى البيانات من الملفات المحملة",
+    agentDataMgmt: "إدارة البيانات",
+    agentDataMgmtDesc: "تصنيف، تعريف، قواعد الجودة وكشف البيانات الشخصية",
+    agentDataModel: "النموذج التحليلي",
+    agentDataModelDesc: "تصميم مخطط نجمي وإنشاء سكريبتات DDL",
+    previewFile: "معاينة الملف",
   },
 } as const;
 
@@ -346,6 +378,7 @@ const FEATURE_CARDS = [
     color: "text-[#067647]",
     bg: "bg-[#067647]/5",
     iconBg: "bg-[#067647]/10",
+    agentMode: "data-management" as const,
   },
   {
     icon: BookOpen,
@@ -355,6 +388,7 @@ const FEATURE_CARDS = [
     color: "text-[#51BAB4]",
     bg: "bg-[#51BAB4]/5",
     iconBg: "bg-[#51BAB4]/10",
+    agentMode: "data-management" as const,
   },
   {
     icon: CheckCircle,
@@ -364,6 +398,7 @@ const FEATURE_CARDS = [
     color: "text-[#774896]",
     bg: "bg-[#774896]/5",
     iconBg: "bg-[#774896]/10",
+    agentMode: "data-management" as const,
   },
   {
     icon: Database,
@@ -373,6 +408,7 @@ const FEATURE_CARDS = [
     color: "text-[#0094D3]",
     bg: "bg-[#0094D3]/5",
     iconBg: "bg-[#0094D3]/10",
+    agentMode: "data-model" as const,
   },
   {
     icon: ScanEye,
@@ -382,6 +418,7 @@ const FEATURE_CARDS = [
     color: "text-red-600",
     bg: "bg-red-50",
     iconBg: "bg-red-100",
+    agentMode: "data-management" as const,
   },
   {
     icon: BarChart3,
@@ -391,6 +428,7 @@ const FEATURE_CARDS = [
     color: "text-[#1A4B8C]",
     bg: "bg-[#1A4B8C]/5",
     iconBg: "bg-[#1A4B8C]/10",
+    agentMode: "insights" as const,
   },
 ];
 
@@ -632,6 +670,11 @@ function SidebarContent({
   setShowClearAllConfirm,
   handleDeleteAllConversations,
   agentStatus,
+  editingConvId,
+  setEditingConvId,
+  editTitle,
+  setEditTitle,
+  handleSaveRename,
 }: {
   t: Translation;
   conversations: Conversation[];
@@ -649,6 +692,11 @@ function SidebarContent({
   setShowClearAllConfirm: (v: boolean) => void;
   handleDeleteAllConversations: () => void;
   agentStatus: AgentStatus;
+  editingConvId: number | null;
+  setEditingConvId: (id: number | null) => void;
+  editTitle: string;
+  setEditTitle: (t: string) => void;
+  handleSaveRename: (id: number) => void;
 }) {
   const statusConfig = STATUS_COLORS[agentStatus];
   const statusLabel = agentStatus === "idle" ? t.agentIdle : agentStatus === "thinking" ? t.agentThinking : agentStatus === "executing" ? t.agentExecuting : t.agentDone;
@@ -733,32 +781,65 @@ function SidebarContent({
                   </div>
                 ) : (
                   <div
-                    className="group flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer text-sm transition-colors"
+                    className="group flex items-center gap-1 rounded-md px-2 py-2 cursor-pointer text-sm transition-colors"
                     style={{
                       backgroundColor: activeConversationId === conv.id ? "#1A4B8C" : "transparent",
                       color: activeConversationId === conv.id ? "#ffffff" : "rgba(255,255,255,0.6)",
                     }}
-                    onClick={() => setActiveConversationId(conv.id)}
+                    onClick={() => editingConvId !== conv.id && setActiveConversationId(conv.id)}
                     onMouseEnter={(e) => { if (activeConversationId !== conv.id) e.currentTarget.style.backgroundColor = "#1A4B8C50"; }}
                     onMouseLeave={(e) => { if (activeConversationId !== conv.id) e.currentTarget.style.backgroundColor = "transparent"; }}
                   >
                     <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
-                    <div className="truncate flex-1">
-                      <span className="text-[13px] block truncate">{conv.title}</span>
-                      <span className="text-[10px] opacity-50">{new Date(conv.createdAt).toLocaleDateString()}</span>
+                    <div className="flex-1 min-w-0">
+                      {editingConvId === conv.id ? (
+                        <input
+                          autoFocus
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") { e.preventDefault(); handleSaveRename(conv.id); }
+                            if (e.key === "Escape") { e.preventDefault(); setEditingConvId(null); }
+                          }}
+                          onBlur={() => handleSaveRename(conv.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-full bg-white/10 text-white text-[12px] rounded px-2 py-0.5 outline-none border border-white/20"
+                          data-testid={`input-rename-${conv.id}`}
+                        />
+                      ) : (
+                        <>
+                          <span className="text-[13px] block truncate">{conv.title}</span>
+                          <span className="text-[10px] opacity-50">{new Date(conv.createdAt).toLocaleDateString()}</span>
+                        </>
+                      )}
                     </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="opacity-0 group-hover:opacity-100 h-6 w-6 flex-shrink-0 text-white/40 hover:text-red-400 hover:bg-white/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeletingConvId(conv.id);
-                      }}
-                      data-testid={`button-delete-conversation-${conv.id}`}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
+                    <div className="flex items-center gap-0.5 opacity-40 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-5 w-5 text-white/60 hover:text-teal-300 hover:bg-white/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingConvId(conv.id);
+                          setEditTitle(conv.title);
+                        }}
+                        data-testid={`button-rename-conversation-${conv.id}`}
+                      >
+                        <Pencil className="w-2.5 h-2.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-5 w-5 text-white/60 hover:text-red-400 hover:bg-white/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletingConvId(conv.id);
+                        }}
+                        data-testid={`button-delete-conversation-${conv.id}`}
+                      >
+                        <Trash2 className="w-2.5 h-2.5" />
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -808,16 +889,6 @@ function SidebarContent({
             )}
           </>
         )}
-        <a
-          href="/user-guide.html"
-          download="ZATCA_Data_Owner_Agent_User_Guide.html"
-          className="flex items-center justify-center gap-2 w-full rounded-md text-white text-[12px] font-medium py-1.5 transition-opacity hover:opacity-80"
-          style={{ backgroundColor: "#51BAB4" }}
-          data-testid="link-download-user-guide"
-        >
-          <BookOpen className="w-3.5 h-3.5 flex-shrink-0" />
-          {t.downloadUserGuide}
-        </a>
         <Button
           onClick={handleNewChat}
           className="w-full justify-center gap-2 font-medium text-white ripple-button"
@@ -880,6 +951,14 @@ export default function ChatPage() {
   const [fadingOutConvId, setFadingOutConvId] = useState<number | null>(null);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
   const [fadingOutAll, setFadingOutAll] = useState(false);
+  const [editingConvId, setEditingConvId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [outputsPanelCollapsed, setOutputsPanelCollapsed] = useState(false);
+  const [agentMode, setAgentMode] = useState<"insights" | "data-management" | "data-model">("data-management");
+  const [textInputMode, setTextInputMode] = useState(false);
+  const [pastedText, setPastedText] = useState("");
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [showExcelPreview, setShowExcelPreview] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -949,7 +1028,7 @@ export default function ChatPage() {
   }, [activeConversation?.messages, streamingContent, scrollToBottom]);
 
   useEffect(() => {
-    resetResultState();
+    resetResultState(true);
     setCollapsedThreads(new Set());
   }, [activeConversationId]);
 
@@ -1066,7 +1145,7 @@ export default function ChatPage() {
     }));
   }, [t]);
 
-  const resetResultState = () => {
+  const resetResultState = (clearActivity = false) => {
     setResultRows([]);
     setIncludedAnalyses([]);
     setSessionFieldNames(null);
@@ -1083,7 +1162,7 @@ export default function ChatPage() {
     setIsInsightsMode(false);
     setProfiledColumns([]);
     profiledColumnsRef.current = [];
-    setActivityLog([]);
+    if (clearActivity) setActivityLog([]);
   };
 
   const processAIResponse = (content: string, messageId?: number) => {
@@ -1194,8 +1273,11 @@ export default function ChatPage() {
     });
   };
 
-  const sendMessage = async (content: string, file?: File | null) => {
-    if (!content.trim() && !file) return;
+  const sendMessage = async (content: string, file?: File | null, extraText?: string) => {
+    if (!content.trim() && !file && !extraText?.trim()) return;
+    const finalContent = extraText?.trim()
+      ? `${content}\n\n--- Pasted Data ---\n${extraText.trim()}`
+      : content;
 
     let conversationId = activeConversationId;
     if (!conversationId) {
@@ -1208,6 +1290,8 @@ export default function ChatPage() {
     setStreamingContent("");
     setInputValue("");
     setSelectedFile(null);
+    setPastedText("");
+    setTextInputMode(false);
     setAgentStatus("thinking");
     setThinkingSteps(getThinkingStepsForCommand(content));
     addActivityEntry("📤", `${t.commandLabel} ${content.substring(0, 40)}...`);
@@ -1219,7 +1303,7 @@ export default function ChatPage() {
           id: Date.now(),
           conversationId,
           role: "user",
-          content: file ? `${content}\n\nUploaded: ${file.name}` : content,
+          content: file ? `${finalContent}\n\nUploaded: ${file.name}` : finalContent,
           createdAt: new Date().toISOString(),
         };
         return old
@@ -1230,7 +1314,7 @@ export default function ChatPage() {
 
     try {
       const formData = new FormData();
-      formData.append("content", content);
+      formData.append("content", finalContent);
       if (file) {
         formData.append("file", file);
       }
@@ -1409,7 +1493,7 @@ export default function ChatPage() {
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (isStreaming) return;
-    sendMessage(inputValue, selectedFile);
+    sendMessage(inputValue, selectedFile, pastedText || undefined);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -1481,12 +1565,30 @@ export default function ChatPage() {
     sendMessage(prompt, selectedFile);
   };
 
+  const renameConversation = useMutation({
+    mutationFn: async ({ id, title }: { id: number; title: string }) => {
+      await apiRequest("PATCH", `/api/conversations/${id}`, { title });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      setEditingConvId(null);
+    },
+  });
+
+  const handleSaveRename = (id: number) => {
+    if (editTitle.trim()) {
+      renameConversation.mutate({ id, title: editTitle.trim() });
+    } else {
+      setEditingConvId(null);
+    }
+  };
+
   const handleNewChat = () => {
     setActiveConversationId(null);
     setInputValue("");
     setSelectedFile(null);
     setStreamingContent("");
-    resetResultState();
+    resetResultState(true);
     setCollapsedThreads(new Set());
   };
 
@@ -1550,6 +1652,11 @@ export default function ChatPage() {
     setShowClearAllConfirm,
     handleDeleteAllConversations,
     agentStatus,
+    editingConvId,
+    setEditingConvId,
+    editTitle,
+    setEditTitle,
+    handleSaveRename,
   };
 
   return (
@@ -1612,6 +1719,10 @@ export default function ChatPage() {
             />
           </div>
         </>
+      )}
+
+      {showExcelPreview && selectedFile && (
+        <ExcelPreview file={selectedFile} onClose={() => setShowExcelPreview(false)} />
       )}
 
       {!isMobile && !sidebarCollapsed && (
@@ -1678,6 +1789,16 @@ export default function ChatPage() {
               </Button>
             </div>
           )}
+          <a
+            href="/user-guide.html"
+            download="ZATCA_Data_Owner_Agent_User_Guide.html"
+            title={t.downloadUserGuide}
+            data-testid="link-download-user-guide"
+          >
+            <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0">
+              <BookOpen className="w-3.5 h-3.5" />
+            </Button>
+          </a>
           <Button
             size="sm"
             variant="ghost"
@@ -1688,6 +1809,18 @@ export default function ChatPage() {
             <Globe className="w-3.5 h-3.5" />
             {lang === "en" ? "EN" : "AR"}
           </Button>
+          {!isMobile && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setOutputsPanelCollapsed(v => !v)}
+              className="h-8 w-8 flex-shrink-0"
+              title={outputsPanelCollapsed ? t.expandOutputs : t.collapseOutputs}
+              data-testid="button-toggle-outputs-panel"
+            >
+              {outputsPanelCollapsed ? <PanelRightOpen className="w-4 h-4" /> : <PanelRightClose className="w-4 h-4" />}
+            </Button>
+          )}
           {isMobile && (
             <Button
               size="icon"
@@ -1701,17 +1834,59 @@ export default function ChatPage() {
           )}
         </div>
 
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <ScrollArea className="h-full">
+        {!isMobile && (
+          <div className="flex items-center gap-1 px-4 py-2 border-b flex-shrink-0 bg-white" style={{ borderColor: "#E5E7EB" }} data-testid="agent-mode-tabs">
+            {([
+              { id: "data-management", icon: Database, labelKey: "agentDataMgmt", descKey: "agentDataMgmtDesc", color: "#0094D3" },
+              { id: "data-model", icon: Layers, labelKey: "agentDataModel", descKey: "agentDataModelDesc", color: "#774896" },
+              { id: "insights", icon: Brain, labelKey: "agentInsights", descKey: "agentInsightsDesc", color: "#067647" },
+            ] as const).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setAgentMode(tab.id)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                style={{
+                  backgroundColor: agentMode === tab.id ? "#0D2E5C" : "transparent",
+                  color: agentMode === tab.id ? "white" : "#6B7280",
+                }}
+                data-testid={`tab-agent-${tab.id}`}
+              >
+                <tab.icon className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{t[tab.labelKey] as string}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex-1 min-h-0 overflow-hidden relative">
+          {isDraggingOver && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-blue-50/90 border-2 border-dashed border-blue-400 rounded-lg pointer-events-none">
+              <Upload className="w-10 h-10 mb-3 text-blue-400" />
+              <p className="text-sm font-medium text-blue-600">Drop file here to upload</p>
+            </div>
+          )}
+          <ScrollArea className="h-full"
+            onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
+            onDragEnter={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
+            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDraggingOver(false); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDraggingOver(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) handleFileChange({ target: { files: e.dataTransfer.files } } as any);
+            }}
+          >
             <div className="max-w-4xl mx-auto w-full px-4 py-6">
               {!activeConversationId && messages.length === 0 && !isStreaming ? (
                 <div className="flex flex-col items-center justify-center pt-8">
                   <h2 className="text-2xl font-bold mb-2 tracking-tight font-main" style={{ color: "#2563EB" }} data-testid="text-hero-title">{t.whatToDo}</h2>
                   <p className="text-center mb-8 max-w-md text-sm leading-relaxed" style={{ color: "#6B7280" }}>
-                    {t.heroDescription}
+                    {agentMode === "insights" ? t.agentInsightsDesc : agentMode === "data-model" ? t.agentDataModelDesc : t.heroDescription}
                   </p>
                   <div className={`grid grid-cols-2 ${isMobile ? "" : "lg:grid-cols-3"} gap-4 w-full max-w-4xl`}>
-                    {FEATURE_CARDS.map((card, cardIdx) => (
+                    {FEATURE_CARDS.filter(c => c.agentMode === agentMode).map((card, cardIdx) => {
+                      const globalIdx = FEATURE_CARDS.indexOf(card);
+                      return (
                       <button
                         key={card.title}
                         onClick={() => {
@@ -1725,16 +1900,17 @@ export default function ChatPage() {
                         <div className={`w-10 h-10 mb-3 rounded-lg ${card.iconBg} flex items-center justify-center`}>
                           <card.icon className={`w-5 h-5 ${card.color}`} />
                         </div>
-                        <h3 className="text-sm font-semibold mb-1" style={{ color: "#1A1A2E" }}>{t[featureCardKeys[cardIdx].titleKey] as string}</h3>
+                        <h3 className="text-sm font-semibold mb-1" style={{ color: "#1A1A2E" }}>{t[featureCardKeys[globalIdx].titleKey] as string}</h3>
                         <p className="text-xs leading-relaxed mb-3" style={{ color: "#6B7280" }}>
-                          {t[featureCardKeys[cardIdx].descKey] as string}
+                          {t[featureCardKeys[globalIdx].descKey] as string}
                         </p>
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium ripple-button rounded-md px-2.5 py-1" style={{ color: "#2563EB", backgroundColor: "#2563EB10" }}>
                           <Play className="w-3 h-3" />
                           {t.startBtn}
                         </span>
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                   <div
                     className="mt-8 w-full max-w-xl border-2 border-dashed rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
@@ -1797,7 +1973,9 @@ export default function ChatPage() {
           {activeConversationId && (
             <div className="px-4 pt-2 pb-1">
               <div className="max-w-4xl mx-auto flex gap-2 flex-wrap">
-                {FEATURE_CARDS.map((card, cardIdx) => (
+                {FEATURE_CARDS.filter(c => c.agentMode === agentMode).map((card, cardIdx) => {
+                  const globalIdx = FEATURE_CARDS.indexOf(card);
+                  return (
                   <button
                     key={card.title}
                     onClick={() => {
@@ -1809,9 +1987,10 @@ export default function ChatPage() {
                     data-testid={`pill-feature-${cardIdx}`}
                   >
                     <card.icon className="w-3 h-3" />
-                    {t[featureCardKeys[cardIdx].titleKey] as string}
+                    {t[featureCardKeys[globalIdx].titleKey] as string}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1825,6 +2004,19 @@ export default function ChatPage() {
                     <FileSpreadsheet className="w-4 h-4 text-white/60 flex-shrink-0" />
                   )}
                   <span className="text-xs truncate flex-1 text-white/80 font-medium">{selectedFile.name}</span>
+                  {!selectedFile.type.startsWith("image/") && (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 flex-shrink-0 text-white/40 hover:text-teal-300 hover:bg-transparent"
+                      onClick={() => setShowExcelPreview(true)}
+                      title={t.previewFile}
+                      data-testid="button-preview-file"
+                    >
+                      <Eye className="w-3 h-3" />
+                    </Button>
+                  )}
                   <Button
                     size="icon"
                     variant="ghost"
@@ -1838,6 +2030,31 @@ export default function ChatPage() {
                   >
                     <X className="w-3 h-3" />
                   </Button>
+                </div>
+              )}
+              {textInputMode && (
+                <div className="mb-2 rounded-lg overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
+                  <div className="flex items-center justify-between px-3 py-1.5 border-b" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+                    <span className="text-xs text-white/60 font-medium">{t.pasteTextMode}</span>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-5 w-5 text-white/40 hover:text-white hover:bg-transparent"
+                      onClick={() => { setTextInputMode(false); setPastedText(""); }}
+                      data-testid="button-close-paste-mode"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <textarea
+                    value={pastedText}
+                    onChange={(e) => setPastedText(e.target.value)}
+                    placeholder={t.pasteTextPlaceholder}
+                    className="w-full bg-transparent text-white/80 text-xs p-3 resize-none outline-none placeholder:text-white/30 font-mono"
+                    rows={4}
+                    data-testid="textarea-paste-data"
+                  />
                 </div>
               )}
               <form onSubmit={handleSubmit} className="flex items-center gap-2">
@@ -1870,6 +2087,19 @@ export default function ChatPage() {
                   >
                     <Paperclip className="w-4 h-4" />
                   </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 flex-shrink-0 text-white/50 hover:text-white hover:bg-white/10"
+                    onClick={() => setTextInputMode(v => !v)}
+                    disabled={isStreaming}
+                    title={t.pasteTextMode}
+                    data-testid="button-toggle-text-input"
+                    style={{ color: textInputMode ? "#51BAB4" : undefined }}
+                  >
+                    <Type className="w-4 h-4" />
+                  </Button>
                   {isTouchDevice && (
                     <Button
                       type="button"
@@ -1900,7 +2130,7 @@ export default function ChatPage() {
                   type="submit"
                   className="h-9 px-4 flex-shrink-0 rounded-lg gap-1.5 text-xs font-medium text-white ripple-button"
                   style={{ backgroundColor: "#2E7D32" }}
-                  disabled={isStreaming || (!inputValue.trim() && !selectedFile)}
+                  disabled={isStreaming || (!inputValue.trim() && !selectedFile && !pastedText.trim())}
                   data-testid="button-send-message"
                 >
                   {isStreaming ? (
@@ -1918,8 +2148,8 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {!isMobile && (
-        <div className="w-[300px] flex-shrink-0" data-testid="outputs-panel">
+      {!isMobile && !outputsPanelCollapsed && (
+        <div className="w-[300px] flex-shrink-0 border-l" style={{ borderColor: "#E5E7EB" }} data-testid="outputs-panel">
           <OutputsPanel
             t={t}
             isRtl={isRtl}

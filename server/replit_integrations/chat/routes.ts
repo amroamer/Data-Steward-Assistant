@@ -1283,6 +1283,19 @@ export function registerChatRoutes(app: Express): void {
     }
   });
 
+  app.patch("/api/conversations/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { title } = req.body;
+      if (!title?.trim()) return res.status(400).json({ error: "Title required" });
+      await chatStorage.updateConversationTitle(id, title.trim());
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error renaming conversation:", error);
+      res.status(500).json({ error: "Failed to rename conversation" });
+    }
+  });
+
   app.delete("/api/conversations/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
