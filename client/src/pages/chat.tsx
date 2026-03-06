@@ -2205,7 +2205,12 @@ function OutputsPanel({
   insightsReports: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
   uploadedFileName: string | null; onDownloadResult: () => void; activityLog: ActivityLogEntry[]; sheetCount: number;
 }) {
-  const hasResultXlsx = resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis;
+  const [outputsExpanded, setOutputsExpanded] = useState({
+    live: true,
+    sheets: true,
+    activity: true
+  });
+
   const hasOutputs = hasResultXlsx || insightsReports.length > 0;
 
   const sheetTags: { label: string; color: string }[] = [];
@@ -2224,90 +2229,124 @@ function OutputsPanel({
 
       <ScrollArea className="flex-1">
         <div className="px-4 space-y-4">
-          <div>
-            <h3 className="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style={{ color: "#1A1A2E", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}>
-              <FileSpreadsheet className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />
-              {t.liveOutputs}
+          <div className="border-b pb-2" style={{ borderColor: "#F3F4F6" }}>
+            <h3 
+              className="text-[11px] font-semibold mb-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors" 
+              style={{ color: "#1A1A2E", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}
+              onClick={() => setOutputsExpanded(prev => ({ ...prev, live: !prev.live }))}
+            >
+              <div className="flex items-center gap-1.5">
+                <FileSpreadsheet className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />
+                {t.liveOutputs}
+              </div>
+              {outputsExpanded.live ? <ChevronDown className="w-3 h-3 text-gray-400" /> : <ChevronRight className="w-3 h-3 text-gray-400" />}
             </h3>
-            {hasOutputs ? (
-              <div className="space-y-2">
-                {hasResultXlsx && (
-                  <div
-                    className="rounded-lg border p-3 cursor-pointer hover:shadow-sm transition-shadow"
-                    style={{ borderColor: "#E5E7EB" }}
-                    onClick={onDownloadResult}
-                    data-testid="output-card-result"
-                  >
-                    <div className="flex items-center gap-2">
-                      <FileSpreadsheet className="w-5 h-5" style={{ color: "#2E7D32" }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold" style={{ color: "#1A1A2E" }}>result.xlsx</p>
-                        <p className="text-[10px]" style={{ color: "#6B7280" }}>{sheetCount} {t.sheetsInResult}{uploadedFileName ? ` — ${uploadedFileName}` : ""}</p>
+            {outputsExpanded.live && (
+              <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                {hasOutputs ? (
+                  <div className="space-y-2 px-1">
+                    {hasResultXlsx && (
+                      <div
+                        className="rounded-lg border p-3 cursor-pointer hover:shadow-sm transition-shadow bg-white"
+                        style={{ borderColor: "#E5E7EB" }}
+                        onClick={onDownloadResult}
+                        data-testid="output-card-result"
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileSpreadsheet className="w-5 h-5" style={{ color: "#2E7D32" }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold" style={{ color: "#1A1A2E" }}>result.xlsx</p>
+                            <p className="text-[10px]" style={{ color: "#6B7280" }}>{sheetCount} {t.sheetsInResult}{uploadedFileName ? ` — ${uploadedFileName}` : ""}</p>
+                          </div>
+                          <Button size="sm" className="h-7 px-2 text-[10px] text-white" style={{ backgroundColor: "#2E7D32" }} onClick={(e) => { e.stopPropagation(); onDownloadResult(); }} data-testid="button-download-result">
+                            <Download className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </div>
-                      <Button size="sm" className="h-7 px-2 text-[10px] text-white" style={{ backgroundColor: "#2E7D32" }} onClick={(e) => { e.stopPropagation(); onDownloadResult(); }} data-testid="button-download-result">
-                        <Download className="w-3 h-3" />
-                      </Button>
-                    </div>
+                    )}
+                    {insightsReports.map((rpt, i) => (
+                      <div key={i} className="rounded-lg border p-2.5 bg-white" style={{ borderColor: "#E5E7EB" }}>
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4" style={{ color: "#E65100" }} />
+                          <span className="text-[10px] truncate flex-1" style={{ color: "#1A1A2E" }}>{rpt.excelFileName}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                ) : (
+                  <p className="text-[10px] py-3 text-center" style={{ color: "#9CA3AF" }}>{t.noOutputsYet}</p>
                 )}
-                {insightsReports.map((rpt, i) => (
-                  <div key={i} className="rounded-lg border p-2.5" style={{ borderColor: "#E5E7EB" }}>
-                    <div className="flex items-center gap-2">
-                      <BarChart3 className="w-4 h-4" style={{ color: "#E65100" }} />
-                      <span className="text-[10px] truncate flex-1" style={{ color: "#1A1A2E" }}>{rpt.excelFileName}</span>
-                    </div>
-                  </div>
-                ))}
               </div>
-            ) : (
-              <p className="text-[10px] py-3 text-center" style={{ color: "#9CA3AF" }}>{t.noOutputsYet}</p>
             )}
           </div>
 
-          <div>
-            <h3 className="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style={{ color: "#1A1A2E", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}>
-              <Tag className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />
-              {t.sheetTracker}
-            </h3>
-            {sheetTags.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {sheetTags.map((tag, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white animate-pop-in"
-                    style={{ backgroundColor: tag.color, animationDelay: `${i * 80}ms` }}
-                    data-testid={`sheet-tag-${i}`}
-                  >
-                    {tag.label}
-                  </span>
-                ))}
+          <div className="border-b pb-2" style={{ borderColor: "#F3F4F6" }}>
+            <h3 
+              className="text-[11px] font-semibold mb-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors" 
+              style={{ color: "#1A1A2E", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}
+              onClick={() => setOutputsExpanded(prev => ({ ...prev, sheets: !prev.sheets }))}
+            >
+              <div className="flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />
+                {t.sheetTracker}
               </div>
-            ) : (
-              <p className="text-[10px] py-2" style={{ color: "#9CA3AF" }}>—</p>
+              {outputsExpanded.sheets ? <ChevronDown className="w-3 h-3 text-gray-400" /> : <ChevronRight className="w-3 h-3 text-gray-400" />}
+            </h3>
+            {outputsExpanded.sheets && (
+              <div className="animate-in fade-in slide-in-from-top-1 duration-200 px-1">
+                {sheetTags.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {sheetTags.map((tag, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white animate-pop-in"
+                        style={{ backgroundColor: tag.color, animationDelay: `${i * 80}ms` }}
+                        data-testid={`sheet-tag-${i}`}
+                      >
+                        {tag.label}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] py-2" style={{ color: "#9CA3AF" }}>—</p>
+                )}
+              </div>
             )}
           </div>
 
-          <div>
-            <h3 className="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style={{ color: "#1A1A2E", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}>
-              <Clock className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />
-              {t.activityTimeline}
-            </h3>
-            {activityLog.length > 0 ? (
-              <div className="space-y-0">
-                {activityLog.slice(-20).reverse().map((entry, i) => (
-                  <div key={i} className="flex items-start gap-2 py-1.5" style={{ borderLeft: isRtl ? "none" : "2px solid #E5E7EB", borderRight: isRtl ? "2px solid #E5E7EB" : "none", paddingLeft: isRtl ? 0 : 10, paddingRight: isRtl ? 10 : 0 }}>
-                    <span className="text-[11px] flex-shrink-0">{entry.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] truncate" style={{ color: "#1A1A2E" }}>{entry.text}</p>
-                      <p className="text-[9px]" style={{ color: "#9CA3AF" }}>{entry.timestamp}</p>
-                    </div>
-                  </div>
-                ))}
+          <div className="pb-4">
+            <h3 
+              className="text-[11px] font-semibold mb-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors" 
+              style={{ color: "#1A1A2E", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}
+              onClick={() => setOutputsExpanded(prev => ({ ...prev, activity: !prev.activity }))}
+            >
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />
+                {t.activityTimeline}
               </div>
-            ) : (
-              <p className="text-[10px] py-2" style={{ color: "#9CA3AF" }}>{t.noActivityYet}</p>
+              {outputsExpanded.activity ? <ChevronDown className="w-3 h-3 text-gray-400" /> : <ChevronRight className="w-3 h-3 text-gray-400" />}
+            </h3>
+            {outputsExpanded.activity && (
+              <div className="animate-in fade-in slide-in-from-top-1 duration-200 px-1">
+                {activityLog.length > 0 ? (
+                  <div className="space-y-0">
+                    {activityLog.slice(-20).reverse().map((entry, i) => (
+                      <div key={i} className="flex items-start gap-2 py-1.5" style={{ borderLeft: isRtl ? "none" : "2px solid #E5E7EB", borderRight: isRtl ? "2px solid #E5E7EB" : "none", paddingLeft: isRtl ? 0 : 10, paddingRight: isRtl ? 10 : 0 }}>
+                        <span className="text-[11px] flex-shrink-0">{entry.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] truncate" style={{ color: "#1A1A2E" }}>{entry.text}</p>
+                          <p className="text-[9px]" style={{ color: "#9CA3AF" }}>{entry.timestamp}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] py-2" style={{ color: "#9CA3AF" }}>{t.noActivityYet}</p>
+                )}
+              </div>
             )}
           </div>
+
         </div>
       </ScrollArea>
     </div>
