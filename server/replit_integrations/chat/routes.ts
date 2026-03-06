@@ -1237,9 +1237,12 @@ function buildProfileFromRows(headers: string[], dataRows: string[][]): Profiled
 }
 
 export function registerChatRoutes(app: Express): void {
-  app.get("/api/conversations", async (_req: Request, res: Response) => {
+  app.get("/api/conversations", async (req: Request, res: Response) => {
     try {
-      const conversations = await chatStorage.getAllConversations();
+      const agentMode = req.query.agentMode as string | undefined;
+      const conversations = agentMode
+        ? await chatStorage.getConversationsByMode(agentMode)
+        : await chatStorage.getAllConversations();
       res.json(conversations);
     } catch (error) {
       console.error("Error fetching conversations:", error);
@@ -1264,8 +1267,8 @@ export function registerChatRoutes(app: Express): void {
 
   app.post("/api/conversations", async (req: Request, res: Response) => {
     try {
-      const { title } = req.body;
-      const conversation = await chatStorage.createConversation(title || "New Chat");
+      const { title, agentMode } = req.body;
+      const conversation = await chatStorage.createConversation(title || "New Chat", agentMode || "data-management");
       res.status(201).json(conversation);
     } catch (error) {
       console.error("Error creating conversation:", error);
@@ -1273,9 +1276,14 @@ export function registerChatRoutes(app: Express): void {
     }
   });
 
-  app.delete("/api/conversations/all", async (_req: Request, res: Response) => {
+  app.delete("/api/conversations/all", async (req: Request, res: Response) => {
     try {
-      await chatStorage.deleteAllConversations();
+      const agentMode = req.query.agentMode as string | undefined;
+      if (agentMode) {
+        await chatStorage.deleteConversationsByMode(agentMode);
+      } else {
+        await chatStorage.deleteAllConversations();
+      }
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting all conversations:", error);

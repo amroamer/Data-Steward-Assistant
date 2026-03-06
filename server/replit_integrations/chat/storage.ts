@@ -5,10 +5,12 @@ import { eq, desc } from "drizzle-orm";
 export interface IChatStorage {
   getConversation(id: number): Promise<typeof conversations.$inferSelect | undefined>;
   getAllConversations(): Promise<(typeof conversations.$inferSelect)[]>;
-  createConversation(title: string): Promise<typeof conversations.$inferSelect>;
+  getConversationsByMode(agentMode: string): Promise<(typeof conversations.$inferSelect)[]>;
+  createConversation(title: string, agentMode?: string): Promise<typeof conversations.$inferSelect>;
   updateConversationTitle(id: number, title: string): Promise<void>;
   deleteConversation(id: number): Promise<void>;
   deleteAllConversations(): Promise<void>;
+  deleteConversationsByMode(agentMode: string): Promise<void>;
   getMessagesByConversation(conversationId: number): Promise<(typeof messages.$inferSelect)[]>;
   createMessage(conversationId: number, role: string, content: string): Promise<typeof messages.$inferSelect>;
 }
@@ -23,8 +25,12 @@ export const chatStorage: IChatStorage = {
     return db.select().from(conversations).orderBy(desc(conversations.createdAt));
   },
 
-  async createConversation(title: string) {
-    const [conversation] = await db.insert(conversations).values({ title }).returning();
+  async getConversationsByMode(agentMode: string) {
+    return db.select().from(conversations).where(eq(conversations.agentMode, agentMode)).orderBy(desc(conversations.createdAt));
+  },
+
+  async createConversation(title: string, agentMode = "data-management") {
+    const [conversation] = await db.insert(conversations).values({ title, agentMode }).returning();
     return conversation;
   },
 
@@ -42,6 +48,14 @@ export const chatStorage: IChatStorage = {
     await db.delete(conversations);
   },
 
+  async deleteConversationsByMode(agentMode: string) {
+    const convs = await db.select().from(conversations).where(eq(conversations.agentMode, agentMode));
+    for (const c of convs) {
+      await db.delete(messages).where(eq(messages.conversationId, c.id));
+    }
+    await db.delete(conversations).where(eq(conversations.agentMode, agentMode));
+  },
+
   async getMessagesByConversation(conversationId: number) {
     return db.select().from(messages).where(eq(messages.conversationId, conversationId)).orderBy(messages.createdAt);
   },
@@ -51,4 +65,3 @@ export const chatStorage: IChatStorage = {
     return message;
   },
 };
-

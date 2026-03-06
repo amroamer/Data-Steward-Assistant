@@ -967,7 +967,8 @@ export default function ChatPage() {
   const { toast } = useToast();
 
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
-    queryKey: ["/api/conversations"],
+    queryKey: ["/api/conversations", agentMode],
+    queryFn: () => fetch(`/api/conversations?agentMode=${agentMode}`).then(r => r.json()),
   });
 
   const { data: activeConversation } = useQuery<Conversation & { messages: Message[] }>({
@@ -977,11 +978,11 @@ export default function ChatPage() {
 
   const createConversation = useMutation({
     mutationFn: async (title: string) => {
-      const res = await apiRequest("POST", "/api/conversations", { title });
+      const res = await apiRequest("POST", "/api/conversations", { title, agentMode });
       return res.json();
     },
     onSuccess: (data: Conversation) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations", agentMode] });
       setActiveConversationId(data.id);
     },
   });
@@ -991,7 +992,7 @@ export default function ChatPage() {
       await apiRequest("DELETE", `/api/conversations/${id}`);
     },
     onSuccess: (_, deletedId) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations", agentMode] });
       if (activeConversationId === deletedId) {
         setActiveConversationId(null);
         resetResultState();
@@ -1005,10 +1006,10 @@ export default function ChatPage() {
 
   const deleteAllConversations = useMutation({
     mutationFn: async () => {
-      await apiRequest("DELETE", "/api/conversations/all");
+      await apiRequest("DELETE", `/api/conversations/all?agentMode=${agentMode}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations", agentMode] });
       setActiveConversationId(null);
       resetResultState();
     },
@@ -1356,7 +1357,7 @@ export default function ChatPage() {
                   setIsStreaming(false);
                   setStreamingContent("");
                   await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
-                  await queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+                  await queryClient.invalidateQueries({ queryKey: ["/api/conversations", agentMode] });
                   toast({
                     title: lang === "ar" ? "خطأ" : "Error",
                     description: data.content || (lang === "ar" ? "حدث خطأ أثناء معالجة الصورة" : "An error occurred while processing the image"),
@@ -1416,7 +1417,7 @@ export default function ChatPage() {
                     }
 
                     await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
-                    await queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+                    await queryClient.invalidateQueries({ queryKey: ["/api/conversations", agentMode] });
 
                     const convData = queryClient.getQueryData<any>(["/api/conversations", conversationId]);
                     if (convData?.messages) {
@@ -1459,7 +1460,7 @@ export default function ChatPage() {
                     }
                   } else {
                     await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
-                    await queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+                    await queryClient.invalidateQueries({ queryKey: ["/api/conversations", agentMode] });
                     const convData2 = queryClient.getQueryData<any>(["/api/conversations", conversationId]);
                     if (convData2?.messages) {
                       const lastMsg2 = convData2.messages[convData2.messages.length - 1];
@@ -1569,7 +1570,7 @@ export default function ChatPage() {
       await apiRequest("PATCH", `/api/conversations/${id}`, { title });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations", agentMode] });
       setEditingConvId(null);
     },
   });
@@ -1880,7 +1881,14 @@ export default function ChatPage() {
             ] as const).map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setAgentMode(tab.id)}
+                onClick={() => {
+                  if (agentMode !== tab.id) {
+                    setAgentMode(tab.id);
+                    setActiveConversationId(null);
+                    resetResultState(true);
+                    setCollapsedThreads(new Set());
+                  }
+                }}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                 style={{
                   backgroundColor: agentMode === tab.id ? "#0D2E5C" : "transparent",
