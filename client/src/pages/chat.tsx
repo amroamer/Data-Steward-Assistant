@@ -230,6 +230,8 @@ const translations = {
     excelFile: "Excel File:",
     downloadUserGuide: "Download User Guide",
     userGuide: "User Guide",
+    outOfScopeTitle: "Out of Scope",
+    outOfScopeBody: "This question is outside the scope of the ZATCA Data & Compliance Agent. Please ask something related to data governance, data quality, tax compliance, or behavioural analysis.",
     renameConversation: "Rename",
     collapseOutputs: "Hide Outputs",
     expandOutputs: "Show Outputs",
@@ -363,6 +365,8 @@ const translations = {
     excelFile: "ملف Excel:",
     downloadUserGuide: "تنزيل دليل المستخدم",
     userGuide: "دليل المستخدم",
+    outOfScopeTitle: "خارج النطاق",
+    outOfScopeBody: "هذا السؤال خارج نطاق وكيل البيانات والامتثال لزاتكا. يرجى طرح سؤال متعلق بحوكمة البيانات أو جودة البيانات أو الامتثال الضريبي أو التحليل السلوكي.",
     renameConversation: "إعادة تسمية",
     collapseOutputs: "إخفاء المخرجات",
     expandOutputs: "إظهار المخرجات",
@@ -503,6 +507,10 @@ const STATUS_COLORS: Record<AgentStatus, { bg: string; text: string; pulse: bool
   executing: { bg: "#E65100", text: "#ffffff", pulse: true },
   done: { bg: "#2E7D32", text: "#ffffff", pulse: false },
 };
+
+function isOutOfScope(text: string): boolean {
+  return text.includes("I am a ZATCA data and compliance consultant");
+}
 
 function detectAnalysisTag(userContent: string, assistantContent?: string, t?: Translation): string | null {
   const tr = t || translations.en;
@@ -2837,6 +2845,21 @@ function ThreadCard({
                       <div>
                         <p className="text-xs font-medium" style={{ color: "#2E7D32" }}>Analysis complete</p>
                         <p className="text-[11px]" style={{ color: "#6B7280" }}>Results are displayed in the Outputs panel. Download the Excel file to view the full report.</p>
+                      </div>
+                    </div>
+                  );
+                }
+                if (isOutOfScope(assistantMsg.content)) {
+                  return (
+                    <div
+                      className="flex items-start gap-3 p-3 rounded-lg"
+                      style={{ backgroundColor: "#FFFBEB", border: "1px solid #F59E0B" }}
+                      data-testid="card-out-of-scope"
+                    >
+                      <span className="text-lg flex-shrink-0">⚠️</span>
+                      <div>
+                        <p className="text-xs font-semibold mb-0.5" style={{ color: "#92400E" }}>{t.outOfScopeTitle}</p>
+                        <p className="text-xs leading-relaxed" style={{ color: "#78350F" }}>{t.outOfScopeBody}</p>
                       </div>
                     </div>
                   );

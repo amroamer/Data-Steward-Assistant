@@ -187,6 +187,30 @@ const t = {
           },
         ],
       },
+      {
+        id: "scope-guardrails",
+        icon: ShieldCheck,
+        color: "#DC2626",
+        title: "Scope & Guardrails",
+        content: [
+          {
+            heading: "What the agent will answer",
+            body: "The agent is scoped exclusively to ZATCA's work areas: data classification (SDAIA NDMO), business definitions, data quality rules, analytical modelling, PII detection (PDPL), data insights, Informatica metadata, and behavioural compliance analysis (Nudge Agent). All responses apply Saudi context — PDPL 2023, VAT Law, FATOORAH, SDAIA NDMO, SAR currency, Saudi business examples.",
+          },
+          {
+            heading: "What the agent will not answer",
+            body: "The agent will decline any request outside these areas — including general coding help, personal questions, news, entertainment, or topics unrelated to ZATCA's data and compliance work. Every Claude API call carries the same ZATCA consultant persona and scope rules, so this behaviour is consistent across all features.",
+          },
+          {
+            heading: "Out-of-scope warning card",
+            body: "If you ask something outside the agent's scope, you will see a yellow ⚠️ warning card instead of a normal response. The card reads 'Out of Scope' and invites you to rephrase your question within the allowed areas. The input console remains active so you can immediately ask something else.",
+          },
+          {
+            heading: "Consistent persona",
+            body: "Every response — whether a data classification table, a DQ rules JSON, a nudge analysis, or a simple follow-up answer — comes from the same expert ZATCA consultant persona. Tone, scope rules, and Saudi regulatory context are applied uniformly to all interactions.",
+          },
+        ],
+      },
     ],
   },
   ar: {
@@ -355,6 +379,30 @@ const t = {
           {
             heading: "ردود الذكاء الاصطناعي",
             body: "ردود Claude تكون دائمًا بالإنجليزية بصرف النظر عن لغة الواجهة. يتحكم زر اللغة في تسميات الواجهة والتنقل فقط، وليس في المحتوى المُولَّد بالذكاء الاصطناعي.",
+          },
+        ],
+      },
+      {
+        id: "scope-guardrails",
+        icon: ShieldCheck,
+        color: "#DC2626",
+        title: "النطاق والضوابط",
+        content: [
+          {
+            heading: "ما يجيب عنه الوكيل",
+            body: "نطاق الوكيل حصري لمجالات عمل زاتكا: تصنيف البيانات (SDAIA NDMO)، التعريفات التجارية، قواعد جودة البيانات، النمذجة التحليلية، الكشف عن البيانات الشخصية (PDPL)، الرؤى البيانية، مخرجات Informatica، وتحليل الامتثال السلوكي. تُطبَّق على جميع الردود السياق السعودي — PDPL 2023، نظام ضريبة القيمة المضافة، فاتورة، SDAIA NDMO، عملة SAR، وأمثلة الأعمال السعودية.",
+          },
+          {
+            heading: "ما لا يجيب عنه الوكيل",
+            body: "سيرفض الوكيل أي طلب خارج هذه المجالات — بما في ذلك المساعدة العامة في البرمجة، والأسئلة الشخصية، والأخبار، والترفيه، أو أي موضوع غير مرتبط بعمل زاتكا في مجال البيانات والامتثال. يحمل كل استدعاء لـ Claude نفس شخصية المستشار ونفس قواعد النطاق.",
+          },
+          {
+            heading: "بطاقة تحذير خارج النطاق",
+            body: "إذا طرحت سؤالًا خارج نطاق الوكيل، ستظهر بطاقة تحذير صفراء ⚠️ بدلًا من الاستجابة العادية. تعرض البطاقة 'خارج النطاق' وتدعوك لإعادة صياغة سؤالك ضمن المجالات المسموح بها. تبقى وحدة تحكم الإدخال نشطة حتى تتمكن من طرح سؤال آخر فورًا.",
+          },
+          {
+            heading: "شخصية متسقة",
+            body: "كل استجابة — سواء كانت جدول تصنيف بيانات، أو JSON لقواعد الجودة، أو تحليل تحفيز، أو إجابة متابعة بسيطة — تأتي من نفس شخصية مستشار زاتكا الخبير. يُطبَّق النبرة وقواعد النطاق والسياق التنظيمي السعودي بشكل موحد على جميع التفاعلات.",
           },
         ],
       },

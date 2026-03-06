@@ -88,6 +88,15 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 - ✅ `DataModelDiagram` — interactive SVG star schema visualization
 - ✅ `ExcelPreview` — full-screen modal, first 200 rows, sheet tabs, sticky headers, alternating row colors
 
+### Global System Prompt & Scope Control
+- ✅ `ZATCA_SYSTEM_PROMPT` constant defined in `server/replit_integrations/chat/routes.ts`
+- ✅ `buildSystemPrompt(featurePrompt)` helper prepends global prompt to every feature system prompt
+- ✅ All 5 Claude API call sites updated: DQ Part 1, DQ Part 2, streaming chat, Nudge follow-up, Nudge main analysis
+- ✅ Out-of-scope detection: `isOutOfScope()` helper in `chat.tsx` checks for Claude's refusal phrase
+- ✅ Yellow ⚠️ warning card rendered in ThreadCard when out-of-scope response detected (EN + AR translations)
+- ✅ Existing feature-specific prompts (DQ, Insights, Informatica, Nudge) preserved — global prompt prepended, not replacing them
+- ✅ User Guide updated with "Scope & Guardrails" section (EN + AR)
+
 ### Command Console
 - ✅ Dark navy input bar with Courier New monospace font
 - ✅ Execute button (`#2E7D32`)
@@ -162,6 +171,7 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 
 | Date | Change |
 |---|---|
+| 2026-03-06 | **Global System Prompt** — `ZATCA_SYSTEM_PROMPT` + `buildSystemPrompt()` injected into all 5 Claude call sites; out-of-scope yellow warning card on frontend (EN+AR); User Guide "Scope & Guardrails" section added |
 | 2026-03-06 | **User Guide Page** — new `/user-guide` page; 8 collapsible sections covering all agent features; EN+AR/RTL; header link next to Use Cases; replaced broken BookOpen download button |
 | 2026-03-06 | **Header Navigation** — Use Cases and User Guide links moved to header bar (next to language toggle); Use Cases link removed from sidebar; BookOpen download anchor removed |
 | 2026-03-06 | **Nudge Agent tab** — moved Nudge Agent link from sidebar to agent mode tabs bar (next to Insights Agent), with Target icon and purple color |

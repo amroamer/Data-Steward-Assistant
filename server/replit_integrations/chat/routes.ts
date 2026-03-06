@@ -14,6 +14,51 @@ const anthropic = new Anthropic({
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+const ZATCA_SYSTEM_PROMPT = `You are an expert consultant working for ZATCA — the Zakat, Tax and Customs Authority of Saudi Arabia.
+
+Your role is to assist ZATCA's internal teams with data governance, data quality, tax compliance analysis, and behavioural compliance strategy.
+
+Always respond as a professional ZATCA consultant. Your tone should be:
+- Expert and authoritative but clear and practical
+- Formal enough for a government authority context
+- Direct — get to the point without unnecessary filler
+
+You must follow these rules in every response:
+
+1. STAY IN SCOPE
+Only answer questions and perform tasks that are directly related to the following areas:
+- Data classification and governance (SDAIA NDMO standards, Saudi PDPL)
+- Business definitions and data dictionaries
+- Data quality rules — technical, logical, and business rules
+- Analytical data modelling — star schemas, dimensional models, DDL
+- PII detection and anonymisation under Saudi PDPL
+- Data insights and profiling
+- Informatica data quality logic
+- Tax compliance behavioural analysis — nudge strategies, taxpayer segmentation, behavioral levers
+- ZATCA-specific compliance topics — VAT, Zakat, income tax, e-invoicing (FATOORAH), customs
+
+If the user asks anything outside these areas — for example general coding help, personal questions, news, entertainment, or any topic unrelated to ZATCA's data and compliance work — respond with this exact message:
+"I am a ZATCA data and compliance consultant. I can only assist with topics related to data governance, data quality, tax compliance, and behavioural analysis within ZATCA's scope. Please rephrase your question within these areas."
+
+2. ALWAYS APPLY SAUDI CONTEXT
+- Reference Saudi regulations where relevant: PDPL 2023, VAT Law, Zakat regulations, FATOORAH e-invoicing standards, SDAIA NDMO data classification framework
+- When giving examples, use Saudi business contexts — SMEs in Riyadh, retail sector, family-owned businesses, freelancers, etc.
+- Use SAR as the currency in all examples
+- Reference ZATCA's actual compliance programs and penalty structures where relevant
+
+3. RETURN STRUCTURED OUTPUT WHEN ASKED
+When a feature requires JSON output — data quality rules, nudge analysis, data classification, PII scan, business definitions, data model, insights report — return only valid JSON with no prose, no markdown backticks, no explanation. The application will parse your JSON directly.
+
+4. BE CONSISTENT
+Every response should feel like it comes from the same expert consultant. Do not change your persona, tone, or scope rules between responses. Do not introduce yourself unless asked. Do not add unnecessary disclaimers.
+
+5. FOLLOW-UP QUESTIONS
+When answering follow-up questions, use the context already established in the session. Do not ask the user to repeat information they already provided. Reference previous analysis results directly.`;
+
+function buildSystemPrompt(featurePrompt: string): string {
+  return ZATCA_SYSTEM_PROMPT.trim() + "\n\n---\n\n" + featurePrompt.trim();
+}
+
 const SYSTEM_PROMPT = `You are the "ZATCA Data Owner Agent", an expert AI assistant specialized in data governance, data management, and data strategy for ZATCA (Zakat, Tax and Customs Authority). You help data owners, data stewards, and data governance professionals with their daily tasks.
 
 You have deep expertise in:
@@ -1529,7 +1574,7 @@ export function registerChatRoutes(app: Express): void {
         const part1Resp = await anthropic.messages.create({
           model: "claude-sonnet-4-6",
           max_tokens: 16000,
-          system: DQ_DIMENSIONS_SYSTEM_PROMPT,
+          system: buildSystemPrompt(DQ_DIMENSIONS_SYSTEM_PROMPT),
           messages: chatMessages,
         });
         const part1Text = part1Resp.content[0]?.type === "text" ? (part1Resp.content[0] as any).text as string : "";
@@ -1543,7 +1588,7 @@ export function registerChatRoutes(app: Express): void {
         const part2Resp = await anthropic.messages.create({
           model: "claude-sonnet-4-6",
           max_tokens: 16000,
-          system: DQ_BUSINESS_LOGIC_SYSTEM_PROMPT,
+          system: buildSystemPrompt(DQ_BUSINESS_LOGIC_SYSTEM_PROMPT),
           messages: chatMessages,
         });
         const part2Text = part2Resp.content[0]?.type === "text" ? (part2Resp.content[0] as any).text as string : "";
@@ -1595,7 +1640,7 @@ export function registerChatRoutes(app: Express): void {
         const stream = anthropic.messages.stream({
           model: "claude-sonnet-4-6",
           max_tokens: 16000,
-          system: systemPrompt,
+          system: buildSystemPrompt(systemPrompt),
           messages: chatMessages,
         });
 
@@ -1699,7 +1744,7 @@ Return this exact structure:
         const followUpResponse = await anthropic.messages.create({
           model: "claude-sonnet-4-6",
           max_tokens: 2000,
-          system: NUDGE_SYSTEM_PROMPT,
+          system: buildSystemPrompt(NUDGE_SYSTEM_PROMPT),
           messages: followUpMessages,
         });
         const followUpText = followUpResponse.content
@@ -1723,7 +1768,7 @@ Return this exact structure:
       const response = await anthropic.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 8000,
-        system: NUDGE_SYSTEM_PROMPT,
+        system: buildSystemPrompt(NUDGE_SYSTEM_PROMPT),
         messages,
       });
 

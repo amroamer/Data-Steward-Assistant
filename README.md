@@ -123,6 +123,19 @@ A three-panel professional workspace:
 
 ---
 
+## Global System Prompt & Scope Control
+
+Every Claude API call across all features (Data Management, Analytical Model, Insights, Nudge Agent) is prepended with a shared `ZATCA_SYSTEM_PROMPT` via a `buildSystemPrompt()` helper in `server/replit_integrations/chat/routes.ts`. This ensures:
+
+- **Consistent persona**: All responses come from the same expert ZATCA consultant — formal, authoritative, practical
+- **Scope enforcement**: Claude will only answer questions related to ZATCA's data and compliance work areas (SDAIA NDMO, PDPL, DQ rules, star schema, PII, Informatica, nudge strategy). Off-topic requests receive a fixed refusal message
+- **Saudi context**: Saudi regulations (PDPL 2023, VAT, Zakat, FATOORAH), SAR currency, and Saudi business examples are applied to all responses
+- **Out-of-scope warning card**: When Claude returns an out-of-scope message, the frontend detects it and renders a yellow ⚠️ warning card instead of the normal response — keeping the input active for the user to rephrase
+
+The feature-specific system prompts (DQ, Insights, Informatica, Nudge) are preserved and appended after the global prompt — they extend it, not replace it.
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -134,7 +147,7 @@ A three-panel professional workspace:
 | Charts | Recharts (donut charts) |
 | Excel | SheetJS (xlsx) |
 | Backend | Express.js, TypeScript |
-| AI | Anthropic Claude Sonnet (claude-sonnet-4-6, max 16,000 tokens) |
+| AI | Anthropic Claude Sonnet (claude-sonnet-4-6, max 16,000 tokens); global `ZATCA_SYSTEM_PROMPT` injected via `buildSystemPrompt()` into all 5 Claude call sites |
 | Database | PostgreSQL on Neon (serverless) |
 | ORM | Drizzle ORM + drizzle-zod |
 | File Handling | Multer, pdf-parse, Mammoth, Sharp |
