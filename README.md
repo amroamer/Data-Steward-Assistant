@@ -59,6 +59,14 @@ Upload any Excel dataset and receive a comprehensive insights report: executive 
 ### 7. Informatica Output
 Generate Informatica-compatible metadata for each data field: field descriptions, data quality rules, Informatica Expression Language SQL statements, SDAIA data classifications (with rationale and handling rules), and format types. Results are exported to a dedicated `informatica_output` sheet in `result.xlsx`.
 
+### 8. Use Cases Page (`/use-cases`)
+A static, fully-browsable catalog of 14 real tasks the agent can perform. Accessible from the sidebar or at `/use-cases`. Features:
+- Filter tabs: All | Data Management | Compliance & Privacy | Analytics | Insights
+- Card grid with color-coded category badges and icons
+- Modal per use case: user story, example input fields, styled HTML/CSS output preview
+- "Launch Agent" CTA — navigates to chat with the prompt pre-filled and agent mode pre-selected via `?prompt=&mode=` URL params
+- Full EN + AR translations with RTL layout toggle
+
 ---
 
 ## UI Architecture — AI Agent Command Center

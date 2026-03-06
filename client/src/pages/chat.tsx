@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ import {
   Brain,
   Layers,
   Cpu,
+  LayoutGrid,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -238,6 +240,7 @@ const translations = {
     agentDataModel: "Analytical Model",
     agentDataModelDesc: "Design star schema & generate DDL scripts",
     previewFile: "Preview file",
+    useCases: "Use Cases",
   },
   ar: {
     newChat: "وكيل مالك بيانات جديد",
@@ -368,6 +371,7 @@ const translations = {
     agentDataModel: "النموذج التحليلي",
     agentDataModelDesc: "تصميم مخطط نجمي وإنشاء سكريبتات DDL",
     previewFile: "معاينة الملف",
+    useCases: "حالات الاستخدام",
   },
 } as const;
 
@@ -760,6 +764,14 @@ function SidebarContent({
           <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusConfig.bg }} />
           {statusLabel}
         </div>
+        <Link
+          href="/use-cases"
+          className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-white/50 hover:text-white/90 hover:bg-white/10 transition-all"
+          data-testid="link-use-cases"
+        >
+          <LayoutGrid className="w-3.5 h-3.5" />
+          {t.useCases}
+        </Link>
       </div>
       <div className="border-t border-white/10" />
       <ScrollArea className="flex-1">
@@ -998,6 +1010,15 @@ export default function ChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isTouchDevice = useTouchDevice();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const promptParam = params.get("prompt");
+    const modeParam = params.get("mode") as "data-management" | "data-model" | "insights" | null;
+    if (promptParam) setInputValue(promptParam);
+    if (modeParam && ["data-management", "data-model", "insights"].includes(modeParam)) setAgentMode(modeParam);
+    if (promptParam || modeParam) history.replaceState({}, "", window.location.pathname);
+  }, []);
 
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
     queryKey: ["/api/conversations", agentMode],
