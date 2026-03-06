@@ -910,6 +910,8 @@ export default function ChatPage() {
   const [streamingContent, setStreamingContent] = useState("");
   const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(240);
+  const sidebarDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [lang, setLang] = useState<Lang>("en");
 
@@ -1725,17 +1727,47 @@ export default function ChatPage() {
 
       {!isMobile && (
         <div
-          className="flex-shrink-0 overflow-hidden transition-all duration-200 ease-in-out"
-          style={{ width: sidebarCollapsed ? 0 : 240 }}
+          className="flex-shrink-0 overflow-hidden"
+          style={{
+            width: sidebarCollapsed ? 0 : sidebarWidth,
+            transition: sidebarDragRef.current ? "none" : "width 200ms ease-in-out",
+          }}
           data-testid="sidebar-panel"
         >
-          <div className="w-[240px] h-full">
+          <div className="h-full" style={{ width: sidebarWidth }}>
             <SidebarContent
               {...sidebarProps}
               setActiveConversationId={setActiveConversationId}
               onCollapse={() => setSidebarCollapsed(true)}
             />
           </div>
+        </div>
+      )}
+
+      {!isMobile && !sidebarCollapsed && (
+        <div
+          className="flex-shrink-0 self-stretch cursor-col-resize z-30 group relative"
+          style={{ width: 4 }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            sidebarDragRef.current = { startX: e.clientX, startWidth: sidebarWidth };
+            const onMove = (ev: MouseEvent) => {
+              if (!sidebarDragRef.current) return;
+              const delta = ev.clientX - sidebarDragRef.current.startX;
+              const next = Math.min(420, Math.max(160, sidebarDragRef.current.startWidth + delta));
+              setSidebarWidth(next);
+            };
+            const onUp = () => {
+              sidebarDragRef.current = null;
+              document.removeEventListener("mousemove", onMove);
+              document.removeEventListener("mouseup", onUp);
+            };
+            document.addEventListener("mousemove", onMove);
+            document.addEventListener("mouseup", onUp);
+          }}
+          data-testid="sidebar-resize-handle"
+        >
+          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-transparent group-hover:bg-[#51BAB4] transition-colors duration-150" />
         </div>
       )}
 
