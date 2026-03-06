@@ -788,29 +788,6 @@ function SidebarContent({
                     onMouseEnter={(e) => { if (activeConversationId !== conv.id) e.currentTarget.style.backgroundColor = "#1A4B8C50"; }}
                     onMouseLeave={(e) => { if (activeConversationId !== conv.id) e.currentTarget.style.backgroundColor = "transparent"; }}
                   >
-                    <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
-                    <div className="flex-1 min-w-0">
-                      {editingConvId === conv.id ? (
-                        <input
-                          autoFocus
-                          value={editTitle}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") { e.preventDefault(); handleSaveRename(conv.id); }
-                            if (e.key === "Escape") { e.preventDefault(); setEditingConvId(null); }
-                          }}
-                          onBlur={() => handleSaveRename(conv.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-full bg-white/10 text-white text-[12px] rounded px-2 py-0.5 outline-none border border-white/20"
-                          data-testid={`input-rename-${conv.id}`}
-                        />
-                      ) : (
-                        <>
-                          <span className="text-[13px] block truncate">{conv.title}</span>
-                          <span className="text-[10px] opacity-50">{new Date(conv.createdAt).toLocaleDateString()}</span>
-                        </>
-                      )}
-                    </div>
                     <div className={`flex items-center gap-0.5 transition-opacity flex-shrink-0 ${activeConversationId === conv.id ? "opacity-80" : "opacity-50 group-hover:opacity-100"}`}>
                       <Button
                         size="icon"
@@ -837,6 +814,28 @@ function SidebarContent({
                       >
                         <Trash2 className="w-2.5 h-2.5" />
                       </Button>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {editingConvId === conv.id ? (
+                        <input
+                          autoFocus
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") { e.preventDefault(); handleSaveRename(conv.id); }
+                            if (e.key === "Escape") { e.preventDefault(); setEditingConvId(null); }
+                          }}
+                          onBlur={() => handleSaveRename(conv.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-full bg-white/10 text-white text-[12px] rounded px-2 py-0.5 outline-none border border-white/20"
+                          data-testid={`input-rename-${conv.id}`}
+                        />
+                      ) : (
+                        <>
+                          <span className="text-[13px] block truncate">{conv.title}</span>
+                          <span className="text-[10px] opacity-50">{new Date(conv.createdAt).toLocaleDateString()}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
