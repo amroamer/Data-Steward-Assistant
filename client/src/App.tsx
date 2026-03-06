@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import ChatPage from "@/pages/chat";
 import UseCasesPage from "@/pages/use-cases";
 import NudgePage from "@/pages/nudge";
+import UserGuidePage from "@/pages/user-guide";
 
 function Router() {
   return (
@@ -13,6 +14,7 @@ function Router() {
       <Route path="/" component={ChatPage} />
       <Route path="/use-cases" component={UseCasesPage} />
       <Route path="/nudge" component={NudgePage} />
+      <Route path="/user-guide" component={UserGuidePage} />
     </Switch>
   );
 }

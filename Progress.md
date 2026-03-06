@@ -95,7 +95,8 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 - ✅ Camera capture on touch/mobile devices
 - ✅ Text paste mode toggle (textarea for raw field names / CSV data)
 - ✅ Language toggle (EN / AR)
-- ✅ User Guide download (BookOpen icon)
+- ✅ Use Cases link in header bar (next to language toggle)
+- ✅ User Guide link in header bar (next to Use Cases, replaces broken download button)
 - ✅ Quick-action pills above console in active conversations, filtered by agent mode
 
 ### Streaming & Status
@@ -161,6 +162,9 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 
 | Date | Change |
 |---|---|
+| 2026-03-06 | **User Guide Page** — new `/user-guide` page; 8 collapsible sections covering all agent features; EN+AR/RTL; header link next to Use Cases; replaced broken BookOpen download button |
+| 2026-03-06 | **Header Navigation** — Use Cases and User Guide links moved to header bar (next to language toggle); Use Cases link removed from sidebar; BookOpen download anchor removed |
+| 2026-03-06 | **Nudge Agent tab** — moved Nudge Agent link from sidebar to agent mode tabs bar (next to Insights Agent), with Target icon and purple color |
 | 2026-03-06 | **Nudge Agent** — new `/nudge` page; `POST /api/nudge` backend; 4-section structured results; `nudge_report_[timestamp].xlsx` export; follow-up Q&A; error handling; EN+AR/RTL; sidebar link; 4 use case cards added to `/use-cases` |
 | 2026-03-06 | **App Renaming** — changed app name from "Data Owner Agent" to "Data & Analytics Agent" across UI, metadata, and docs |
 | 2026-03-06 | **Favicon** — replaced with official ZATCA logo (`ZATCA-o.png`, 310×310 PNG) downloaded directly from zatca.gov.sa; no HTML changes needed |

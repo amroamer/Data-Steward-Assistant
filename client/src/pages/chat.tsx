@@ -229,6 +229,7 @@ const translations = {
     followUp: "Ask Follow-up",
     excelFile: "Excel File:",
     downloadUserGuide: "Download User Guide",
+    userGuide: "User Guide",
     renameConversation: "Rename",
     collapseOutputs: "Hide Outputs",
     expandOutputs: "Show Outputs",
@@ -361,6 +362,7 @@ const translations = {
     followUp: "متابعة",
     excelFile: "ملف Excel:",
     downloadUserGuide: "تنزيل دليل المستخدم",
+    userGuide: "دليل المستخدم",
     renameConversation: "إعادة تسمية",
     collapseOutputs: "إخفاء المخرجات",
     expandOutputs: "إظهار المخرجات",
@@ -767,14 +769,6 @@ function SidebarContent({
           <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusConfig.bg }} />
           {statusLabel}
         </div>
-        <Link
-          href="/use-cases"
-          className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-white/50 hover:text-white/90 hover:bg-white/10 transition-all"
-          data-testid="link-use-cases"
-        >
-          <LayoutGrid className="w-3.5 h-3.5" />
-          {t.useCases}
-        </Link>
       </div>
       <div className="border-t border-white/10" />
       <ScrollArea className="flex-1">
@@ -1923,16 +1917,24 @@ export default function ChatPage() {
               </Button>
             </div>
           )}
-          <a
-            href="/user-guide.html"
-            download="ZATCA_Data_Owner_Agent_User_Guide.html"
-            title={t.downloadUserGuide}
-            data-testid="link-download-user-guide"
+          <Link
+            href="/use-cases"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
+            style={{ color: "#6B7280" }}
+            data-testid="link-use-cases"
           >
-            <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0">
-              <BookOpen className="w-3.5 h-3.5" />
-            </Button>
-          </a>
+            <LayoutGrid className="w-3.5 h-3.5" />
+            {t.useCases}
+          </Link>
+          <Link
+            href="/user-guide"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
+            style={{ color: "#6B7280" }}
+            data-testid="link-user-guide"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            {t.userGuide}
+          </Link>
           <Button
             size="sm"
             variant="ghost"
