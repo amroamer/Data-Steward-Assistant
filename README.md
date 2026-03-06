@@ -160,3 +160,4 @@ A three-panel professional workspace:
 | ZATCA Blue | `#2563EB` |
 | Download Green | `#2E7D32` |
 | Font | Inter (UI), Courier New (command console) |
+| Favicon | Official ZATCA logo (`ZATCA-o.png`, 310×310 PNG) from zatca.gov.sa |
