@@ -98,6 +98,7 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 - ✅ User Guide updated with "Scope & Guardrails" section (EN + AR)
 
 ### Command Console
+- ✅ Upload strip ("Upload a file to get started") moved from empty-state hero into the command console — always visible when no file is selected, hidden when file is attached or paste mode is active
 - ✅ Dark navy input bar with Courier New monospace font
 - ✅ Execute button (`#2E7D32`)
 - ✅ File upload via paperclip icon (Excel, PDF, Word, images)
@@ -171,6 +172,7 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 
 | Date | Change |
 |---|---|
+| 2026-03-06 | **Upload Strip Relocation** — moved drag-and-drop upload area from empty-state hero into command console bar; compact strip always visible above textarea when no file selected; User Guide updated |
 | 2026-03-06 | **Global System Prompt** — `ZATCA_SYSTEM_PROMPT` + `buildSystemPrompt()` injected into all 5 Claude call sites; out-of-scope yellow warning card on frontend (EN+AR); User Guide "Scope & Guardrails" section added |
 | 2026-03-06 | **User Guide Page** — new `/user-guide` page; 8 collapsible sections covering all agent features; EN+AR/RTL; header link next to Use Cases; replaced broken BookOpen download button |
 | 2026-03-06 | **Header Navigation** — Use Cases and User Guide links moved to header bar (next to language toggle); Use Cases link removed from sidebar; BookOpen download anchor removed |

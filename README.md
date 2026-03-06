@@ -101,6 +101,8 @@ A three-panel professional workspace:
 | **Center Panel** (dot-grid `#F4F6F9`) | Capabilities dashboard on first load, activity cards for commands and AI responses, command console at bottom |
 | **Right Outputs Panel** (white) | Live result download (result.xlsx), sheet tracker with color-coded tags, activity timeline — collapsible |
 
+**Command Console (bottom dark navy bar)**: Contains the file upload strip ("Upload a file to get started" — always visible when no file is selected), file attachment preview, paste-text mode, the main command textarea, and action buttons (paperclip, camera, execute). The upload strip is integrated inline above the textarea for persistent, consistent access across all agent modes.
+
 ### 3 Agent Modes (isolated session lists)
 
 | Mode | Icon | Purpose |

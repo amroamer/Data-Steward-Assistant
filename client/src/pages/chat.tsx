@@ -2061,16 +2061,6 @@ export default function ChatPage() {
                       );
                     })}
                   </div>
-                  <div
-                    className="mt-8 w-full max-w-xl border-2 border-dashed rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
-                    style={{ borderColor: "#E5E7EB" }}
-                    onClick={() => fileInputRef.current?.click()}
-                    data-testid="dropzone-upload"
-                  >
-                    <Upload className="w-8 h-8 mx-auto mb-2" style={{ color: "#6B7280" }} />
-                    <p className="text-sm font-medium" style={{ color: "#6B7280" }}>{t.dragDropUpload}</p>
-                    <p className="text-[10px] mt-1" style={{ color: "#9CA3AF" }}>{t.uploadFooter}</p>
-                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -2180,6 +2170,20 @@ export default function ChatPage() {
                   >
                     <X className="w-3 h-3" />
                   </Button>
+                </div>
+              )}
+              {!selectedFile && !textInputMode && (
+                <div
+                  className="mb-2 flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer border border-dashed transition-all"
+                  style={{ borderColor: "rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.04)" }}
+                  onClick={() => fileInputRef.current?.click()}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.4)"; (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.08)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.2)"; (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.04)"; }}
+                  data-testid="dropzone-upload"
+                >
+                  <Upload className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "rgba(255,255,255,0.4)" }} />
+                  <span className="text-xs font-medium flex-1" style={{ color: "rgba(255,255,255,0.5)" }}>{t.dragDropUpload}</span>
+                  <span className="text-[10px] hidden sm:block" style={{ color: "rgba(255,255,255,0.3)" }}>{t.uploadFooter}</span>
                 </div>
               )}
               {textInputMode && (

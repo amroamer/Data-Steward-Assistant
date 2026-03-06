@@ -139,7 +139,7 @@ const t = {
           },
           {
             heading: "How to upload",
-            body: "Click the paperclip icon in the command console to select a file from your device. On mobile, a camera icon appears for direct photo capture. Files are processed server-side and attached to your message automatically.",
+            body: "There are two ways to upload a file. First, click the compact 'Upload a file to get started' strip inside the dark navy command console at the bottom — it is always visible when no file is selected. Second, click the paperclip icon (📎) in the same console row. On mobile, a camera icon also appears for direct photo capture. Files are processed server-side and attached to your message automatically.",
           },
           {
             heading: "Large images",
@@ -338,7 +338,7 @@ const t = {
           },
           {
             heading: "كيفية الرفع",
-            body: "انقر على أيقونة المشبك في وحدة تحكم الأوامر لاختيار ملف من جهازك. على الأجهزة المحمولة تظهر أيقونة الكاميرا للتقاط صورة مباشرة.",
+            body: "هناك طريقتان لرفع الملف: الأولى، انقر على شريط 'قم بتحميل ملف للبدء' المضغوط داخل وحدة تحكم الأوامر ذات الخلفية الداكنة أسفل الصفحة — يظهر دائمًا عند عدم اختيار ملف. الثانية، انقر على أيقونة المشبك (📎) في نفس الصف. على الأجهزة المحمولة تظهر أيقونة الكاميرا للتقاط صورة مباشرة.",
           },
         ],
       },
