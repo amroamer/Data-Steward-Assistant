@@ -56,6 +56,9 @@ Scan datasets for personal and sensitive information against Saudi PDPL categori
 ### 6. Data Insights Report
 Upload any Excel dataset and receive a comprehensive insights report: executive summary, key insights, column-level statistics, anomalies, trends, and actionable recommendations — exported as a standalone styled Excel report.
 
+### 7. Informatica Output
+Generate Informatica-compatible metadata for each data field: field descriptions, data quality rules, Informatica Expression Language SQL statements, SDAIA data classifications (with rationale and handling rules), and format types. Results are exported to a dedicated `informatica_output` sheet in `result.xlsx`.
+
 ---
 
 ## UI Architecture — AI Agent Command Center

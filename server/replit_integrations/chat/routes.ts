@@ -311,6 +311,18 @@ const DQ_TRIGGER_KEYWORDS = [
   "dq analysis",
 ];
 
+const INFORMATICA_TRIGGER_KEYWORDS = [
+  "informatica output",
+  "generate informatica",
+  "informatica metadata",
+  "informatica compatible",
+  "informatica sql",
+  "informatica format",
+  "generate informatica output",
+  "informatica mapping",
+  "create informatica output",
+];
+
 const DQ_DIMENSIONS_SYSTEM_PROMPT = `You are the "ZATCA Data Owner Agent" — a senior data quality architect. You are performing PART 1 of a 2-part data quality analysis.
 
 PART 1 SCOPE — Generate ONLY Layer 1 (Technical Rules) and Layer 2 (Logical Rules):
@@ -439,6 +451,11 @@ function isDqRequest(message: string): boolean {
   return DQ_TRIGGER_KEYWORDS.some(kw => lower.includes(kw));
 }
 
+function isInformaticaRequest(message: string): boolean {
+  const lower = message.toLowerCase();
+  return INFORMATICA_TRIGGER_KEYWORDS.some(kw => lower.includes(kw));
+}
+
 interface DqFieldRule {
   rule_id: string;
   rule_name: string;
@@ -501,6 +518,44 @@ function mergeDqResults(part1: DqJson, part2: DqJson): DqJson {
     business_logic_warnings: warnings,
   };
 }
+
+const INFORMATICA_SYSTEM_PROMPT = `You are the "ZATCA Data Owner Agent", an expert data governance AI. The user wants an Informatica-compatible metadata output for their data fields.
+
+Analyze ALL column/field names provided and generate a comprehensive Informatica output.
+
+You MUST return ONLY a JSON code block (wrapped in triple-backtick json fences) with EXACTLY this structure — no prose, no explanation outside the JSON:
+
+\`\`\`json
+{
+  "descriptions": {
+    "column_name": "Clear, business-friendly description of what this field represents and its business purpose"
+  },
+  "data_quality_rules": {
+    "column_name": "Complete plain-language sentences describing all data quality requirements: nullability, format, valid ranges, referential integrity, and any business constraints."
+  },
+  "informatica_sql": {
+    "column_name": ["IIF(ISNULL(column_name), 'REJECT', 'PASS')", "IIF(LENGTH(column_name) > 0, 'VALID', 'INVALID')"]
+  },
+  "data_classification": {
+    "column_name": {
+      "classification_level": "Confidential",
+      "rationale": "Brief rationale for why this classification level was assigned",
+      "handling_rules": "Must be encrypted at rest and in transit. Access restricted to authorized personnel only. Cannot be shared externally without data masking."
+    }
+  },
+  "format_types": {
+    "column_name": "VARCHAR(100) | DATE (YYYY-MM-DD) | DECIMAL(18,2) | INTEGER | BOOLEAN | TIMESTAMP"
+  }
+}
+\`\`\`
+
+Rules:
+- Cover EVERY column/field listed by the user. Do not skip any.
+- classification_level must be one of: Top Secret | Secret | Confidential | Restricted | Public (per SDAIA NDMO framework)
+- handling_rules must reference the correct NDMO/PDPL policy verbatim handling guidance for that classification level
+- informatica_sql must contain 2–4 Informatica Expression Language compatible validation expressions per field (using IIF, ISNULL, LENGTH, REGEXP_MATCH, IN, etc.)
+- format_types must use standard SQL/Informatica data type notation
+- Be precise and specific — avoid generic placeholder text`;
 
 const INSIGHTS_SYSTEM_PROMPT = `You are a senior data analyst. The user has uploaded a dataset and wants a comprehensive insights report. You will receive pre-computed column-level statistics and a sample of up to 10 rows.
 
@@ -1321,6 +1376,7 @@ export function registerChatRoutes(app: Express): void {
       let userContent = req.body.content || "";
       let extractedFieldNames: string[] = [];
       let insightsMode = false;
+      let informaticaMode = false;
       let profiledDataText = "";
       let profiledColumns: ColumnProfile[] = [];
 
@@ -1441,7 +1497,9 @@ export function registerChatRoutes(app: Express): void {
         }
       }
 
-      const dqSplitMode = !insightsMode && !imageContent && isDqRequest(originalUserMessage) &&
+      if (isInformaticaRequest(originalUserMessage)) informaticaMode = true;
+
+      const dqSplitMode = !insightsMode && !informaticaMode && !imageContent && isDqRequest(originalUserMessage) &&
         (req.file != null || extractedFieldNames.length > 0 || dqFieldNames.length > 0);
 
       res.setHeader("Content-Type", "text/event-stream");
@@ -1512,7 +1570,7 @@ export function registerChatRoutes(app: Express): void {
           fullResponse += chunk;
         }
       } else {
-        const systemPrompt = insightsMode ? INSIGHTS_SYSTEM_PROMPT : SYSTEM_PROMPT;
+        const systemPrompt = insightsMode ? INSIGHTS_SYSTEM_PROMPT : informaticaMode ? INFORMATICA_SYSTEM_PROMPT : SYSTEM_PROMPT;
 
         if (imageContent) {
           const lastMsg = chatMessages[chatMessages.length - 1];

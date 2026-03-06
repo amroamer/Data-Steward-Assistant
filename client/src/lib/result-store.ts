@@ -92,6 +92,20 @@ export interface DqAnalysisResult {
   business_logic_warnings: DqBusinessWarning[];
 }
 
+export interface InformaticaClassification {
+  classification_level: string;
+  rationale: string;
+  handling_rules: string;
+}
+
+export interface InformaticaOutput {
+  descriptions: Record<string, string>;
+  data_quality_rules: Record<string, string>;
+  informatica_sql: Record<string, string[]>;
+  data_classification: Record<string, InformaticaClassification>;
+  format_types: Record<string, string>;
+}
+
 export interface ResultRow {
   field_name: string;
   business_term?: string;
@@ -633,7 +647,75 @@ function appendDqSheets(wb: XLSX.WorkBook, dq: DqAnalysisResult): void {
   }
 }
 
-export function generateResultExcel(rows: ResultRow[], includedAnalyses: AnalysisType[], dataModel?: DataModelJSON, piiScan?: PiiScanResult, dqAnalysis?: DqAnalysisResult): void {
+export function detectInformaticaJSON(content: string): InformaticaOutput | null {
+  const allBlocks = content.matchAll(/```(?:json)?\s*([\s\S]*?)```/g);
+  for (const match of allBlocks) {
+    const candidate = match[1].trim();
+    if (!candidate) continue;
+    try {
+      const parsed = JSON.parse(candidate);
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        parsed.informatica_sql &&
+        parsed.descriptions &&
+        parsed.data_classification &&
+        parsed.format_types
+      ) {
+        return parsed as InformaticaOutput;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+export function generateInformaticaSummary(output: InformaticaOutput): string {
+  const fieldCount = Object.keys(output.descriptions).length;
+  const lines: string[] = [];
+  lines.push(`✅ Informatica Output Generated`);
+  lines.push(`Processed ${fieldCount} fields — descriptions, DQ rules, SQL expressions, classification, and format types.`);
+  lines.push(`Results saved to result.xlsx — Sheet: informatica_output`);
+  return lines.join("\n");
+}
+
+function appendInformaticaSheet(wb: XLSX.WorkBook, output: InformaticaOutput): void {
+  const headers = [
+    "Field Name", "Description", "Format Type",
+    "Classification Level", "Rationale", "Handling Rules",
+    "DQ Rules", "Informatica SQL"
+  ];
+  const fields = Object.keys(output.descriptions);
+  const rows: string[][] = [headers];
+  for (const field of fields) {
+    const cls = output.data_classification[field] || {};
+    const sql = Array.isArray(output.informatica_sql[field]) ? output.informatica_sql[field].join("\n") : (output.informatica_sql[field] || "");
+    rows.push([
+      field,
+      output.descriptions[field] || "",
+      output.format_types[field] || "",
+      (cls as InformaticaClassification).classification_level || "",
+      (cls as InformaticaClassification).rationale || "",
+      (cls as InformaticaClassification).handling_rules || "",
+      output.data_quality_rules[field] || "",
+      sql,
+    ]);
+  }
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const colWidths = headers.map((h, i) => {
+    let max = h.length;
+    for (const row of rows.slice(1)) {
+      const cell = row[i] || "";
+      const len = cell.split("\n").reduce((a, l) => Math.max(a, l.length), 0);
+      if (len > max) max = len;
+    }
+    return { wch: Math.min(Math.max(max + 2, 14), 60) };
+  });
+  ws["!cols"] = colWidths;
+  ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
+  XLSX.utils.book_append_sheet(wb, ws, "informatica_output");
+}
+
+export function generateResultExcel(rows: ResultRow[], includedAnalyses: AnalysisType[], dataModel?: DataModelJSON, piiScan?: PiiScanResult, dqAnalysis?: DqAnalysisResult, informaticaOutput?: InformaticaOutput): void {
   const orderedAnalyses = ANALYSIS_ORDER.filter((a) => includedAnalyses.includes(a));
 
   const wb = XLSX.utils.book_new();
@@ -690,7 +772,7 @@ export function generateResultExcel(rows: ResultRow[], includedAnalyses: Analysi
     XLSX.utils.book_append_sheet(wb, ws, ANALYSIS_SHEET_NAMES[analysis]);
   }
 
-  if (wb.SheetNames.length === 0 && (!dataModel) && (!piiScan) && (!dqAnalysis)) {
+  if (wb.SheetNames.length === 0 && (!dataModel) && (!piiScan) && (!dqAnalysis) && (!informaticaOutput)) {
     const headers = ["Field Name"];
     const keys = ["field_name"];
     for (const analysis of orderedAnalyses) {
@@ -713,6 +795,10 @@ export function generateResultExcel(rows: ResultRow[], includedAnalyses: Analysi
 
   if (piiScan) {
     appendPiiScanSheet(wb, piiScan);
+  }
+
+  if (informaticaOutput) {
+    appendInformaticaSheet(wb, informaticaOutput);
   }
 
   XLSX.writeFile(wb, "result.xlsx");

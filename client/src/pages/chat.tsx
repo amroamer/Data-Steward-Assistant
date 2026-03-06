@@ -62,6 +62,7 @@ import {
   Type,
   Brain,
   Layers,
+  Cpu,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -74,6 +75,7 @@ import {
   type DataModelJSON,
   type PiiScanResult,
   type DqAnalysisResult,
+  type InformaticaOutput,
   detectAndExtractAllAnalyses,
   mergeResults,
   mergeDqResults,
@@ -85,6 +87,8 @@ import {
   generatePiiScanSummary,
   detectDqAnalysisJSON,
   generateDqAnalysisSummary,
+  detectInformaticaJSON,
+  generateInformaticaSummary,
 } from "@/lib/result-store";
 import DataModelDiagram from "@/components/DataModelDiagram";
 import ExcelPreview from "@/components/ExcelPreview";
@@ -166,8 +170,11 @@ const translations = {
     tagDataClassification: "Data Classification",
     tagDataQuality: "Data Quality Rules",
     tagInsights: "Data Insights",
+    tagInformatica: "Informatica Output",
     cardInsights: "Data Insights Report",
     cardInsightsDesc: "Analyze data and generate comprehensive insights report",
+    cardInformatica: "Informatica Output",
+    cardInformaticaDesc: "Generate Informatica-compatible metadata, SQL expressions & classifications",
     insightsReportGenerated: "📊 Data Insights Report Generated",
     insightsToast: (title: string) => `Insights report "${title}" generated`,
     downloadInsightsReport: "📥 Download Insights Report",
@@ -293,8 +300,11 @@ const translations = {
     tagDataClassification: "تصنيف البيانات",
     tagDataQuality: "قواعد جودة البيانات",
     tagInsights: "رؤى البيانات",
+    tagInformatica: "مخرجات إنفورماتيكا",
     cardInsights: "تقرير رؤى البيانات",
     cardInsightsDesc: "تحليل البيانات وإنشاء تقرير رؤى شامل",
+    cardInformatica: "مخرجات إنفورماتيكا",
+    cardInformaticaDesc: "إنشاء بيانات وصفية وتعبيرات SQL وتصنيفات متوافقة مع إنفورماتيكا",
     insightsReportGenerated: "📊 تم إنشاء تقرير رؤى البيانات",
     insightsToast: (title: string) => `تم إنشاء تقرير الرؤى "${title}"`,
     downloadInsightsReport: "📥 تحميل تقرير الرؤى",
@@ -371,6 +381,7 @@ const featureCardKeys: { titleKey: TranslationKey; descKey: TranslationKey }[] =
   { titleKey: "cardDataModel", descKey: "cardDataModelDesc" },
   { titleKey: "cardPiiDetection", descKey: "cardPiiDetectionDesc" },
   { titleKey: "cardInsights", descKey: "cardInsightsDesc" },
+  { titleKey: "cardInformatica", descKey: "cardInformaticaDesc" },
 ];
 
 const FEATURE_CARDS = [
@@ -434,6 +445,16 @@ const FEATURE_CARDS = [
     iconBg: "bg-[#1A4B8C]/10",
     agentMode: "insights" as const,
   },
+  {
+    icon: Cpu,
+    title: "Informatica Output",
+    description: "Generate Informatica-compatible metadata, SQL expressions & classifications",
+    prompt: "Generate an Informatica output for my data fields. Include field descriptions, data quality rules, Informatica Expression Language SQL, SDAIA data classifications, and format types. Return as the required JSON structure.",
+    color: "text-[#F57C00]",
+    bg: "bg-[#F57C00]/5",
+    iconBg: "bg-[#F57C00]/10",
+    agentMode: "data-management" as const,
+  },
 ];
 
 interface ThreadPair {
@@ -464,6 +485,7 @@ const SHEET_TAG_COLORS: Record<string, string> = {
   pii_scan: "#C62828",
   data_model: "#0D2E5C",
   insights: "#E65100",
+  informatica: "#F57C00",
 };
 
 const STATUS_COLORS: Record<AgentStatus, { bg: string; text: string; pulse: boolean }> = {
@@ -483,6 +505,7 @@ function detectAnalysisTag(userContent: string, assistantContent?: string, t?: T
   if (combined.includes("scan_summary")) return tr.tagPiiScan;
   if (combined.includes("fact_table_name") || (combined.includes("fact_tables") && combined.includes("dimension_tables"))) return tr.tagDataModel;
   if (combined.includes("dq_dimension") || combined.includes("rule_layer")) return tr.tagDataQuality;
+  if (combined.includes("informatica_sql") || combined.includes("format_types")) return tr.tagInformatica;
 
   // 2. User intent only — based on what the user typed, not the AI response
   if (
@@ -938,6 +961,8 @@ export default function ChatPage() {
   const [latestPiiScan, setLatestPiiScan] = useState<PiiScanResult | null>(null);
   const [dqAnalyses, setDqAnalyses] = useState<Record<number, DqAnalysisResult>>({});
   const [latestDqAnalysis, setLatestDqAnalysis] = useState<DqAnalysisResult | null>(null);
+  const [informaticaOutputs, setInformaticaOutputs] = useState<Record<number, InformaticaOutput>>({});
+  const [latestInformaticaOutput, setLatestInformaticaOutput] = useState<InformaticaOutput | null>(null);
 
   const [insightsReports, setInsightsReports] = useState<{ report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[]>([]);
   const [insightsForMessage, setInsightsForMessage] = useState<Record<number, InsightsReport>>({});
@@ -1053,9 +1078,11 @@ export default function ChatPage() {
     const piiMap: Record<number, PiiScanResult> = {};
     const insightsMap: Record<number, InsightsReport> = {};
     const dqMap: Record<number, DqAnalysisResult> = {};
+    const informaticaMap: Record<number, InformaticaOutput> = {};
     let lastModel: DataModelJSON | null = null;
     let lastPii: PiiScanResult | null = null;
     let lastDq: DqAnalysisResult | null = null;
+    let lastInformatica: InformaticaOutput | null = null;
     for (const msg of activeConversation.messages) {
       if (msg.role !== "assistant") continue;
       const insights = detectInsightsJSON(msg.content);
@@ -1084,6 +1111,12 @@ export default function ChatPage() {
         dqMap[msg.id] = dqResult;
         lastDq = dqResult;
         msgParts.push(generateDqAnalysisSummary(dqResult));
+      }
+      const informaticaResult = detectInformaticaJSON(msg.content);
+      if (informaticaResult) {
+        informaticaMap[msg.id] = informaticaResult;
+        lastInformatica = informaticaResult;
+        msgParts.push(generateInformaticaSummary(informaticaResult));
       }
       const msgModel = detectDataModelJSON(msg.content);
       if (msgModel) {
@@ -1122,6 +1155,10 @@ export default function ChatPage() {
     if (Object.keys(dqMap).length > 0) {
       setDqAnalyses(prev => ({ ...prev, ...dqMap }));
       setLatestDqAnalysis(lastDq);
+    }
+    if (Object.keys(informaticaMap).length > 0) {
+      setInformaticaOutputs(prev => ({ ...prev, ...informaticaMap }));
+      setLatestInformaticaOutput(lastInformatica);
     }
     if (Object.keys(insightsMap).length > 0) {
       setInsightsForMessage(prev => ({ ...prev, ...insightsMap }));
@@ -1165,6 +1202,8 @@ export default function ChatPage() {
     setLatestPiiScan(null);
     setDqAnalyses({});
     setLatestDqAnalysis(null);
+    setInformaticaOutputs({});
+    setLatestInformaticaOutput(null);
     setInsightsReports([]);
     setInsightsForMessage({});
     setIsInsightsMode(false);
@@ -1216,6 +1255,17 @@ export default function ChatPage() {
       }
       summaryParts.push(generateDqAnalysisSummary(dqResult));
       toastParts.push(`${dqResult.analysis_summary.total_rules_generated} DQ rules generated across ${dqResult.analysis_summary.total_fields_analyzed} fields`);
+    }
+
+    const informaticaResult = detectInformaticaJSON(content);
+    if (informaticaResult) {
+      setLatestInformaticaOutput(informaticaResult);
+      if (messageId) {
+        setInformaticaOutputs(prev => ({ ...prev, [messageId]: informaticaResult }));
+      }
+      summaryParts.push(generateInformaticaSummary(informaticaResult));
+      const fieldCount = Object.keys(informaticaResult.descriptions).length;
+      toastParts.push(`Informatica output generated for ${fieldCount} fields`);
     }
 
     const model = detectDataModelJSON(content);
@@ -1601,8 +1651,8 @@ export default function ChatPage() {
   };
 
   const handleDownloadResult = () => {
-    if (resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis) {
-      generateResultExcel(resultRows, includedAnalyses, latestDataModel || undefined, latestPiiScan || undefined, latestDqAnalysis || undefined);
+    if (resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis || latestInformaticaOutput) {
+      generateResultExcel(resultRows, includedAnalyses, latestDataModel || undefined, latestPiiScan || undefined, latestDqAnalysis || undefined, latestInformaticaOutput || undefined);
     }
   };
 
@@ -1643,7 +1693,7 @@ export default function ChatPage() {
   const messages = activeConversation?.messages || [];
   const threads = groupMessagesIntoThreads(messages);
 
-  const sheetCount = includedAnalyses.length + (latestDataModel ? 3 : 0) + (latestPiiScan ? 1 : 0) + (latestDqAnalysis ? 3 : 0);
+  const sheetCount = includedAnalyses.length + (latestDataModel ? 3 : 0) + (latestPiiScan ? 1 : 0) + (latestDqAnalysis ? 3 : 0) + (latestInformaticaOutput ? 1 : 0);
 
   const sidebarProps = {
     t,
@@ -1720,6 +1770,7 @@ export default function ChatPage() {
               latestDataModel={latestDataModel}
               latestPiiScan={latestPiiScan}
               latestDqAnalysis={latestDqAnalysis}
+              latestInformaticaOutput={latestInformaticaOutput}
               insightsReports={insightsReports}
               uploadedFileName={uploadedFileName}
               onDownloadResult={handleDownloadResult}
@@ -2005,9 +2056,10 @@ export default function ChatPage() {
                         streamingContent={isActiveStreaming ? streamingContent : ""}
                         timeTick={isActiveStreaming ? timeTick : undefined}
                         summaryOverride={thread.assistantMsg ? summaryOverrides[thread.assistantMsg.id] : undefined}
-                        onDownloadResult={(resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis) ? handleDownloadResult : undefined}
+                        onDownloadResult={(resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis || latestInformaticaOutput) ? handleDownloadResult : undefined}
                         dataModel={thread.assistantMsg ? (dataModels[thread.assistantMsg.id] || undefined) : undefined}
                         dqAnalysis={thread.assistantMsg ? (dqAnalyses[thread.assistantMsg.id] || undefined) : undefined}
+                        informaticaOutput={thread.assistantMsg ? (informaticaOutputs[thread.assistantMsg.id] || undefined) : undefined}
                         insightsReport={thread.assistantMsg ? (insightsForMessage[thread.assistantMsg.id] || undefined) : undefined}
                         allInsightsReports={insightsReports}
                         profiledColumns={profiledColumns}
@@ -2231,6 +2283,7 @@ export default function ChatPage() {
               latestDataModel={latestDataModel}
               latestPiiScan={latestPiiScan}
               latestDqAnalysis={latestDqAnalysis}
+              latestInformaticaOutput={latestInformaticaOutput}
               insightsReports={insightsReports}
               uploadedFileName={uploadedFileName}
               onDownloadResult={handleDownloadResult}
@@ -2245,11 +2298,11 @@ export default function ChatPage() {
 }
 
 function OutputsPanel({
-  t, isRtl, resultRows, includedAnalyses, latestDataModel, latestPiiScan, latestDqAnalysis, insightsReports, uploadedFileName, onDownloadResult, activityLog, sheetCount,
+  t, isRtl, resultRows, includedAnalyses, latestDataModel, latestPiiScan, latestDqAnalysis, latestInformaticaOutput, insightsReports, uploadedFileName, onDownloadResult, activityLog, sheetCount,
 }: {
   t: Translation; isRtl: boolean;
   resultRows: ResultRow[]; includedAnalyses: AnalysisType[];
-  latestDataModel: DataModelJSON | null; latestPiiScan: PiiScanResult | null; latestDqAnalysis: DqAnalysisResult | null;
+  latestDataModel: DataModelJSON | null; latestPiiScan: PiiScanResult | null; latestDqAnalysis: DqAnalysisResult | null; latestInformaticaOutput: InformaticaOutput | null;
   insightsReports: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
   uploadedFileName: string | null; onDownloadResult: () => void; activityLog: ActivityLogEntry[]; sheetCount: number;
 }) {
@@ -2259,7 +2312,7 @@ function OutputsPanel({
     activity: true
   });
 
-  const hasResultXlsx = resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis;
+  const hasResultXlsx = resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis || latestInformaticaOutput;
   const hasOutputs = hasResultXlsx || insightsReports.length > 0;
 
   const sheetTags: { label: string; color: string }[] = [];
@@ -2269,6 +2322,7 @@ function OutputsPanel({
   if (latestDataModel) sheetTags.push({ label: "Data Model", color: SHEET_TAG_COLORS.data_model });
   if (latestPiiScan) sheetTags.push({ label: "PII Scan", color: SHEET_TAG_COLORS.pii_scan });
   if (latestDqAnalysis) sheetTags.push({ label: "DQ Rules", color: SHEET_TAG_COLORS.data_quality });
+  if (latestInformaticaOutput) sheetTags.push({ label: "Informatica", color: SHEET_TAG_COLORS.informatica });
 
   return (
     <div className="h-full bg-white flex flex-col font-main" style={{ borderLeft: isRtl ? "none" : "1px solid #E5E7EB", borderRight: isRtl ? "1px solid #E5E7EB" : "none" }} data-testid="outputs-panel-content">
@@ -2405,14 +2459,14 @@ function OutputsPanel({
 function ThreadCard({
   thread, idx, isCollapsed, onToggle, tag, isRtl, t, lang,
   isActiveStreaming, liveSteps, completedSteps, streamingContent, timeTick,
-  summaryOverride, onDownloadResult, dataModel, dqAnalysis, insightsReport,
+  summaryOverride, onDownloadResult, dataModel, dqAnalysis, informaticaOutput, insightsReport,
   allInsightsReports, profiledColumns = [], uploadedFileName, onAskFollowUp,
 }: {
   thread: ThreadPair; idx: number; isCollapsed: boolean; onToggle: () => void;
   tag: string | null; isRtl: boolean; t: Translation; lang: Lang;
   isActiveStreaming: boolean; liveSteps: ThinkingStep[]; completedSteps?: ThinkingStep[];
   streamingContent: string; timeTick?: number; summaryOverride?: string; onDownloadResult?: () => void;
-  dataModel?: DataModelJSON | null; dqAnalysis?: DqAnalysisResult | null;
+  dataModel?: DataModelJSON | null; dqAnalysis?: DqAnalysisResult | null; informaticaOutput?: InformaticaOutput | null;
   insightsReport?: InsightsReport | null;
   allInsightsReports?: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
   profiledColumns?: BackendColumnProfile[]; uploadedFileName?: string | null;
@@ -2426,6 +2480,7 @@ function ThreadCard({
 
   const hasDataModel = dataModel != null;
   const hasDqAnalysis = dqAnalysis != null;
+  const hasInformatica = informaticaOutput != null;
   const hasInsights = insightsReport != null;
   const hasSummary = !!summaryOverride;
 
@@ -2611,7 +2666,7 @@ function ThreadCard({
                 </div>
                 <Loader2 className="w-3 h-3 animate-spin" style={{ color: "#E65100" }} />
               </div>
-              {/^\s*```(?:json)?\s*\{[\s\S]*"(?:analysis_summary|scan_summary|fact_tables|report_title)"/.test(streamingContent) ? (
+              {/^\s*```(?:json)?\s*\{[\s\S]*"(?:analysis_summary|scan_summary|fact_tables|report_title|informatica_sql)"/.test(streamingContent) ? (
                 <div className="flex items-center gap-2 text-[11px]" style={{ color: "#6B7280" }}>
                   <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" style={{ color: "#2563EB" }} />
                   <span>Generating analysis — results will appear in the Outputs panel when complete...</span>
@@ -2661,6 +2716,51 @@ function ThreadCard({
                 </div>
               )}
 
+              {hasInformatica && informaticaOutput && (
+                <div className="space-y-2" data-testid={`informatica-card-${assistantMsg.id}`}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Cpu className="w-3.5 h-3.5" style={{ color: "#F57C00" }} />
+                    <span className="text-[11px] font-semibold" style={{ color: "#F57C00" }}>
+                      {lang === "ar" ? "مخرجات إنفورماتيكا" : "Informatica Output"}
+                    </span>
+                    <span className="text-[10px]" style={{ color: "#9CA3AF" }}>
+                      — {Object.keys(informaticaOutput.descriptions).length} {lang === "ar" ? "حقل" : "fields"}
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto rounded border" style={{ borderColor: "#FED7AA" }}>
+                    <table className="w-full text-[10px]">
+                      <thead>
+                        <tr style={{ backgroundColor: "#FFF7ED" }}>
+                          <th className="px-2 py-1 text-left font-semibold" style={{ color: "#92400E", borderBottom: "1px solid #FED7AA" }}>{lang === "ar" ? "الحقل" : "Field"}</th>
+                          <th className="px-2 py-1 text-left font-semibold" style={{ color: "#92400E", borderBottom: "1px solid #FED7AA" }}>{lang === "ar" ? "التصنيف" : "Classification"}</th>
+                          <th className="px-2 py-1 text-left font-semibold" style={{ color: "#92400E", borderBottom: "1px solid #FED7AA" }}>{lang === "ar" ? "النوع" : "Format"}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.keys(informaticaOutput.descriptions).slice(0, 5).map((field, i) => (
+                          <tr key={field} style={{ backgroundColor: i % 2 === 0 ? "#ffffff" : "#FFF7ED" }}>
+                            <td className="px-2 py-1 font-mono" style={{ color: "#374151", borderBottom: "1px solid #FEE2C5" }}>{field}</td>
+                            <td className="px-2 py-1" style={{ color: "#6B7280", borderBottom: "1px solid #FEE2C5" }}>
+                              {informaticaOutput.data_classification[field]?.classification_level || "—"}
+                            </td>
+                            <td className="px-2 py-1" style={{ color: "#6B7280", borderBottom: "1px solid #FEE2C5" }}>
+                              {informaticaOutput.format_types[field] || "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {Object.keys(informaticaOutput.descriptions).length > 5 && (
+                    <div className="text-[10px]" style={{ color: "#9CA3AF" }}>
+                      {lang === "ar"
+                        ? `+ ${Object.keys(informaticaOutput.descriptions).length - 5} حقل آخر في ملف النتائج`
+                        : `+ ${Object.keys(informaticaOutput.descriptions).length - 5} more fields in result file`}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {hasInsights && (
                 <div className="space-y-2" data-testid={`insights-card-${assistantMsg.id}`}>
                   <Button
@@ -2691,7 +2791,7 @@ function ThreadCard({
               )}
 
               {!hasSummary && !hasDataModel && !hasDqAnalysis && !hasInsights && (() => {
-                const hasStructuredJson = /```(?:json)?\s*[\s\S]*?"(?:analysis_summary|scan_summary|fact_tables|report_title)"/.test(assistantMsg.content);
+                const hasStructuredJson = /```(?:json)?\s*[\s\S]*?"(?:analysis_summary|scan_summary|fact_tables|report_title|informatica_sql)"/.test(assistantMsg.content);
                 if (hasStructuredJson) {
                   return (
                     <div className="flex items-start gap-2 p-3 rounded-lg" style={{ backgroundColor: "#F0F9F4", border: "1px solid #BBF7D0" }}>

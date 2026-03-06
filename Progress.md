@@ -200,3 +200,4 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 | 2026-03-06 | Dynamic "New Session" button label per agent mode (EN + AR) |
 | 2026-03-06 | Fixed `agentMode is not defined` crash in `SidebarContent` |
 | 2026-03-06 | Created `README.md` and `Progress.md` documentation files |
+| 2026-03-06 | **Informatica Output** — backend system prompt, trigger detection, frontend detection/state/streaming, Informatica mini-table in ThreadCard, `informatica_output` Excel sheet, EN+AR translations, orange tag, Informatica feature card |
