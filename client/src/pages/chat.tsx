@@ -2211,6 +2211,7 @@ function OutputsPanel({
     activity: true
   });
 
+  const hasResultXlsx = resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis;
   const hasOutputs = hasResultXlsx || insightsReports.length > 0;
 
   const sheetTags: { label: string; color: string }[] = [];
