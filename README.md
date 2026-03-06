@@ -1,12 +1,12 @@
-# ZATCA Data Owner Agent
+# ZATCA Data & Analytics agent
 
-> AI-powered Data Governance Command Center for ZATCA professionals
+> AI-powered Data & Analytics Command Center for ZATCA professionals
 
 ---
 
 ## Purpose
 
-The ZATCA Data Owner Agent is an intelligent assistant built specifically for data owners, data stewards, and data governance professionals at ZATCA (Zakat, Tax and Customs Authority) and affiliated Saudi organizations. It automates the most time-consuming data governance tasks — classification, quality rules, business definitions, PII detection, analytical modelling, and insights — through a conversational AI interface backed by Claude Sonnet.
+The ZATCA Data & Analytics agent is an intelligent assistant built specifically for data owners, data stewards, and data governance professionals at ZATCA (Zakat, Tax and Customs Authority) and affiliated Saudi organizations. It automates the most time-consuming data governance tasks — classification, quality rules, business definitions, PII detection, analytical modelling, and insights — through a conversational AI interface backed by Claude Sonnet.
 
 ---
 

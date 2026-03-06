@@ -112,7 +112,7 @@ type Lang = "en" | "ar";
 
 const translations = {
   en: {
-    newChat: "New Data Owner Agent",
+    newChat: "New Data & Analytics agent",
     newChatDataManagement: "New Data Management Agent",
     newChatDataModel: "New Analytical Data Model Agent",
     newChatInsights: "New Insight Report Agent",
@@ -123,8 +123,8 @@ const translations = {
     deleteAllSessions: "Delete all sessions?",
     yesDeleteAll: "Yes, Delete All",
     clearAllSessions: "Clear All Sessions",
-    appTitle: "ZATCA Data Owner Agent",
-    heroTitle: "Data Owner Agent",
+    appTitle: "ZATCA Data & Analytics agent",
+    heroTitle: "Data & Analytics agent",
     heroDescription: "Your AI assistant for data governance. Upload Excel, PDF, Word, or image files to classify data, generate definitions, or define quality rules.",
     collapse: "Collapse",
     expand: "Expand",
@@ -754,7 +754,7 @@ function SidebarContent({
           </Button>
         </div>
         <div className="mb-3">
-          <h1 className="text-white font-bold text-sm" data-testid="text-app-title">Data Owner Agent</h1>
+          <h1 className="text-white font-bold text-sm" data-testid="text-app-title">Data & Analytics agent</h1>
         </div>
         <div
           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium ${statusConfig.pulse ? "animate-pulse-status" : ""}`}

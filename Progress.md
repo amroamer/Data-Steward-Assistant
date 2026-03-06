@@ -1,4 +1,4 @@
-# Progress Tracker — ZATCA Data Owner Agent
+# Progress Tracker — ZATCA Data & Analytics agent
 
 Track all feature development, fixes, and backlog items. Updated as work progresses.
 
@@ -137,69 +137,11 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 
 ---
 
-## Backlog 📋
-
-### Product Features
-- 📋 User authentication (login / registration) and multi-tenant session isolation
-- 📋 Organization-level workspaces (team accounts)
-- 📋 Saved analysis templates (reusable prompts per data domain)
-- 📋 Bulk upload — process multiple files in one session
-- 📋 Scheduled analysis — run DQ scans on a recurring schedule via API/webhook
-- 📋 Data dictionary builder — accumulate definitions across multiple sessions into a persistent catalog
-- 📋 Custom classification taxonomy (allow organizations to define their own sensitivity levels on top of NDMO)
-- 📋 Approval workflow — data steward reviews and approves AI-generated definitions before publishing
-- 📋 Version history for data classifications and definitions
-
-### Insights Agent Enhancements
-- 📋 Chart visualizations inside the app (bar, line, scatter) for insights reports
-- 📋 Comparison reports — compare two datasets or two time periods
-- 📋 Anomaly alerts — flag statistical outliers in real time
-
-### Analytical Model Enhancements
-- 📋 Export diagram as PNG/SVG image
-- 📋 Support for snowflake schema in addition to star schema
-- 📋 Auto-detect existing table relationships from uploaded schema files
-
-### Export & Integration
-- 📋 PDF export of all reports (in addition to Excel)
-- 📋 SharePoint / OneDrive integration for direct export
-- 📋 REST API for programmatic access (for system integrators and enterprise clients)
-- 📋 Webhook support for triggering analyses from external systems
-
-### Monetization Infrastructure
-- 📋 Subscription billing system (Stripe integration)
-- 📋 Usage tracking per organization (analyses run, exports generated)
-- 📋 Freemium tier with monthly analysis limits and upgrade prompts
-- 📋 Admin dashboard for subscription management
-- 📋 White-label configuration panel (custom logo, colors, domain)
-
-### Performance & Reliability
-- 📋 Redis caching for repeated file analysis on same dataset
-- 📋 Background job queue for large file processing (avoid SSE timeouts)
-- 📋 Rate limiting per user/organization
-- 📋 Error reporting and monitoring (Sentry or equivalent)
-
-### Compliance & Security
-- 📋 Data residency controls (ensure data stays within Saudi cloud regions)
-- 📋 Audit log of all analyses performed (who ran what, when)
-- 📋 Automatic PII redaction before sending data to Claude API (for highly sensitive datasets)
-- 📋 PDPL compliance documentation for the platform itself
-
-### Mobile & Accessibility
-- 📋 Native mobile app (React Native) for field data capture
-- 📋 Accessibility audit (WCAG 2.1 AA compliance)
-- 📋 Keyboard navigation improvements for power users
-
----
-
 ## Recently Completed (Last Session)
 
 | Date | Change |
 |---|---|
-| 2026-03-06 | Per-agent-mode isolated session lists (DB migration + full-stack wiring) |
-| 2026-03-06 | Dynamic "New Session" button label per agent mode (EN + AR) |
-| 2026-03-06 | Fixed `agentMode is not defined` crash in `SidebarContent` |
-| 2026-03-06 | Created `README.md` and `Progress.md` documentation files |
-| 2026-03-06 | **Informatica Output** — backend system prompt, trigger detection, frontend detection/state/streaming, Informatica mini-table in ThreadCard, `informatica_output` Excel sheet, EN+AR translations, orange tag, Informatica feature card |
-| 2026-03-06 | **Use Cases Page** — static `/use-cases` route; 14 use case cards with filter tabs (All/Data Management/Compliance/Analytics/Insights); click-to-open modals with user story, example input, styled HTML/CSS output previews; "Launch Agent" CTA pre-fills `?prompt=&mode=` URL params; chat.tsx reads params on mount and clears them; Use Cases link in sidebar (EN + AR/RTL) |
+| 2026-03-06 | **App Renaming** — changed app name from "Data Owner Agent" to "Data & Analytics agent" across UI, metadata, and docs |
 | 2026-03-06 | **Favicon** — replaced with official ZATCA logo (`ZATCA-o.png`, 310×310 PNG) downloaded directly from zatca.gov.sa; no HTML changes needed |
+| 2026-03-06 | **Use Cases Page** — static `/use-cases` route; 14 use case cards with filter tabs (All/Data Management/Compliance/Analytics/Insights); click-to-open modals with user story, example input, styled HTML/CSS output previews; "Launch Agent" CTA pre-fills `?prompt=&mode=` URL params; chat.tsx reads params on mount and clears them; Use Cases link in sidebar (EN + AR/RTL) |
+| 2026-03-06 | **Informatica Output** — backend system prompt, trigger detection, frontend detection/state/streaming, Informatica mini-table in ThreadCard, `informatica_output` Excel sheet, EN+AR translations, orange tag, Informatica feature card |
