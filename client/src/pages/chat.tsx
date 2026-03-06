@@ -1433,13 +1433,6 @@ export default function ChatPage() {
         insightsMap[msg.id] = insights;
         msgParts.push(t.insightsReportGenerated);
       } else if (looksLikeInsightsJSON(msg.content)) {
-        const fallbackReport: InsightsReport = {
-          report_title: "Data Insights Report",
-          dataset_summary: { total_rows: 0, total_columns: 0 },
-          key_insights: [],
-          recommendations: [],
-        };
-        insightsMap[msg.id] = fallbackReport;
         msgParts.push(t.insightsReportGenerated);
       }
       const piiScan = detectPiiScanJSON(msg.content);
@@ -2914,6 +2907,410 @@ function OutputsPanel({
   );
 }
 
+function InsightsReportCard({ report, onDownload }: { report: InsightsReport; onDownload: () => void }) {
+  const [openSections, setOpenSections] = useState({ descriptive: true, diagnostic: true, analytical: true });
+  const toggle = (k: keyof typeof openSections) => setOpenSections(prev => ({ ...prev, [k]: !prev[k] }));
+
+  const s = report.descriptive.summary;
+  const es = report.executive_summary;
+
+  const nullPctColor = (pct: number) => pct === 0 ? { bg: "#DCFCE7", text: "#166534" } : pct <= 10 ? { bg: "#FEF9C3", text: "#854D0E" } : { bg: "#FEE2E2", text: "#991B1B" };
+  const completenessColor = (pct: number) => pct >= 90 ? { bg: "#DCFCE7", text: "#166534" } : pct >= 70 ? { bg: "#FEF9C3", text: "#854D0E" } : { bg: "#FEE2E2", text: "#991B1B" };
+  const statusColor = (status: string) => status === "Good" ? { bg: "#DCFCE7", text: "#166534" } : status === "Acceptable" ? { bg: "#FEF9C3", text: "#854D0E" } : { bg: "#FEE2E2", text: "#991B1B" };
+  const strengthColor = (s: string) => s === "Strong" ? "#1E3A8A" : s === "Moderate" ? "#1D4ED8" : "#6B7280";
+  const severityColor = (s: string) => s === "High" ? { bg: "#FEE2E2", text: "#991B1B" } : s === "Medium" ? { bg: "#FEF9C3", text: "#C2410C" } : { bg: "#FEFCE8", text: "#854D0E" };
+  const directionIcon = (d: string) => d === "Increasing" ? "↑" : d === "Decreasing" ? "↓" : d === "Stable" ? "→" : "⚡";
+  const directionColor = (d: string) => d === "Increasing" ? "#166534" : d === "Decreasing" ? "#991B1B" : d === "Volatile" ? "#C2410C" : "#6B7280";
+  const riskColor = (r: string) => r === "High" ? "#991B1B" : r === "Medium" ? "#C2410C" : "#166534";
+  const noiseColor = (n: string) => n === "High" ? "#991B1B" : n === "Medium" ? "#854D0E" : "#166534";
+
+  const SectionHeader = ({ title, section }: { title: string; section: keyof typeof openSections }) => (
+    <button
+      onClick={() => toggle(section)}
+      className="w-full flex items-center justify-between px-4 py-3 text-left font-bold text-sm text-white rounded-t-xl"
+      style={{ backgroundColor: "#1A4B8C" }}
+    >
+      <span>{title}</span>
+      <ChevronDown className={`w-4 h-4 transition-transform ${openSections[section] ? "rotate-180" : ""}`} />
+    </button>
+  );
+
+  const SubHeader = ({ title }: { title: string }) => (
+    <div className="px-4 py-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: "#6B7280", backgroundColor: "#F8FAFF", borderBottom: "1px solid #E5E7EB" }}>{title}</div>
+  );
+
+  const Tbl = ({ headers, rows, className }: { headers: string[]; rows: React.ReactNode[][]; className?: string }) => (
+    <div className={`overflow-x-auto ${className ?? ""}`}>
+      <table className="w-full text-xs">
+        <thead>
+          <tr style={{ backgroundColor: "#F1F5FB" }}>
+            {headers.map((h, i) => <th key={i} className="px-3 py-2 text-left font-semibold text-gray-500 text-[10px] uppercase tracking-wider whitespace-nowrap">{h}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} className="border-t border-gray-50 hover:bg-gray-50">
+              {row.map((cell, j) => <td key={j} className="px-3 py-2 text-gray-700 align-top">{cell}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4 mt-2" data-testid="insights-report-card">
+      {/* Executive Summary Banner */}
+      <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "#0D2E5C", borderLeft: "4px solid #F59E0B" }} data-testid="insights-exec-banner">
+        <div className="p-5 space-y-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1">Headline Finding</p>
+            <p className="text-white font-bold text-base leading-snug">{es.headline_finding}</p>
+          </div>
+          {es.top_3_insights.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1">Top Insights</p>
+              <ol className="space-y-1">
+                {es.top_3_insights.map((ins, i) => (
+                  <li key={i} className="text-white/90 text-xs flex gap-2"><span className="font-bold text-white/50">{i + 1}.</span>{ins}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {es.biggest_risk && (
+              <div className="rounded-lg p-3" style={{ backgroundColor: "#991B1B33" }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-red-300 mb-0.5">Biggest Risk</p>
+                <p className="text-red-200 text-xs">{es.biggest_risk}</p>
+              </div>
+            )}
+            {es.immediate_action && (
+              <div className="rounded-lg p-3" style={{ backgroundColor: "#16653420" }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-green-300 mb-0.5">Immediate Action</p>
+                <p className="text-green-200 text-xs">{es.immediate_action}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Section 1 — Descriptive */}
+      <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm" data-testid="insights-section-descriptive">
+        <SectionHeader title="Section 1 — Descriptive: What Happened?" section="descriptive" />
+        {openSections.descriptive && (
+          <div className="bg-white divide-y divide-gray-100">
+            {/* Stat tiles */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4">
+              {[
+                { label: "Total Rows", value: s.total_rows.toLocaleString(), icon: "📋" },
+                { label: "Total Columns", value: s.total_columns.toLocaleString(), icon: "📊" },
+                { label: "Duplicate Rows", value: s.duplicate_rows.toLocaleString(), icon: "🔁" },
+                { label: "Completeness", value: `${s.overall_completeness_pct}%`, icon: "✅" },
+              ].map((tile, i) => (
+                <div key={i} className="rounded-lg p-3 text-center" style={{ backgroundColor: "#F8FAFF", border: "1px solid #E5E7EB" }}>
+                  <div className="text-lg">{tile.icon}</div>
+                  <div className="text-base font-bold" style={{ color: "#0D2E5C" }}>{tile.value}</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">{tile.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Field Profiles */}
+            {report.descriptive.field_profiles.length > 0 && (
+              <div>
+                <SubHeader title="Field Profiles" />
+                <Tbl
+                  headers={["Field Name", "Data Type", "Null %", "Unique", "Min", "Max", "Average", "Top Values", "Consistent?", "Insight"]}
+                  rows={report.descriptive.field_profiles.map(fp => {
+                    const nc = nullPctColor(fp.null_pct);
+                    return [
+                      <span className="font-mono font-medium">{fp.field_name}</span>,
+                      fp.data_type,
+                      <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: nc.bg, color: nc.text }}>{fp.null_pct}%</span>,
+                      fp.unique_count,
+                      fp.min ?? "—",
+                      fp.max ?? "—",
+                      fp.average ?? "—",
+                      Array.isArray(fp.top_values) ? fp.top_values.slice(0, 3).join(", ") : "—",
+                      <span className={fp.data_type_consistent ? "text-green-600 font-bold" : "text-red-600 font-bold"}>{fp.data_type_consistent ? "✅" : "❌"}</span>,
+                      <span className="text-[10px] text-gray-600 italic">{fp.insight}</span>,
+                    ];
+                  })}
+                />
+              </div>
+            )}
+
+            {/* Completeness Scorecard */}
+            {report.descriptive.completeness_scorecard.length > 0 && (
+              <div>
+                <SubHeader title="Completeness Scorecard" />
+                <div className="p-4 space-y-2">
+                  {[...report.descriptive.completeness_scorecard].sort((a, b) => a.completeness_pct - b.completeness_pct).map((cs, i) => {
+                    const sc = completenessColor(cs.completeness_pct);
+                    return (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="text-xs text-gray-600 w-36 truncate flex-shrink-0">{cs.field_name}</span>
+                        <div className="flex-1 h-4 rounded-full overflow-hidden" style={{ backgroundColor: "#F1F5F9" }}>
+                          <div className="h-full rounded-full" style={{ width: `${Math.min(cs.completeness_pct, 100)}%`, backgroundColor: sc.text }} />
+                        </div>
+                        <span className="text-[10px] font-bold w-8 text-right" style={{ color: sc.text }}>{cs.completeness_pct}%</span>
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: sc.bg, color: sc.text }}>{cs.status}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Date Range */}
+            {report.descriptive.date_range && report.descriptive.date_range.date_field_used && (
+              <div>
+                <SubHeader title="Date Range" />
+                <div className="p-4 flex flex-wrap gap-4">
+                  {[
+                    { label: "Earliest", value: report.descriptive.date_range.earliest },
+                    { label: "Latest", value: report.descriptive.date_range.latest },
+                    { label: "Span (days)", value: String(report.descriptive.date_range.span_days) },
+                    { label: "Field Used", value: report.descriptive.date_range.date_field_used },
+                  ].map((item, i) => (
+                    <div key={i} className="rounded-lg px-3 py-2" style={{ backgroundColor: "#F0F9FF", border: "1px solid #BAE6FD" }}>
+                      <p className="text-[9px] text-gray-500 uppercase tracking-wider">{item.label}</p>
+                      <p className="text-xs font-semibold text-gray-800">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Section 2 — Diagnostic */}
+      <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm" data-testid="insights-section-diagnostic">
+        <SectionHeader title="Section 2 — Diagnostic: Why Did It Happen?" section="diagnostic" />
+        {openSections.diagnostic && (
+          <div className="bg-white divide-y divide-gray-100">
+            {report.diagnostic.correlations.length > 0 && (
+              <div>
+                <SubHeader title="Correlations" />
+                <Tbl
+                  headers={["Field A", "Field B", "Relationship", "Strength", "Business Meaning"]}
+                  rows={report.diagnostic.correlations.map(c => [
+                    c.field_a, c.field_b, c.relationship,
+                    <span className="font-bold" style={{ color: strengthColor(c.strength) }}>{c.strength}</span>,
+                    c.business_meaning,
+                  ])}
+                />
+              </div>
+            )}
+
+            {report.diagnostic.outliers.length > 0 && (
+              <div>
+                <SubHeader title="Outliers" />
+                <Tbl
+                  headers={["Field Name", "Outlier Description", "Est. Affected Rows", "Possible Cause"]}
+                  rows={report.diagnostic.outliers.map(o => [
+                    o.field_name, o.outlier_description,
+                    <span className={o.affected_rows_estimate > 100 ? "font-bold text-red-600" : ""}>{o.affected_rows_estimate.toLocaleString()}</span>,
+                    o.possible_cause,
+                  ])}
+                />
+              </div>
+            )}
+
+            {report.diagnostic.skewness.length > 0 && (
+              <div>
+                <SubHeader title="Distribution Shape" />
+                <Tbl
+                  headers={["Field Name", "Distribution Shape", "Implication"]}
+                  rows={report.diagnostic.skewness.map(sk => [
+                    sk.field_name,
+                    <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ backgroundColor: "#EDE9FE", color: "#6D28D9" }}>{sk.distribution_shape}</span>,
+                    sk.implication,
+                  ])}
+                />
+              </div>
+            )}
+
+            {report.diagnostic.trends.length > 0 && (
+              <div>
+                <SubHeader title="Trends" />
+                <Tbl
+                  headers={["Field Name", "Trend Type", "Direction", "Observation"]}
+                  rows={report.diagnostic.trends.map(tr => [
+                    tr.field_name, tr.trend_type,
+                    <span className="font-bold" style={{ color: directionColor(tr.direction) }}>{directionIcon(tr.direction)} {tr.direction}</span>,
+                    tr.observation,
+                  ])}
+                />
+              </div>
+            )}
+
+            {report.diagnostic.cohort_comparison.length > 0 && (
+              <div>
+                <SubHeader title="Cohort Comparison" />
+                <Tbl
+                  headers={["Cohort Field", "Cohorts Found", "Key Difference", "Business Implication"]}
+                  rows={report.diagnostic.cohort_comparison.map(c => [
+                    c.cohort_field,
+                    c.cohorts_identified.join(", "),
+                    c.key_difference,
+                    c.business_implication,
+                  ])}
+                />
+              </div>
+            )}
+
+            {report.diagnostic.funnel_dropoff.length > 0 && (
+              <div>
+                <SubHeader title="Funnel Drop-off" />
+                <div className="p-4 space-y-3">
+                  {report.diagnostic.funnel_dropoff.map((stage, i) => (
+                    <div key={i} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-gray-700">{stage.stage}</span>
+                        <span className={`font-bold ${stage.dropoff_pct > 20 ? "text-red-600" : "text-gray-600"}`}>{stage.dropoff_pct}% drop</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="h-5 rounded flex items-center justify-center text-[10px] font-bold text-white" style={{ width: "100%", backgroundColor: "#1A4B8C", opacity: Math.max(0.3, 1 - i * 0.15) }}>
+                          {stage.records_in.toLocaleString()} in → {stage.records_out.toLocaleString()} out
+                        </div>
+                      </div>
+                      {stage.likely_cause && <p className="text-[10px] text-gray-500 italic">{stage.likely_cause}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {report.diagnostic.cross_field_violations.length > 0 && (
+              <div>
+                <SubHeader title="Cross-field Violations" />
+                <Tbl
+                  headers={["Fields Involved", "Violation Description", "Est. Affected Rows", "Severity"]}
+                  rows={report.diagnostic.cross_field_violations.map(v => {
+                    const sc = severityColor(v.severity);
+                    return [
+                      v.fields_involved.join(", "),
+                      v.violation_description,
+                      v.affected_rows_estimate.toLocaleString(),
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ backgroundColor: sc.bg, color: sc.text }}>{v.severity}</span>,
+                    ];
+                  })}
+                />
+              </div>
+            )}
+
+            {report.diagnostic.concentration_report.length > 0 && (
+              <div>
+                <SubHeader title="Concentration Report" />
+                <Tbl
+                  headers={["Field Name", "Top 10% Contribution", "Observation"]}
+                  rows={report.diagnostic.concentration_report.map(c => [
+                    c.field_name,
+                    <span className="font-bold" style={{ color: "#1A4B8C" }}>{c.top_10pct_contribution}</span>,
+                    c.observation,
+                  ])}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Section 3 — Analytical */}
+      <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm" data-testid="insights-section-analytical">
+        <SectionHeader title="Section 3 — Analytical: What Does It Mean?" section="analytical" />
+        {openSections.analytical && (
+          <div className="bg-white divide-y divide-gray-100">
+            {report.analytical.segments.length > 0 && (
+              <div>
+                <SubHeader title="Segments" />
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {report.analytical.segments.map((seg, i) => (
+                    <div key={i} className="rounded-xl border border-gray-100 p-4 space-y-2" style={{ backgroundColor: "#F8FAFF" }}>
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <p className="font-bold text-sm" style={{ color: "#0D2E5C" }}>{seg.segment_name}</p>
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#DBEAFE", color: "#1E3A8A" }}>{seg.estimated_size_pct}%</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {seg.defining_characteristics.map((ch, j) => (
+                          <span key={j} className="text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: "#E5E7EB", color: "#374151" }}>{ch}</span>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-600 leading-relaxed">{seg.business_meaning}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {report.analytical.contribution_analysis.length > 0 && (
+              <div>
+                <SubHeader title="Contribution Analysis" />
+                <Tbl
+                  headers={["Field Name", "Top Contributors", "Contribution %", "Insight"]}
+                  rows={report.analytical.contribution_analysis.map(c => [
+                    c.field_name,
+                    c.top_contributors.join(", "),
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-3 rounded-full" style={{ backgroundColor: "#E5E7EB" }}>
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(c.contribution_pct, 100)}%`, backgroundColor: "#1A4B8C" }} />
+                      </div>
+                      <span className="text-[10px] font-bold" style={{ color: "#1A4B8C" }}>{c.contribution_pct}%</span>
+                    </div>,
+                    c.insight,
+                  ])}
+                />
+              </div>
+            )}
+
+            {report.analytical.lineage_quality.length > 0 && (
+              <div>
+                <SubHeader title="Data Lineage Quality" />
+                <Tbl
+                  headers={["Field Name", "Error Propagation Risk", "Downstream Impact", "Recommendation"]}
+                  rows={report.analytical.lineage_quality.map(l => [
+                    l.field_name,
+                    <span className="font-bold" style={{ color: riskColor(l.error_propagation_risk) }}>{l.error_propagation_risk}</span>,
+                    l.downstream_impact,
+                    l.recommendation,
+                  ])}
+                />
+              </div>
+            )}
+
+            {report.analytical.time_series_decomposition.length > 0 && (
+              <div>
+                <SubHeader title="Time Series Decomposition" />
+                <Tbl
+                  headers={["Field Name", "Trend", "Seasonality", "Noise Level", "Insight"]}
+                  rows={report.analytical.time_series_decomposition.map(ts => [
+                    ts.field_name, ts.trend, ts.seasonality,
+                    <span className="font-bold" style={{ color: noiseColor(ts.noise_level) }}>{ts.noise_level}</span>,
+                    ts.insight,
+                  ])}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Download */}
+      <button
+        onClick={onDownload}
+        className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
+        style={{ backgroundColor: "#2E7D32" }}
+        data-testid="button-download-insights-report"
+      >
+        <Download className="w-4 h-4" />
+        📥 Download Insights Report
+      </button>
+    </div>
+  );
+}
+
 function NudgeResultCard({ report, t }: { report: NudgeReport; t: Translation }) {
   const riskBadge = (level: string) => {
     const c = nudgeRiskColor(level);
@@ -3441,33 +3838,12 @@ function ThreadCard({
                 </div>
               )}
 
-              {hasInsights && (
-                <div className="space-y-2" data-testid={`insights-card-${assistantMsg.id}`}>
-                  <Button
-                    size="sm"
-                    onClick={() => handleDownloadInsights(insightsReport!)}
-                    className="gap-1.5 text-[11px] text-white font-medium h-8 px-3 rounded-md ripple-button"
-                    style={{ backgroundColor: "#1A4B8C" }}
-                    data-testid={`button-download-insights-${assistantMsg.id}`}
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    {t.downloadInsightsReport}
-                  </Button>
-                  {allInsightsReports && allInsightsReports.length > 1 && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-medium" style={{ color: "#6B7280" }}>{t.previousReports}</p>
-                      {allInsightsReports.map((rpt, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <FileSpreadsheet className="w-3 h-3 flex-shrink-0" style={{ color: "#6B7280" }} />
-                          <span className="text-[10px] truncate flex-1" style={{ color: "#6B7280" }}>{rpt.excelFileName}</span>
-                          <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px]" onClick={() => handleDownloadInsights(rpt.report, rpt.fileName, rpt.columns)} data-testid={`button-download-prev-insights-${i}`}>
-                            <Download className="w-2.5 h-2.5" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              {hasInsights && insightsReport && (
+                <InsightsReportCard
+                  report={insightsReport}
+                  onDownload={() => handleDownloadInsights(insightsReport)}
+                  data-testid={`insights-card-${assistantMsg.id}`}
+                />
               )}
 
               {hasNudge && nudgeReport && (
@@ -3475,7 +3851,21 @@ function ThreadCard({
               )}
 
               {!hasSummary && !hasDataModel && !hasDqAnalysis && !hasInsights && !hasNudge && (() => {
-                const hasStructuredJson = /```(?:json)?\s*[\s\S]*?"(?:analysis_summary|scan_summary|fact_tables|report_title|informatica_sql)"/.test(assistantMsg.content);
+                const isFailedInsights = looksLikeInsightsJSON(assistantMsg.content);
+                if (isFailedInsights) {
+                  return (
+                    <div className="flex items-start gap-2 p-3 rounded-lg" style={{ backgroundColor: "#FEF2F2", border: "1px solid #FECACA" }} data-testid="card-insights-error">
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: "#DC2626" }}>
+                        <span className="text-white text-[8px] font-bold">!</span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium" style={{ color: "#DC2626" }}>Analysis could not be completed</p>
+                        <p className="text-[11px]" style={{ color: "#991B1B" }}>Please check your file and try again.</p>
+                      </div>
+                    </div>
+                  );
+                }
+                const hasStructuredJson = /```(?:json)?\s*[\s\S]*?"(?:analysis_summary|scan_summary|fact_tables|informatica_sql)"/.test(assistantMsg.content);
                 if (hasStructuredJson) {
                   return (
                     <div className="flex items-start gap-2 p-3 rounded-lg" style={{ backgroundColor: "#F0F9F4", border: "1px solid #BBF7D0" }}>

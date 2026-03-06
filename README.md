@@ -54,7 +54,7 @@ Design star schema fact and dimension tables from uploaded data. Generates:
 Scan datasets for personal and sensitive information against Saudi PDPL categories and international PII patterns. Identifies PII columns with risk level, legal basis, PDPL article references, and recommended handling.
 
 ### 6. Data Insights Report
-Upload any Excel dataset and receive a comprehensive insights report: executive summary, key insights, column-level statistics, anomalies, trends, and actionable recommendations — exported as a standalone styled Excel report.
+Upload any Excel dataset and receive a three-level insights report generated in a single Claude call: (1) **Descriptive** — what happened: summary stats, field profiles with null % colour-coded, completeness scorecard and date range; (2) **Diagnostic** — why it happened: correlations, outliers, distribution shape, trends, cohort comparison, funnel drop-off, cross-field violations and concentration; (3) **Analytical** — what it means: segments, contribution analysis, data lineage quality and time-series decomposition. Results are displayed inline as collapsible sections with a dark-navy executive summary banner at the top. Exported as a **standalone** 6-sheet Excel file (executive_summary, descriptive_field_profiles, completeness_scorecard, diagnostic_correlations, diagnostic_findings, analytical_insights) — never combined with result.xlsx.
 
 ### 7. Informatica Output
 Generate Informatica-compatible metadata for each data field: field descriptions, data quality rules, Informatica Expression Language SQL statements, SDAIA data classifications (with rationale and handling rules), and format types. Results are exported to a dedicated `informatica_output` sheet in `result.xlsx`.

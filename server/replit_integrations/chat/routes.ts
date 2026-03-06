@@ -602,54 +602,168 @@ Rules:
 - format_types must use standard SQL/Informatica data type notation
 - Be precise and specific — avoid generic placeholder text`;
 
-const INSIGHTS_SYSTEM_PROMPT = `You are a senior data analyst. The user has uploaded a dataset and wants a comprehensive insights report. You will receive pre-computed column-level statistics and a sample of up to 10 rows.
+const INSIGHTS_SYSTEM_PROMPT = `You are a senior ZATCA data analyst. The user has uploaded a dataset. Based on the statistical profile and sample provided, generate a comprehensive data insights report covering three levels of analysis: Descriptive, Diagnostic, and Analytical.
 
-Your task is to analyze the profiled statistics and sample data, then return ONLY a JSON object (wrapped in triple-backtick json fences) with the following schema. Do NOT include any prose, explanation, or markdown outside the JSON code block.
+Return ONLY valid JSON — no prose, no markdown, no backtick fences. The JSON must match this exact structure:
 
-\`\`\`json
 {
-  "report_title": "A descriptive title for the insights report",
-  "dataset_summary": {
-    "total_rows": 0,
-    "total_columns": 0,
-    "numeric_columns": 0,
-    "text_columns": 0,
-    "date_columns": 0,
-    "overall_completeness_pct": 0.0,
-    "summary_text": "A 2-3 sentence high-level summary of the dataset."
+  "report_title": "...",
+  "dataset_context": "2-3 sentence description of what this dataset appears to contain",
+
+  "descriptive": {
+    "summary": {
+      "total_rows": 0,
+      "total_columns": 0,
+      "duplicate_rows": 0,
+      "overall_completeness_pct": 0
+    },
+    "field_profiles": [
+      {
+        "field_name": "...",
+        "data_type": "...",
+        "null_count": 0,
+        "null_pct": 0,
+        "unique_count": 0,
+        "top_values": ["..."],
+        "min": "...",
+        "max": "...",
+        "average": "...",
+        "data_type_consistent": true,
+        "insight": "1-sentence observation about this field"
+      }
+    ],
+    "date_range": {
+      "earliest": "...",
+      "latest": "...",
+      "span_days": 0,
+      "date_field_used": "..."
+    },
+    "completeness_scorecard": [
+      {
+        "field_name": "...",
+        "completeness_pct": 0,
+        "status": "Good"
+      }
+    ]
   },
-  "key_insights": [
-    {
-      "insight_no": 1,
-      "category": "Distribution | Correlation | Anomaly | Trend | Quality | Pattern",
-      "title": "Short insight title",
-      "description": "1-2 sentence description of the insight",
-      "affected_columns": ["col1", "col2"],
-      "business_impact": "High | Medium | Low",
-      "confidence": "High | Medium | Low"
-    }
-  ],
-  "recommendations": [
-    {
-      "recommendation_no": 1,
-      "title": "Short recommendation title",
-      "description": "1-2 sentence recommendation",
-      "priority": "High | Medium | Low",
-      "effort": "High | Medium | Low",
-      "affected_columns": ["col1"]
-    }
-  ]
+
+  "diagnostic": {
+    "correlations": [
+      {
+        "field_a": "...",
+        "field_b": "...",
+        "relationship": "...",
+        "strength": "Strong | Moderate | Weak",
+        "business_meaning": "..."
+      }
+    ],
+    "outliers": [
+      {
+        "field_name": "...",
+        "outlier_description": "...",
+        "affected_rows_estimate": 0,
+        "possible_cause": "..."
+      }
+    ],
+    "skewness": [
+      {
+        "field_name": "...",
+        "distribution_shape": "Normal | Right-Skewed | Left-Skewed | Bimodal | Flat",
+        "implication": "..."
+      }
+    ],
+    "trends": [
+      {
+        "field_name": "...",
+        "trend_type": "YoY | MoM | Quarterly",
+        "direction": "Increasing | Decreasing | Stable | Volatile",
+        "observation": "..."
+      }
+    ],
+    "cohort_comparison": [
+      {
+        "cohort_field": "...",
+        "cohorts_identified": ["..."],
+        "key_difference": "...",
+        "business_implication": "..."
+      }
+    ],
+    "funnel_dropoff": [
+      {
+        "stage": "...",
+        "records_in": 0,
+        "records_out": 0,
+        "dropoff_pct": 0,
+        "likely_cause": "..."
+      }
+    ],
+    "cross_field_violations": [
+      {
+        "fields_involved": ["..."],
+        "violation_description": "...",
+        "affected_rows_estimate": 0,
+        "severity": "High | Medium | Low"
+      }
+    ],
+    "concentration_report": [
+      {
+        "field_name": "...",
+        "top_10pct_contribution": "...",
+        "observation": "..."
+      }
+    ]
+  },
+
+  "analytical": {
+    "segments": [
+      {
+        "segment_name": "...",
+        "defining_characteristics": ["..."],
+        "estimated_size_pct": 0,
+        "business_meaning": "..."
+      }
+    ],
+    "contribution_analysis": [
+      {
+        "field_name": "...",
+        "top_contributors": ["..."],
+        "contribution_pct": 0,
+        "insight": "..."
+      }
+    ],
+    "lineage_quality": [
+      {
+        "field_name": "...",
+        "error_propagation_risk": "High | Medium | Low",
+        "downstream_impact": "...",
+        "recommendation": "..."
+      }
+    ],
+    "time_series_decomposition": [
+      {
+        "field_name": "...",
+        "trend": "...",
+        "seasonality": "...",
+        "noise_level": "High | Medium | Low",
+        "insight": "..."
+      }
+    ]
+  },
+
+  "executive_summary": {
+    "headline_finding": "...",
+    "top_3_insights": ["...", "...", "..."],
+    "biggest_risk": "...",
+    "immediate_action": "..."
+  }
 }
-\`\`\`
 
 Rules:
-- Provide at least 5 key_insights if the data supports it, up to 10
-- Provide at least 3 recommendations, up to 8
-- Keep each description concise (1-2 sentences max)
-- Do NOT include column_profiles or data_quality_flags — those are handled separately
-- Base your analysis on the profiled statistics provided, not assumptions
-- confidence should reflect how certain you are given the stats and sample size
-- Return ONLY the JSON block, no other text`;
+- Do NOT include any predictive, forecast, or future-projection fields whatsoever
+- completeness_scorecard status must be exactly: "Good" (>=90%), "Acceptable" (70-89%), or "Poor" (<70%)
+- For any diagnostic array where the data does not support analysis, return an empty array []
+- field_profiles must include every column present in the profiled statistics
+- Return ONLY the JSON object, no other text, no markdown backticks`;
 
 interface ColumnProfile {
   column_name: string;

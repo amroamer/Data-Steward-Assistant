@@ -87,15 +87,19 @@ const t = {
         content: [
           {
             heading: "Uploading your data",
-            body: "Switch to the Insights Agent tab. Upload an Excel file (.xlsx or .xls) using the paperclip icon in the command console, then ask 'analyze this data' or 'give me insights'. The agent profiles every column automatically.",
+            body: "Switch to the Insights Agent tab. Upload an Excel file (.xlsx or .xls) using the paperclip icon in the command console, then ask 'analyze this data' or 'give me insights'. The agent profiles every column automatically — no manual configuration needed.",
           },
           {
-            heading: "What the report includes",
-            body: "Executive summary, key insights with headlines, column-level statistics (null rates, cardinality, min/max/avg), anomalies and outliers, trends over time dimensions, and actionable recommendations tailored to the dataset.",
+            heading: "Three automatic analysis levels",
+            body: "Every report covers: (1) Descriptive — what happened: summary stats, field profiles with null % colour-coded, completeness scorecard and date range; (2) Diagnostic — why it happened: correlations, outliers, distribution shape, trends, cohort comparison, funnel drop-off, cross-field violations and concentration; (3) Analytical — what it means: behavioural segments, contribution analysis, data lineage quality and time-series decomposition.",
+          },
+          {
+            heading: "Inline executive summary banner",
+            body: "At the top of every response you will see an executive summary banner (dark navy background) showing: the headline finding, top 3 insights, biggest risk (red) and immediate action (green). Below it the three sections expand and collapse on click.",
           },
           {
             heading: "Exporting the report",
-            body: "Click the 'Download Insights Report' button in the response card. The report is exported as a styled standalone Excel file with a cover page, summary sheet, and per-column detail sheets.",
+            body: "Click the green 'Download Insights Report' button below the collapsible sections. The report is exported as a standalone Excel file with 6 sheets: executive_summary, descriptive_field_profiles, completeness_scorecard, diagnostic_correlations, diagnostic_findings, and analytical_insights. It is never combined with result.xlsx.",
           },
         ],
       },
@@ -290,15 +294,19 @@ const t = {
         content: [
           {
             heading: "رفع بياناتك",
-            body: "انتقل إلى تبويب وكيل الرؤى. حمّل ملف Excel باستخدام أيقونة المشبك في وحدة تحكم الأوامر، ثم اطلب 'تحليل هذه البيانات'. يقوم الوكيل بتحليل كل عمود تلقائيًا.",
+            body: "انتقل إلى تبويب وكيل الرؤى. حمّل ملف Excel باستخدام أيقونة المشبك في وحدة تحكم الأوامر، ثم اطلب 'تحليل هذه البيانات'. يقوم الوكيل بتحليل كل عمود تلقائيًا — دون أي إعداد يدوي.",
           },
           {
-            heading: "ما يتضمنه التقرير",
-            body: "ملخص تنفيذي، رؤى رئيسية بعناوين واضحة، إحصاءات على مستوى الأعمدة (معدلات الفراغ، الأنماط، الحد الأدنى/الأقصى/المتوسط)، الشذوذات والقيم المتطرفة، الاتجاهات، وتوصيات قابلة للتنفيذ.",
+            heading: "ثلاثة مستويات تحليل تلقائية",
+            body: "يغطي كل تقرير: (١) الوصفي — ما حدث: إحصاءات ملخصة، ملامح الحقول مع نسبة الفراغ مُرمَّزة بالألوان، سجل اكتمال البيانات ونطاق التاريخ؛ (٢) التشخيصي — لماذا حدث: الارتباطات، القيم الشاذة، توزيع البيانات، الاتجاهات، مقارنة المجموعات، قمع التسرب، انتهاكات الحقول المتقاطعة والتركيز؛ (٣) التحليلي — ماذا يعني: الشرائح السلوكية، تحليل المساهمة، جودة نسب البيانات وتحليل السلاسل الزمنية.",
+          },
+          {
+            heading: "لافتة الملخص التنفيذي المُضمَّنة",
+            body: "في أعلى كل رد ستظهر لافتة ملخص تنفيذي (خلفية زرقاء داكنة) تعرض: النتيجة الرئيسية، أبرز 3 رؤى، أكبر خطر (باللون الأحمر) والإجراء الفوري (باللون الأخضر). يمكن طي الأقسام الثلاثة الموجودة أسفلها والتوسع فيها بنقرة واحدة.",
           },
           {
             heading: "تصدير التقرير",
-            body: "انقر على زر 'تنزيل تقرير الرؤى' في بطاقة الاستجابة. يُصدَّر التقرير كملف Excel منسق مستقل يحتوي على صفحة غلاف وصفحة ملخص وصفحات تفصيلية لكل عمود.",
+            body: "انقر على زر 'تنزيل تقرير الرؤى' الأخضر أسفل الأقسام القابلة للطي. يُصدَّر التقرير كملف Excel مستقل يحتوي على 6 أوراق: executive_summary وdescriptive_field_profiles وcompleteness_scorecard وdiagnostic_correlations وdiagnostic_findings وanalytical_insights. لا يُدمج أبدًا مع ملف result.xlsx.",
           },
         ],
       },

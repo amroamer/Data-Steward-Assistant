@@ -1,62 +1,169 @@
+// INSIGHTS REPORT: Standalone file only. Never write to result.xlsx.
 import * as XLSX from "xlsx";
 
-export interface DatasetSummary {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface DescriptiveSummary {
   total_rows: number;
   total_columns: number;
-  numeric_columns?: number;
-  text_columns?: number;
-  date_columns?: number;
-  overall_completeness_pct?: number;
-  summary_text?: string;
-  date_range?: string;
+  duplicate_rows: number;
+  overall_completeness_pct: number;
 }
 
-export interface KeyInsight {
-  insight_no: number;
-  category: string;
-  title: string;
-  description: string;
-  affected_columns: string[];
-  business_impact: string;
-  confidence: string;
-}
-
-export interface ColumnProfile {
-  column_name: string;
+export interface FieldProfile {
+  field_name: string;
   data_type: string;
   null_count: number;
   null_pct: number;
-  unique_values: number;
-  min?: string | number | null;
-  max?: string | number | null;
-  mean?: string | number | null;
-  median?: string | number | null;
-  std_dev?: string | number | null;
-  top_values?: string | any[] | null;
-  anomaly_flag: boolean;
-  anomaly_description?: string;
-  anomaly_detail?: string;
+  unique_count: number;
+  top_values: string[];
+  min: string;
+  max: string;
+  average: string;
+  data_type_consistent: boolean;
+  insight: string;
 }
 
-export interface Recommendation {
-  recommendation_no: number;
-  title: string;
-  description: string;
-  priority: string;
-  effort: string;
-  affected_columns: string[];
+export interface DateRange {
+  earliest: string;
+  latest: string;
+  span_days: number;
+  date_field_used: string;
 }
 
-export interface DataQualityFlag {
-  flag_no: number;
-  column_name: string;
-  issue: string;
-  severity: string;
-  details?: string;
-  affected_rows_estimate?: number;
-  suggested_fix: string;
+export interface CompletenessScore {
+  field_name: string;
+  completeness_pct: number;
+  status: "Good" | "Acceptable" | "Poor";
 }
 
+export interface DescriptiveLevel {
+  summary: DescriptiveSummary;
+  field_profiles: FieldProfile[];
+  date_range?: DateRange;
+  completeness_scorecard: CompletenessScore[];
+}
+
+export interface Correlation {
+  field_a: string;
+  field_b: string;
+  relationship: string;
+  strength: "Strong" | "Moderate" | "Weak";
+  business_meaning: string;
+}
+
+export interface Outlier {
+  field_name: string;
+  outlier_description: string;
+  affected_rows_estimate: number;
+  possible_cause: string;
+}
+
+export interface SkewnessEntry {
+  field_name: string;
+  distribution_shape: string;
+  implication: string;
+}
+
+export interface TrendEntry {
+  field_name: string;
+  trend_type: string;
+  direction: string;
+  observation: string;
+}
+
+export interface CohortComparison {
+  cohort_field: string;
+  cohorts_identified: string[];
+  key_difference: string;
+  business_implication: string;
+}
+
+export interface FunnelDropoff {
+  stage: string;
+  records_in: number;
+  records_out: number;
+  dropoff_pct: number;
+  likely_cause: string;
+}
+
+export interface CrossFieldViolation {
+  fields_involved: string[];
+  violation_description: string;
+  affected_rows_estimate: number;
+  severity: "High" | "Medium" | "Low";
+}
+
+export interface ConcentrationEntry {
+  field_name: string;
+  top_10pct_contribution: string;
+  observation: string;
+}
+
+export interface DiagnosticLevel {
+  correlations: Correlation[];
+  outliers: Outlier[];
+  skewness: SkewnessEntry[];
+  trends: TrendEntry[];
+  cohort_comparison: CohortComparison[];
+  funnel_dropoff: FunnelDropoff[];
+  cross_field_violations: CrossFieldViolation[];
+  concentration_report: ConcentrationEntry[];
+}
+
+export interface Segment {
+  segment_name: string;
+  defining_characteristics: string[];
+  estimated_size_pct: number;
+  business_meaning: string;
+}
+
+export interface ContributionAnalysis {
+  field_name: string;
+  top_contributors: string[];
+  contribution_pct: number;
+  insight: string;
+}
+
+export interface LineageQuality {
+  field_name: string;
+  error_propagation_risk: "High" | "Medium" | "Low";
+  downstream_impact: string;
+  recommendation: string;
+}
+
+export interface TimeSeriesDecomposition {
+  field_name: string;
+  trend: string;
+  seasonality: string;
+  noise_level: "High" | "Medium" | "Low";
+  insight: string;
+}
+
+export interface AnalyticalLevel {
+  segments: Segment[];
+  contribution_analysis: ContributionAnalysis[];
+  lineage_quality: LineageQuality[];
+  time_series_decomposition: TimeSeriesDecomposition[];
+}
+
+export interface ExecutiveSummary {
+  headline_finding: string;
+  top_3_insights: string[];
+  biggest_risk: string;
+  immediate_action: string;
+}
+
+export interface InsightsReport {
+  report_title: string;
+  dataset_context: string;
+  descriptive: DescriptiveLevel;
+  diagnostic: DiagnosticLevel;
+  analytical: AnalyticalLevel;
+  executive_summary: ExecutiveSummary;
+}
+
+// Legacy compat — still used by backend column profiling display
 export interface BackendColumnProfile {
   column_name: string;
   data_type: string;
@@ -74,14 +181,7 @@ export interface BackendColumnProfile {
   date_range_days?: number | null;
 }
 
-export interface InsightsReport {
-  report_title: string;
-  dataset_summary: DatasetSummary;
-  key_insights: KeyInsight[];
-  column_profiles?: ColumnProfile[];
-  recommendations: Recommendation[];
-  data_quality_flags?: DataQualityFlag[];
-}
+// ─── Detection ────────────────────────────────────────────────────────────────
 
 function tryParseInsights(text: string): InsightsReport | null {
   try {
@@ -89,22 +189,51 @@ function tryParseInsights(text: string): InsightsReport | null {
     if (
       parsed &&
       typeof parsed.report_title === "string" &&
-      parsed.dataset_summary &&
-      typeof parsed.dataset_summary.total_rows === "number" &&
-      typeof parsed.dataset_summary.total_columns === "number" &&
-      Array.isArray(parsed.key_insights)
+      parsed.descriptive &&
+      parsed.executive_summary
     ) {
-      return {
-        report_title: parsed.report_title,
-        dataset_summary: parsed.dataset_summary,
-        key_insights: parsed.key_insights,
-        column_profiles: Array.isArray(parsed.column_profiles) ? parsed.column_profiles : [],
-        recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
-        data_quality_flags: Array.isArray(parsed.data_quality_flags) ? parsed.data_quality_flags : [],
-      };
+      return normalizeReport(parsed);
     }
   } catch {}
   return null;
+}
+
+function normalizeReport(parsed: any): InsightsReport {
+  const d = parsed.diagnostic || {};
+  const a = parsed.analytical || {};
+  const desc = parsed.descriptive || {};
+  return {
+    report_title: parsed.report_title ?? "Data Insights Report",
+    dataset_context: parsed.dataset_context ?? "",
+    descriptive: {
+      summary: desc.summary ?? { total_rows: 0, total_columns: 0, duplicate_rows: 0, overall_completeness_pct: 0 },
+      field_profiles: Array.isArray(desc.field_profiles) ? desc.field_profiles : [],
+      date_range: desc.date_range ?? undefined,
+      completeness_scorecard: Array.isArray(desc.completeness_scorecard) ? desc.completeness_scorecard : [],
+    },
+    diagnostic: {
+      correlations: Array.isArray(d.correlations) ? d.correlations : [],
+      outliers: Array.isArray(d.outliers) ? d.outliers : [],
+      skewness: Array.isArray(d.skewness) ? d.skewness : [],
+      trends: Array.isArray(d.trends) ? d.trends : [],
+      cohort_comparison: Array.isArray(d.cohort_comparison) ? d.cohort_comparison : [],
+      funnel_dropoff: Array.isArray(d.funnel_dropoff) ? d.funnel_dropoff : [],
+      cross_field_violations: Array.isArray(d.cross_field_violations) ? d.cross_field_violations : [],
+      concentration_report: Array.isArray(d.concentration_report) ? d.concentration_report : [],
+    },
+    analytical: {
+      segments: Array.isArray(a.segments) ? a.segments : [],
+      contribution_analysis: Array.isArray(a.contribution_analysis) ? a.contribution_analysis : [],
+      lineage_quality: Array.isArray(a.lineage_quality) ? a.lineage_quality : [],
+      time_series_decomposition: Array.isArray(a.time_series_decomposition) ? a.time_series_decomposition : [],
+    },
+    executive_summary: {
+      headline_finding: parsed.executive_summary?.headline_finding ?? "",
+      top_3_insights: Array.isArray(parsed.executive_summary?.top_3_insights) ? parsed.executive_summary.top_3_insights : [],
+      biggest_risk: parsed.executive_summary?.biggest_risk ?? "",
+      immediate_action: parsed.executive_summary?.immediate_action ?? "",
+    },
+  };
 }
 
 function repairAndParse(raw: string): InsightsReport | null {
@@ -123,42 +252,18 @@ function repairAndParse(raw: string): InsightsReport | null {
         else if (ch === "}" || ch === "]") stack.pop();
       }
     }
-
     let repaired = raw;
-    if (inString) {
-      repaired += '"';
-    }
-
+    if (inString) repaired += '"';
     repaired = repaired.replace(/,\s*$/, "");
-
-    const lastSignificant = repaired.trimEnd();
-    if (lastSignificant.endsWith(":")) {
-      repaired = repaired.trimEnd() + " null";
-    } else if (lastSignificant.endsWith(",")) {
-      repaired = repaired.trimEnd().slice(0, -1);
-    }
-
-    while (stack.length > 0) {
-      repaired += stack.pop();
-    }
-
+    while (stack.length > 0) repaired += stack.pop();
     const parsed = JSON.parse(repaired);
-    if (parsed.report_title && parsed.dataset_summary) {
-      return {
-        report_title: parsed.report_title ?? "Data Insights Report",
-        dataset_summary: parsed.dataset_summary ?? { total_rows: 0, total_columns: 0 },
-        key_insights: Array.isArray(parsed.key_insights) ? parsed.key_insights : [],
-        column_profiles: Array.isArray(parsed.column_profiles) ? parsed.column_profiles : [],
-        recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
-        data_quality_flags: Array.isArray(parsed.data_quality_flags) ? parsed.data_quality_flags : [],
-      } as InsightsReport;
-    }
+    if (parsed.report_title && parsed.descriptive) return normalizeReport(parsed);
   } catch {}
   return null;
 }
 
 export function looksLikeInsightsJSON(content: string): boolean {
-  return content.includes('"report_title"') && content.includes('"dataset_summary"') && content.includes('"key_insights"');
+  return content.includes('"report_title"') && content.includes('"descriptive"') && content.includes('"executive_summary"');
 }
 
 export function detectInsightsJSON(content: string): InsightsReport | null {
@@ -169,512 +274,366 @@ export function detectInsightsJSON(content: string): InsightsReport | null {
     const result = tryParseInsights(candidate);
     if (result) return result;
   }
-
   const result2 = tryParseInsights(content.trim());
   if (result2) return result2;
-
   if (looksLikeInsightsJSON(content)) {
     const raw = content.replace(/^```(?:json)?\s*/m, "").replace(/```\s*$/m, "").trim();
     return repairAndParse(raw);
   }
-
   return null;
 }
 
-const DARK_BLUE = "1A4B8C";
+// ─── Excel Colors ─────────────────────────────────────────────────────────────
+
+const ZATCA_NAVY = "1A4B8C";
 const WHITE = "FFFFFF";
-const LIGHT_GREY = "F0F0F0";
-const ALT_ROW = "F5F8FF";
-const RED_BG = "FFEBEE";
-const GREEN_TEXT = "2E7D32";
-const RED_TEXT = "C62828";
-const ORANGE_TEXT = "E65100";
-const YELLOW_TEXT = "F9A825";
-const DARK_RED_TEXT = "B71C1C";
+const ALT_ROW = "EBF2FB";
+const GREEN_FILL = "DCFCE7";
+const GREEN_TEXT = "166534";
+const YELLOW_FILL = "FEF9C3";
+const YELLOW_TEXT = "854D0E";
+const RED_FILL = "FEE2E2";
+const RED_TEXT = "991B1B";
+const ORANGE_TEXT = "C2410C";
+const BLUE_DARK = "1E3A8A";
+const BLUE_MID = "1D4ED8";
+const GREY_TEXT = "6B7280";
+const SECTION_HEADER_FILL = "0D2E5C";
 
-function headerStyle(): XLSX.CellObject["s"] {
-  return {
-    font: { bold: true, color: { rgb: WHITE }, sz: 11 },
-    fill: { fgColor: { rgb: DARK_BLUE } },
-    alignment: { horizontal: "center", vertical: "center", wrapText: true },
-    border: {
-      top: { style: "thin", color: { rgb: "CCCCCC" } },
-      bottom: { style: "thin", color: { rgb: "CCCCCC" } },
-      left: { style: "thin", color: { rgb: "CCCCCC" } },
-      right: { style: "thin", color: { rgb: "CCCCCC" } },
-    },
-  };
+function hStyle(): any {
+  return { font: { bold: true, color: { rgb: WHITE }, sz: 11 }, fill: { fgColor: { rgb: ZATCA_NAVY } }, alignment: { horizontal: "center", wrapText: true }, border: { top: { style: "thin", color: { rgb: "CCCCCC" } }, bottom: { style: "thin", color: { rgb: "CCCCCC" } }, left: { style: "thin", color: { rgb: "CCCCCC" } }, right: { style: "thin", color: { rgb: "CCCCCC" } } } };
 }
 
-function cellBorder(): XLSX.CellObject["s"] {
-  return {
-    border: {
-      top: { style: "thin", color: { rgb: "E0E0E0" } },
-      bottom: { style: "thin", color: { rgb: "E0E0E0" } },
-      left: { style: "thin", color: { rgb: "E0E0E0" } },
-      right: { style: "thin", color: { rgb: "E0E0E0" } },
-    },
-  };
+function sectionHeaderStyle(): any {
+  return { font: { bold: true, color: { rgb: WHITE }, sz: 12 }, fill: { fgColor: { rgb: SECTION_HEADER_FILL } }, alignment: { horizontal: "left" } };
 }
 
-function altRowStyle(rowIdx: number): XLSX.CellObject["s"] {
-  const base = cellBorder();
-  if (rowIdx % 2 === 1) {
-    return { ...base, fill: { fgColor: { rgb: ALT_ROW } } };
-  }
-  return base;
+function alt(r: number): any {
+  if (r % 2 === 1) return { fill: { fgColor: { rgb: ALT_ROW } } };
+  return {};
 }
 
-function autoWidth(ws: XLSX.WorkSheet, data: string[][]): void {
-  const colWidths = data[0].map((_h, i) => {
-    let max = 0;
+function autoWidth(ws: XLSX.WorkSheet, data: any[][]): void {
+  if (!data[0]) return;
+  ws["!cols"] = data[0].map((_: any, i: number) => {
+    let max = 10;
     for (const row of data) {
-      const len = (row[i] || "").length;
+      const len = String(row[i] ?? "").length;
       if (len > max) max = len;
     }
-    return { wch: Math.min(Math.max(max + 2, 12), 60) };
+    return { wch: Math.min(max + 2, 60) };
   });
-  ws["!cols"] = colWidths;
 }
 
 function freezeHeader(ws: XLSX.WorkSheet): void {
-  ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
+  (ws as any)["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
 }
 
-function applyHeaderStyles(ws: XLSX.WorkSheet, colCount: number): void {
+function applyHeaders(ws: XLSX.WorkSheet, colCount: number): void {
   for (let c = 0; c < colCount; c++) {
     const addr = XLSX.utils.encode_cell({ r: 0, c });
-    if (ws[addr]) {
-      ws[addr].s = headerStyle();
-    }
+    if (ws[addr]) ws[addr].s = hStyle();
   }
 }
 
-function applyAltRowStyles(ws: XLSX.WorkSheet, rowCount: number, colCount: number, startRow: number = 1): void {
-  for (let r = startRow; r < rowCount; r++) {
+function applyAltRows(ws: XLSX.WorkSheet, rowCount: number, colCount: number, start = 1): void {
+  for (let r = start; r < rowCount; r++) {
     for (let c = 0; c < colCount; c++) {
       const addr = XLSX.utils.encode_cell({ r, c });
-      if (ws[addr]) {
-        ws[addr].s = { ...(ws[addr].s || {}), ...altRowStyle(r - startRow) };
-      }
+      if (ws[addr]) ws[addr].s = { ...(ws[addr].s || {}), ...alt(r - start) };
     }
   }
 }
 
-function impactColor(impact: string): string {
-  const lower = impact.toLowerCase();
-  if (lower === "high" || lower === "critical") return RED_TEXT;
-  if (lower === "medium" || lower === "moderate") return ORANGE_TEXT;
-  return GREEN_TEXT;
+function setCellStyle(ws: XLSX.WorkSheet, r: number, c: number, style: any): void {
+  const addr = XLSX.utils.encode_cell({ r, c });
+  if (ws[addr]) ws[addr].s = { ...(ws[addr].s || {}), ...style };
 }
 
-function severityColor(severity: string): string {
-  const lower = severity.toLowerCase();
-  if (lower === "critical") return DARK_RED_TEXT;
-  if (lower === "high") return RED_TEXT;
-  if (lower === "medium" || lower === "moderate") return ORANGE_TEXT;
-  return YELLOW_TEXT;
+function nullPctStyle(pct: number): any {
+  if (pct === 0) return { font: { bold: true, color: { rgb: GREEN_TEXT } }, fill: { fgColor: { rgb: GREEN_FILL } } };
+  if (pct <= 10) return { font: { bold: true, color: { rgb: YELLOW_TEXT } }, fill: { fgColor: { rgb: YELLOW_FILL } } };
+  return { font: { bold: true, color: { rgb: RED_TEXT } }, fill: { fgColor: { rgb: RED_FILL } } };
 }
 
-function severityOrder(severity: string): number {
-  const lower = severity.toLowerCase();
-  if (lower === "critical") return 0;
-  if (lower === "high") return 1;
-  if (lower === "medium" || lower === "moderate") return 2;
-  return 3;
+function statusStyle(status: string): any {
+  if (status === "Good") return { font: { bold: true, color: { rgb: GREEN_TEXT } }, fill: { fgColor: { rgb: GREEN_FILL } } };
+  if (status === "Acceptable") return { font: { bold: true, color: { rgb: YELLOW_TEXT } }, fill: { fgColor: { rgb: YELLOW_FILL } } };
+  return { font: { bold: true, color: { rgb: RED_TEXT } }, fill: { fgColor: { rgb: RED_FILL } } };
 }
 
-function priorityColor(priority: string): string {
-  const lower = priority.toLowerCase();
-  if (lower === "high" || lower === "critical") return RED_TEXT;
-  if (lower === "medium" || lower === "moderate") return ORANGE_TEXT;
-  return GREEN_TEXT;
+function strengthStyle(strength: string): any {
+  if (strength === "Strong") return { font: { bold: true, color: { rgb: BLUE_DARK } } };
+  if (strength === "Moderate") return { font: { color: { rgb: BLUE_MID } } };
+  return { font: { color: { rgb: GREY_TEXT } } };
 }
 
-function effortColor(effort: string): string {
-  const lower = effort.toLowerCase();
-  if (lower === "high") return RED_TEXT;
-  if (lower === "medium" || lower === "moderate") return ORANGE_TEXT;
-  return GREEN_TEXT;
+function severityStyle(severity: string): any {
+  if (severity === "High") return { font: { bold: true, color: { rgb: RED_TEXT } }, fill: { fgColor: { rgb: RED_FILL } } };
+  if (severity === "Medium") return { font: { bold: true, color: { rgb: ORANGE_TEXT } }, fill: { fgColor: { rgb: YELLOW_FILL } } };
+  return { font: { bold: true, color: { rgb: YELLOW_TEXT } }, fill: { fgColor: { rgb: "FEFCE8" } } };
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  "data quality": "E8F5E9",
-  "trend": "E3F2FD",
-  "anomaly": "FFF3E0",
-  "correlation": "F3E5F5",
-  "distribution": "E0F7FA",
-  "completeness": "FFF8E1",
-  "pattern": "FCE4EC",
-};
-
-function categoryBg(category: string): string {
-  const lower = category.toLowerCase();
-  for (const [key, color] of Object.entries(CATEGORY_COLORS)) {
-    if (lower.includes(key)) return color;
-  }
-  return "F5F5F5";
+function riskStyle(risk: string): any {
+  if (risk === "High") return { font: { bold: true, color: { rgb: RED_TEXT } } };
+  if (risk === "Medium") return { font: { bold: true, color: { rgb: ORANGE_TEXT } } };
+  return { font: { bold: true, color: { rgb: GREEN_TEXT } } };
 }
+
+function noiseStyle(noise: string): any {
+  if (noise === "High") return { font: { bold: true, color: { rgb: RED_TEXT } } };
+  if (noise === "Medium") return { font: { bold: true, color: { rgb: YELLOW_TEXT } } };
+  return { font: { bold: true, color: { rgb: GREEN_TEXT } } };
+}
+
+// ─── Sheet Builders ────────────────────────────────────────────────────────────
 
 function buildExecutiveSummarySheet(wb: XLSX.WorkBook, report: InsightsReport, sourceFileName: string): void {
-  const data: string[][] = [];
+  const es = report.executive_summary;
+  const s = report.descriptive.summary;
   const now = new Date();
-  const dateStr = now.toISOString().split("T")[0];
-
-  data.push([report.report_title]);
-  data.push([""]);
-  data.push(["Report Date", dateStr]);
-  data.push(["Source File", sourceFileName]);
-  data.push([""]);
-  data.push(["Dataset Summary"]);
-  data.push(["Total Rows", String(report.dataset_summary.total_rows)]);
-  data.push(["Total Columns", String(report.dataset_summary.total_columns)]);
-  if (report.dataset_summary.overall_completeness_pct != null) {
-    data.push(["Data Completeness", `${report.dataset_summary.overall_completeness_pct}%`]);
+  const rows: any[][] = [
+    ["Field", "Value"],
+    ["Report Title", report.report_title],
+    ["Dataset Context", report.dataset_context],
+    ["Source File", sourceFileName],
+    ["Report Date", now.toISOString().split("T")[0]],
+    ["", ""],
+    ["Total Rows", s.total_rows],
+    ["Total Columns", s.total_columns],
+    ["Duplicate Rows", s.duplicate_rows],
+    ["Overall Completeness %", s.overall_completeness_pct],
+    ["", ""],
+    ["Headline Finding", es.headline_finding],
+    ["Top Insight 1", es.top_3_insights[0] ?? ""],
+    ["Top Insight 2", es.top_3_insights[1] ?? ""],
+    ["Top Insight 3", es.top_3_insights[2] ?? ""],
+    ["Biggest Risk", es.biggest_risk],
+    ["Immediate Action", es.immediate_action],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [{ wch: 28 }, { wch: 90 }];
+  if (ws["A1"]) ws["A1"].s = hStyle();
+  if (ws["B1"]) ws["B1"].s = hStyle();
+  const biggestRiskRow = rows.findIndex(r => r[0] === "Biggest Risk");
+  if (biggestRiskRow >= 0) {
+    [0, 1].forEach(c => setCellStyle(ws, biggestRiskRow, c, { fill: { fgColor: { rgb: RED_FILL } }, font: { bold: true, color: { rgb: RED_TEXT } } }));
   }
-  if (report.dataset_summary.date_range) {
-    data.push(["Date Range", report.dataset_summary.date_range]);
+  const actionRow = rows.findIndex(r => r[0] === "Immediate Action");
+  if (actionRow >= 0) {
+    [0, 1].forEach(c => setCellStyle(ws, actionRow, c, { fill: { fgColor: { rgb: GREEN_FILL } }, font: { bold: true, color: { rgb: GREEN_TEXT } } }));
   }
-  if (report.dataset_summary.summary_text) {
-    data.push(["Summary", report.dataset_summary.summary_text]);
-  }
-  data.push([""]);
-  data.push(["Top Key Insights"]);
-
-  const topInsights = report.key_insights
-    .filter((i) => i.business_impact?.toLowerCase() === "high" || i.business_impact?.toLowerCase() === "critical")
-    .slice(0, 5);
-  const insightsToShow = topInsights.length > 0 ? topInsights : report.key_insights.slice(0, 5);
-
-  for (const insight of insightsToShow) {
-    data.push([`${insight.insight_no}. ${insight.title}`, insight.description]);
-  }
-
-  const ws = XLSX.utils.aoa_to_sheet(data);
-
-  ws["!cols"] = [{ wch: 30 }, { wch: 80 }];
-
-  const titleAddr = XLSX.utils.encode_cell({ r: 0, c: 0 });
-  if (ws[titleAddr]) {
-    ws[titleAddr].s = {
-      font: { bold: true, color: { rgb: DARK_BLUE }, sz: 16 },
-    };
-  }
-
-  for (let r = 0; r < data.length; r++) {
-    const cellA = XLSX.utils.encode_cell({ r, c: 0 });
-    if (ws[cellA] && (data[r][0] === "Dataset Summary" || data[r][0] === "Top Key Insights")) {
-      ws[cellA].s = {
-        font: { bold: true, color: { rgb: DARK_BLUE }, sz: 13 },
-        fill: { fgColor: { rgb: LIGHT_GREY } },
-      };
-      const cellB = XLSX.utils.encode_cell({ r, c: 1 });
-      if (ws[cellB]) {
-        ws[cellB].s = { fill: { fgColor: { rgb: LIGHT_GREY } } };
-      }
-    }
-    if (ws[cellA] && (data[r][0] === "Report Date" || data[r][0] === "Source File"
-      || data[r][0] === "Total Rows" || data[r][0] === "Total Columns"
-      || data[r][0] === "Data Completeness" || data[r][0] === "Date Range" || data[r][0] === "Summary")) {
-      ws[cellA].s = { font: { bold: true } };
-    }
-  }
-
   XLSX.utils.book_append_sheet(wb, ws, "executive_summary");
 }
 
-function buildKeyInsightsSheet(wb: XLSX.WorkBook, report: InsightsReport): void {
-  const headers = ["Insight #", "Category", "Title", "Description", "Affected Columns", "Business Impact", "Confidence"];
-  const data: string[][] = [headers];
-
-  for (const insight of report.key_insights) {
+function buildFieldProfilesSheet(wb: XLSX.WorkBook, report: InsightsReport): void {
+  const headers = ["Field Name", "Data Type", "Null Count", "Null %", "Unique Count", "Min", "Max", "Average", "Top Values", "Consistent?", "Insight"];
+  const data: any[][] = [headers];
+  for (const fp of report.descriptive.field_profiles) {
     data.push([
-      String(insight.insight_no),
-      insight.category || "",
-      insight.title,
-      insight.description,
-      (insight.affected_columns || []).join(", "),
-      insight.business_impact || "",
-      insight.confidence || "",
+      fp.field_name, fp.data_type, fp.null_count,
+      fp.null_pct, fp.unique_count,
+      fp.min ?? "", fp.max ?? "", fp.average ?? "",
+      Array.isArray(fp.top_values) ? fp.top_values.slice(0, 5).join(", ") : "",
+      fp.data_type_consistent ? "YES" : "NO",
+      fp.insight ?? "",
     ]);
   }
-
   const ws = XLSX.utils.aoa_to_sheet(data);
   autoWidth(ws, data);
   freezeHeader(ws);
-  applyHeaderStyles(ws, headers.length);
-
+  applyHeaders(ws, headers.length);
+  applyAltRows(ws, data.length, headers.length);
   for (let r = 1; r < data.length; r++) {
-    const rowData = data[r];
-    for (let c = 0; c < headers.length; c++) {
-      const addr = XLSX.utils.encode_cell({ r, c });
-      if (!ws[addr]) continue;
-
-      const base = altRowStyle(r - 1);
-
-      if (c === 1) {
-        ws[addr].s = { ...base, fill: { fgColor: { rgb: categoryBg(rowData[1]) } } };
-      } else if (c === 5) {
-        ws[addr].s = { ...base, font: { bold: true, color: { rgb: impactColor(rowData[5]) } } };
-      } else {
-        ws[addr].s = base;
-      }
-    }
+    const fp = report.descriptive.field_profiles[r - 1];
+    if (!fp) continue;
+    setCellStyle(ws, r, 3, nullPctStyle(fp.null_pct));
+    const consAddr = XLSX.utils.encode_cell({ r, c: 9 });
+    if (ws[consAddr]) ws[consAddr].s = fp.data_type_consistent
+      ? { font: { bold: true, color: { rgb: GREEN_TEXT } }, fill: { fgColor: { rgb: GREEN_FILL } } }
+      : { font: { bold: true, color: { rgb: RED_TEXT } }, fill: { fgColor: { rgb: RED_FILL } } };
   }
-
-  XLSX.utils.book_append_sheet(wb, ws, "key_insights");
+  XLSX.utils.book_append_sheet(wb, ws, "descriptive_field_profiles");
 }
 
-function formatTopValues(tv: { value: string; count: number }[] | null | undefined): string {
-  if (!tv) return "";
-  return tv.map(v => `${v.value} (${v.count})`).join(", ");
-}
-
-function buildColumnProfilesSheet(wb: XLSX.WorkBook, backendColumns: BackendColumnProfile[]): void {
-  const headers = [
-    "Column Name", "Data Type", "Null Count", "Null %", "Unique Values",
-    "Min", "Max", "Mean", "Median", "Std Dev", "Top Values",
-  ];
-  const data: string[][] = [headers];
-
-  for (const col of backendColumns) {
-    const isHighNull = col.null_pct > 20;
-    data.push([
-      col.column_name,
-      col.data_type || "",
-      String(col.null_count ?? 0),
-      `${(col.null_pct ?? 0).toFixed(1)}%`,
-      String(col.unique_values ?? 0),
-      String(col.min ?? col.earliest ?? ""),
-      String(col.max ?? col.latest ?? ""),
-      col.mean != null ? String(col.mean) : "",
-      col.median != null ? String(col.median) : "",
-      col.std_dev != null ? String(col.std_dev) : "",
-      formatTopValues(col.top_values),
-    ]);
-  }
-
+function buildCompletenessSheet(wb: XLSX.WorkBook, report: InsightsReport): void {
+  const headers = ["Field Name", "Completeness %", "Status"];
+  const sorted = [...report.descriptive.completeness_scorecard].sort((a, b) => a.completeness_pct - b.completeness_pct);
+  const data: any[][] = [headers, ...sorted.map(cs => [cs.field_name, cs.completeness_pct, cs.status])];
   const ws = XLSX.utils.aoa_to_sheet(data);
   autoWidth(ws, data);
   freezeHeader(ws);
-  applyHeaderStyles(ws, headers.length);
-
+  applyHeaders(ws, headers.length);
+  applyAltRows(ws, data.length, headers.length);
   for (let r = 1; r < data.length; r++) {
-    const col = backendColumns[r - 1];
-    const isHighNull = col && col.null_pct > 20;
-
-    for (let c = 0; c < headers.length; c++) {
-      const addr = XLSX.utils.encode_cell({ r, c });
-      if (!ws[addr]) continue;
-
-      const base = altRowStyle(r - 1);
-
-      if (isHighNull) {
-        ws[addr].s = { ...base, fill: { fgColor: { rgb: RED_BG.replace("#", "") } } };
-      } else {
-        ws[addr].s = base;
-      }
-    }
+    setCellStyle(ws, r, 2, statusStyle(sorted[r - 1]?.status ?? ""));
   }
-
-  XLSX.utils.book_append_sheet(wb, ws, "column_profiles");
+  XLSX.utils.book_append_sheet(wb, ws, "completeness_scorecard");
 }
 
-function buildRecommendationsSheet(wb: XLSX.WorkBook, report: InsightsReport): void {
-  const headers = ["#", "Title", "Description", "Priority", "Effort", "Affected Columns"];
-  const data: string[][] = [headers];
-
-  for (const rec of report.recommendations || []) {
-    data.push([
-      String(rec.recommendation_no),
-      rec.title,
-      rec.description,
-      rec.priority || "",
-      rec.effort || "",
-      (rec.affected_columns || []).join(", "),
-    ]);
-  }
-
+function buildCorrelationsSheet(wb: XLSX.WorkBook, report: InsightsReport): void {
+  const headers = ["Field A", "Field B", "Relationship", "Strength", "Business Meaning"];
+  const data: any[][] = [headers, ...report.diagnostic.correlations.map(c => [c.field_a, c.field_b, c.relationship, c.strength, c.business_meaning])];
   const ws = XLSX.utils.aoa_to_sheet(data);
   autoWidth(ws, data);
   freezeHeader(ws);
-  applyHeaderStyles(ws, headers.length);
-
+  applyHeaders(ws, headers.length);
+  applyAltRows(ws, data.length, headers.length);
   for (let r = 1; r < data.length; r++) {
-    const rowData = data[r];
-    for (let c = 0; c < headers.length; c++) {
-      const addr = XLSX.utils.encode_cell({ r, c });
-      if (!ws[addr]) continue;
+    setCellStyle(ws, r, 3, strengthStyle(report.diagnostic.correlations[r - 1]?.strength ?? ""));
+  }
+  XLSX.utils.book_append_sheet(wb, ws, "diagnostic_correlations");
+}
 
-      const base = altRowStyle(r - 1);
+function buildDiagnosticFindingsSheet(wb: XLSX.WorkBook, report: InsightsReport): void {
+  const d = report.diagnostic;
+  const rows: any[][] = [];
 
-      if (c === 3) {
-        ws[addr].s = { ...base, font: { bold: true, color: { rgb: priorityColor(rowData[3]) } } };
-      } else if (c === 4) {
-        ws[addr].s = { ...base, font: { bold: true, color: { rgb: effortColor(rowData[4]) } } };
-      } else {
-        ws[addr].s = base;
+  function addSection(title: string, headers: string[], dataRows: any[][]): void {
+    rows.push([title]);
+    rows.push(headers);
+    for (const row of dataRows) rows.push(row);
+    rows.push([]);
+  }
+
+  addSection("OUTLIERS", ["Field Name", "Outlier Description", "Est. Affected Rows", "Possible Cause"],
+    d.outliers.map(o => [o.field_name, o.outlier_description, o.affected_rows_estimate, o.possible_cause]));
+
+  addSection("DISTRIBUTION SHAPE", ["Field Name", "Distribution Shape", "Implication"],
+    d.skewness.map(s => [s.field_name, s.distribution_shape, s.implication]));
+
+  addSection("TRENDS", ["Field Name", "Trend Type", "Direction", "Observation"],
+    d.trends.map(t => [t.field_name, t.trend_type, t.direction, t.observation]));
+
+  addSection("COHORT COMPARISON", ["Cohort Field", "Cohorts Found", "Key Difference", "Business Implication"],
+    d.cohort_comparison.map(c => [c.cohort_field, c.cohorts_identified.join(", "), c.key_difference, c.business_implication]));
+
+  addSection("FUNNEL DROP-OFF", ["Stage", "Records In", "Records Out", "Drop-off %", "Likely Cause"],
+    d.funnel_dropoff.map(f => [f.stage, f.records_in, f.records_out, f.dropoff_pct, f.likely_cause]));
+
+  addSection("CROSS-FIELD VIOLATIONS", ["Fields Involved", "Violation Description", "Est. Affected Rows", "Severity"],
+    d.cross_field_violations.map(v => [v.fields_involved.join(", "), v.violation_description, v.affected_rows_estimate, v.severity]));
+
+  addSection("CONCENTRATION REPORT", ["Field Name", "Top 10% Contribution", "Observation"],
+    d.concentration_report.map(c => [c.field_name, c.top_10pct_contribution, c.observation]));
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [{ wch: 30 }, { wch: 50 }, { wch: 20 }, { wch: 50 }];
+  ws["!rows"] = [];
+
+  let sectionTitles = ["OUTLIERS", "DISTRIBUTION SHAPE", "TRENDS", "COHORT COMPARISON", "FUNNEL DROP-OFF", "CROSS-FIELD VIOLATIONS", "CONCENTRATION REPORT"];
+  for (let r = 0; r < rows.length; r++) {
+    const val = rows[r][0];
+    if (typeof val === "string" && sectionTitles.includes(val)) {
+      for (let c = 0; c < 5; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (!ws[addr]) ws[addr] = { v: "", t: "s" };
+        ws[addr].s = sectionHeaderStyle();
+      }
+    }
+    if (val === "Field Name" || val === "Cohort Field" || val === "Stage" || val === "Fields Involved") {
+      for (let c = 0; c < 5; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (ws[addr]) ws[addr].s = hStyle();
       }
     }
   }
 
-  XLSX.utils.book_append_sheet(wb, ws, "recommendations");
+  XLSX.utils.book_append_sheet(wb, ws, "diagnostic_findings");
 }
 
-function deriveQualityFlags(backendColumns: BackendColumnProfile[]): DataQualityFlag[] {
-  const flags: DataQualityFlag[] = [];
-  let flagNo = 1;
-  for (const col of backendColumns) {
-    if (col.null_pct > 50) {
-      flags.push({ flag_no: flagNo++, column_name: col.column_name, issue: "Very high null rate", severity: "High", suggested_fix: "Investigate data source for missing values or consider removing column" });
-    } else if (col.null_pct > 20) {
-      flags.push({ flag_no: flagNo++, column_name: col.column_name, issue: "High null rate", severity: "Medium", suggested_fix: "Review data collection process and apply imputation if appropriate" });
-    }
-    if (col.data_type === "Number" && col.std_dev != null && col.mean != null && col.mean !== 0) {
-      const cv = Math.abs(col.std_dev / col.mean);
-      if (cv > 3) {
-        flags.push({ flag_no: flagNo++, column_name: col.column_name, issue: "Extreme variance — possible outliers", severity: "Medium", suggested_fix: "Review outlier values and consider applying caps or filters" });
+function buildAnalyticalInsightsSheet(wb: XLSX.WorkBook, report: InsightsReport): void {
+  const a = report.analytical;
+  const rows: any[][] = [];
+
+  function addSection(title: string, headers: string[], dataRows: any[][]): void {
+    rows.push([title]);
+    rows.push(headers);
+    for (const row of dataRows) rows.push(row);
+    rows.push([]);
+  }
+
+  addSection("SEGMENTS", ["Segment Name", "Defining Characteristics", "Est. Size %", "Business Meaning"],
+    a.segments.map(s => [s.segment_name, s.defining_characteristics.join("; "), s.estimated_size_pct, s.business_meaning]));
+
+  addSection("CONTRIBUTION ANALYSIS", ["Field Name", "Top Contributors", "Contribution %", "Insight"],
+    a.contribution_analysis.map(c => [c.field_name, c.top_contributors.join(", "), c.contribution_pct, c.insight]));
+
+  addSection("DATA LINEAGE QUALITY", ["Field Name", "Error Propagation Risk", "Downstream Impact", "Recommendation"],
+    a.lineage_quality.map(l => [l.field_name, l.error_propagation_risk, l.downstream_impact, l.recommendation]));
+
+  addSection("TIME SERIES DECOMPOSITION", ["Field Name", "Trend", "Seasonality", "Noise Level", "Insight"],
+    a.time_series_decomposition.map(t => [t.field_name, t.trend, t.seasonality, t.noise_level, t.insight]));
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [{ wch: 30 }, { wch: 50 }, { wch: 20 }, { wch: 50 }];
+
+  const sectionTitles = ["SEGMENTS", "CONTRIBUTION ANALYSIS", "DATA LINEAGE QUALITY", "TIME SERIES DECOMPOSITION"];
+  const riskRow = "Field Name";
+  for (let r = 0; r < rows.length; r++) {
+    const val = rows[r][0];
+    if (typeof val === "string" && sectionTitles.includes(val)) {
+      for (let c = 0; c < 5; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (!ws[addr]) ws[addr] = { v: "", t: "s" };
+        ws[addr].s = sectionHeaderStyle();
       }
     }
-    if (col.unique_values === 1 && col.null_count === 0) {
-      flags.push({ flag_no: flagNo++, column_name: col.column_name, issue: "Single constant value — no variability", severity: "Low", suggested_fix: "Consider removing column if it provides no analytical value" });
-    }
-  }
-  return flags;
-}
-
-function buildDataQualityFlagsSheet(wb: XLSX.WorkBook, backendColumns: BackendColumnProfile[], reportFlags?: DataQualityFlag[]): void {
-  const headers = ["#", "Column Name", "Issue", "Severity", "Details", "Suggested Fix"];
-
-  const derivedFlags = deriveQualityFlags(backendColumns);
-  const allFlags = [...(reportFlags || []), ...derivedFlags];
-
-  const seen = new Set<string>();
-  const deduped = allFlags.filter(f => {
-    const key = `${f.column_name}:${f.issue}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  let flagNo = 1;
-  deduped.forEach(f => { f.flag_no = flagNo++; });
-
-  const sortedFlags = deduped.sort(
-    (a, b) => severityOrder(a.severity) - severityOrder(b.severity)
-  );
-
-  const data: string[][] = [headers];
-  for (const flag of sortedFlags) {
-    data.push([
-      String(flag.flag_no),
-      flag.column_name,
-      flag.issue,
-      flag.severity || "",
-      flag.details || "",
-      flag.suggested_fix || "",
-    ]);
-  }
-
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  autoWidth(ws, data);
-  freezeHeader(ws);
-  applyHeaderStyles(ws, headers.length);
-
-  for (let r = 1; r < data.length; r++) {
-    const rowData = data[r];
-    for (let c = 0; c < headers.length; c++) {
-      const addr = XLSX.utils.encode_cell({ r, c });
-      if (!ws[addr]) continue;
-
-      const base = altRowStyle(r - 1);
-
-      if (c === 3) {
-        ws[addr].s = { ...base, font: { bold: true, color: { rgb: severityColor(rowData[3]) } } };
-      } else {
-        ws[addr].s = base;
+    if (val === riskRow) {
+      for (let c = 0; c < 5; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (ws[addr]) ws[addr].s = hStyle();
       }
     }
   }
 
-  XLSX.utils.book_append_sheet(wb, ws, "data_quality_flags");
+  XLSX.utils.book_append_sheet(wb, ws, "analytical_insights");
 }
 
-export function generateInsightsExcel(report: InsightsReport, sourceFileName: string, backendColumns?: BackendColumnProfile[]): string {
+// ─── Public Export Function ───────────────────────────────────────────────────
+
+export function generateInsightsExcel(report: InsightsReport, sourceFileName: string, _backendColumns?: BackendColumnProfile[]): string {
   const wb = XLSX.utils.book_new();
-
   buildExecutiveSummarySheet(wb, report, sourceFileName);
-  buildKeyInsightsSheet(wb, report);
-
-  const cols = backendColumns && backendColumns.length > 0 ? backendColumns : [];
-  if (cols.length > 0) {
-    buildColumnProfilesSheet(wb, cols);
-  }
-
-  buildRecommendationsSheet(wb, report);
-
-  if (cols.length > 0) {
-    buildDataQualityFlagsSheet(wb, cols, report.data_quality_flags);
-  }
+  buildFieldProfilesSheet(wb, report);
+  buildCompletenessSheet(wb, report);
+  buildCorrelationsSheet(wb, report);
+  buildDiagnosticFindingsSheet(wb, report);
+  buildAnalyticalInsightsSheet(wb, report);
 
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
   const fileName = `insights_report_${timestamp}.xlsx`;
-
   XLSX.writeFile(wb, fileName);
-
   return fileName;
 }
 
+// ─── Legacy compatibility helpers (used by chat.tsx outputs panel) ────────────
+
 export function getInsightsScorecard(report: InsightsReport): { totalInsights: number; highImpact: number; anomalies: number; completeness: number } {
-  const totalInsights = report.key_insights.length;
-  const highImpact = report.key_insights.filter(
-    (i) => i.business_impact?.toLowerCase() === "high" || i.business_impact?.toLowerCase() === "critical"
-  ).length;
-  const anomalies = (report.column_profiles || []).filter((c) => c.anomaly_flag).length;
-  const completeness = report.dataset_summary.overall_completeness_pct != null
-    ? Math.round(report.dataset_summary.overall_completeness_pct)
-    : 100;
+  const s = report.descriptive.summary;
+  const totalInsights = report.diagnostic.correlations.length + report.diagnostic.outliers.length + report.analytical.segments.length;
+  const highImpact = report.diagnostic.cross_field_violations.filter(v => v.severity === "High").length + report.diagnostic.outliers.length;
+  const anomalies = report.diagnostic.outliers.length;
+  const completeness = s.overall_completeness_pct ?? 100;
   return { totalInsights, highImpact, anomalies, completeness };
 }
 
 export function generateInsightsSummary(report: InsightsReport): string {
-  const lines: string[] = [];
-
-  lines.push(`Data Insights Report: ${report.report_title}`);
-  lines.push("");
-  lines.push(`Dataset: ${report.dataset_summary.total_rows} rows x ${report.dataset_summary.total_columns} columns`);
-
-  if (report.dataset_summary.summary_text) {
-    lines.push(report.dataset_summary.summary_text);
-  }
-
-  lines.push("");
-
-  const totalInsights = report.key_insights.length;
-  const highImpact = report.key_insights.filter(
-    (i) => i.business_impact?.toLowerCase() === "high" || i.business_impact?.toLowerCase() === "critical"
-  ).length;
-  const anomalies = (report.column_profiles || []).filter((c) => c.anomaly_flag).length;
-  const completeness = report.dataset_summary.overall_completeness_pct != null
-    ? Math.round(report.dataset_summary.overall_completeness_pct)
-    : 100;
-
-  lines.push(`Total Insights: ${totalInsights} | High Impact: ${highImpact} | Anomalies: ${anomalies} | Completeness: ${completeness}%`);
-  lines.push("");
-
-  const topInsights = report.key_insights.slice(0, 3);
-  for (const insight of topInsights) {
-    lines.push(`${insight.insight_no}. ${insight.title} — ${insight.description}`);
-  }
-
-  if (report.key_insights.length > 3) {
-    lines.push(`...and ${report.key_insights.length - 3} more insights in the full report.`);
-  }
-
-  lines.push("");
-  lines.push("Results saved to insights report Excel file.");
-
+  const s = report.descriptive.summary;
+  const es = report.executive_summary;
+  const lines = [
+    `Data Insights Report: ${report.report_title}`,
+    "",
+    `Dataset: ${s.total_rows} rows × ${s.total_columns} columns | ${s.overall_completeness_pct}% complete`,
+    report.dataset_context,
+    "",
+    `Headline: ${es.headline_finding}`,
+    `Biggest Risk: ${es.biggest_risk}`,
+    `Immediate Action: ${es.immediate_action}`,
+    "",
+    "Results saved to insights report Excel file.",
+  ];
   return lines.join("\n");
 }
