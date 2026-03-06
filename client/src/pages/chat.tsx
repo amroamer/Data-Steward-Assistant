@@ -34,14 +34,12 @@ import {
   Download,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Minimize2,
   Maximize2,
   Paperclip,
   Database,
   PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
   GripVertical,
   ScanEye,
   Globe,
@@ -1725,27 +1723,47 @@ export default function ChatPage() {
         <ExcelPreview file={selectedFile} onClose={() => setShowExcelPreview(false)} />
       )}
 
-      {!isMobile && !sidebarCollapsed && (
-        <div className="w-[240px] flex-shrink-0" data-testid="sidebar-panel">
-          <SidebarContent
-            {...sidebarProps}
-            setActiveConversationId={setActiveConversationId}
-            onCollapse={() => setSidebarCollapsed(true)}
-          />
+      {!isMobile && (
+        <div
+          className="flex-shrink-0 overflow-hidden transition-all duration-200 ease-in-out"
+          style={{ width: sidebarCollapsed ? 0 : 240 }}
+          data-testid="sidebar-panel"
+        >
+          <div className="w-[240px] h-full">
+            <SidebarContent
+              {...sidebarProps}
+              setActiveConversationId={setActiveConversationId}
+              onCollapse={() => setSidebarCollapsed(true)}
+            />
+          </div>
         </div>
+      )}
+
+      {!isMobile && (
+        <button
+          onClick={() => setSidebarCollapsed(v => !v)}
+          className="flex-shrink-0 self-center z-30 flex items-center justify-center rounded-r-md transition-colors"
+          style={{ width: 14, height: 48, backgroundColor: "#0D2E5C", color: "rgba(255,255,255,0.7)", borderTop: "1px solid #1A4B8C", borderRight: "1px solid #1A4B8C", borderBottom: "1px solid #1A4B8C" }}
+          onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#1A4B8C")}
+          onMouseLeave={e => (e.currentTarget.style.backgroundColor = "#0D2E5C")}
+          data-testid="button-toggle-sidebar"
+          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {sidebarCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+        </button>
       )}
 
       <div className="flex-1 min-w-0 flex flex-col command-center-bg">
         <div className="h-12 flex items-center gap-3 px-4 flex-shrink-0 border-b" style={{ borderColor: "#E5E7EB", backgroundColor: "#FFFFFF" }}>
-          {(isMobile || sidebarCollapsed) && (
+          {isMobile && (
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => { if (isMobile) setMobileSidebarOpen(true); else setSidebarCollapsed(false); }}
+              onClick={() => setMobileSidebarOpen(true)}
               className="h-8 w-8"
               data-testid="button-expand-sidebar"
             >
-              {isMobile ? <Menu className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+              <Menu className="w-4 h-4" />
             </Button>
           )}
           <div className="flex items-center gap-2 text-xs flex-1 min-w-0" style={{ color: "#1A1A2E" }}>
@@ -1809,18 +1827,6 @@ export default function ChatPage() {
             <Globe className="w-3.5 h-3.5" />
             {lang === "en" ? "EN" : "AR"}
           </Button>
-          {!isMobile && (
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setOutputsPanelCollapsed(v => !v)}
-              className="h-8 w-8 flex-shrink-0"
-              title={outputsPanelCollapsed ? t.expandOutputs : t.collapseOutputs}
-              data-testid="button-toggle-outputs-panel"
-            >
-              {outputsPanelCollapsed ? <PanelRightOpen className="w-4 h-4" /> : <PanelRightClose className="w-4 h-4" />}
-            </Button>
-          )}
           {isMobile && (
             <Button
               size="icon"
@@ -2148,22 +2154,42 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {!isMobile && !outputsPanelCollapsed && (
-        <div className="w-[300px] flex-shrink-0 border-l" style={{ borderColor: "#E5E7EB" }} data-testid="outputs-panel">
-          <OutputsPanel
-            t={t}
-            isRtl={isRtl}
-            resultRows={resultRows}
-            includedAnalyses={includedAnalyses}
-            latestDataModel={latestDataModel}
-            latestPiiScan={latestPiiScan}
-            latestDqAnalysis={latestDqAnalysis}
-            insightsReports={insightsReports}
-            uploadedFileName={uploadedFileName}
-            onDownloadResult={handleDownloadResult}
-            activityLog={activityLog}
-            sheetCount={sheetCount}
-          />
+      {!isMobile && (
+        <button
+          onClick={() => setOutputsPanelCollapsed(v => !v)}
+          className="flex-shrink-0 self-center z-30 flex items-center justify-center rounded-l-md transition-colors"
+          style={{ width: 14, height: 48, backgroundColor: "#F9FAFB", color: "#9CA3AF", borderTop: "1px solid #E5E7EB", borderLeft: "1px solid #E5E7EB", borderBottom: "1px solid #E5E7EB" }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#EEF2FF"; e.currentTarget.style.color = "#2563EB"; }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#F9FAFB"; e.currentTarget.style.color = "#9CA3AF"; }}
+          data-testid="button-toggle-outputs"
+          title={outputsPanelCollapsed ? t.expandOutputs : t.collapseOutputs}
+        >
+          {outputsPanelCollapsed ? <ChevronLeft className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        </button>
+      )}
+
+      {!isMobile && (
+        <div
+          className="flex-shrink-0 overflow-hidden transition-all duration-200 ease-in-out"
+          style={{ width: outputsPanelCollapsed ? 0 : 300 }}
+          data-testid="outputs-panel-wrapper"
+        >
+          <div className="w-[300px] h-full border-l" style={{ borderColor: "#E5E7EB" }} data-testid="outputs-panel">
+            <OutputsPanel
+              t={t}
+              isRtl={isRtl}
+              resultRows={resultRows}
+              includedAnalyses={includedAnalyses}
+              latestDataModel={latestDataModel}
+              latestPiiScan={latestPiiScan}
+              latestDqAnalysis={latestDqAnalysis}
+              insightsReports={insightsReports}
+              uploadedFileName={uploadedFileName}
+              onDownloadResult={handleDownloadResult}
+              activityLog={activityLog}
+              sheetCount={sheetCount}
+            />
+          </div>
         </div>
       )}
     </div>
