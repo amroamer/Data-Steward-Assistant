@@ -65,6 +65,7 @@ import {
   Layers,
   Cpu,
   LayoutGrid,
+  Target,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -766,24 +767,14 @@ function SidebarContent({
           <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusConfig.bg }} />
           {statusLabel}
         </div>
-        <div className="flex gap-1 mt-2">
-          <Link
-            href="/use-cases"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-white/50 hover:text-white/90 hover:bg-white/10 transition-all"
-            data-testid="link-use-cases"
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            {t.useCases}
-          </Link>
-          <Link
-            href="/nudge"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-white/50 hover:text-white/90 hover:bg-white/10 transition-all"
-            data-testid="link-nudge-agent"
-          >
-            <Brain className="w-3.5 h-3.5" />
-            {t.nudgeAgent}
-          </Link>
-        </div>
+        <Link
+          href="/use-cases"
+          className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium text-white/50 hover:text-white/90 hover:bg-white/10 transition-all"
+          data-testid="link-use-cases"
+        >
+          <LayoutGrid className="w-3.5 h-3.5" />
+          {t.useCases}
+        </Link>
       </div>
       <div className="border-t border-white/10" />
       <ScrollArea className="flex-1">
@@ -1993,6 +1984,16 @@ export default function ChatPage() {
                 <span>{t[tab.labelKey] as string}</span>
               </button>
             ))}
+            <div className="w-px h-5 bg-gray-200 mx-1 flex-shrink-0" />
+            <Link
+              href="/nudge"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100"
+              style={{ color: "#7C3AED" }}
+              data-testid="tab-nudge-agent"
+            >
+              <Target className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>{t.nudgeAgent}</span>
+            </Link>
           </div>
         )}
 
