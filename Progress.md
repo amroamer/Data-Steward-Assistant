@@ -184,6 +184,7 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 
 | Date | Change |
 |---|---|
+| 2026-03-08 | **Remove Follow-up Button** — removed "Ask Follow-up" button from chat ThreadCard footer and entire follow-up section (input + answer display) from Nudge Agent page; removed associated state, handler, translation strings, and orphaned `Send` icon import |
 | 2026-03-08 | **Deterministic Outputs** — set `temperature: 0` on all 5 Claude API call sites (DQ Rules Part 1, DQ Rules Part 2, main agent stream, Nudge follow-up, Nudge main); same input now always produces the same output across all agent modes |
 | 2026-03-06 | **Upload Strip Relocation** — moved drag-and-drop upload area from empty-state hero into command console bar; compact strip always visible above textarea when no file selected; User Guide updated |
 | 2026-03-06 | **Global System Prompt** — `ZATCA_SYSTEM_PROMPT` + `buildSystemPrompt()` injected into all 5 Claude call sites; out-of-scope yellow warning card on frontend (EN+AR); User Guide "Scope & Guardrails" section added |

@@ -4,7 +4,6 @@ import * as XLSX from "xlsx";
 import {
   ArrowLeft,
   Target,
-  Send,
   Download,
   ChevronDown,
   ChevronUp,
@@ -136,9 +135,6 @@ const translations = {
     statLevers: "Levers",
     statQuickWins: "Quick Wins",
     statLift: "Est. Lift",
-    followUpPlaceholder: "Ask a follow-up question...",
-    followUpBtn: "Ask",
-    followUpTitle: "Follow-up Answer",
     scenarioLabel: "Scenario:",
     langToggle: "عربي",
     severity: "Severity",
@@ -205,9 +201,6 @@ const translations = {
     statLevers: "الرافعات",
     statQuickWins: "انتصارات سريعة",
     statLift: "التحسين المتوقع",
-    followUpPlaceholder: "اطرح سؤالاً متابعاً...",
-    followUpBtn: "اسأل",
-    followUpTitle: "إجابة المتابعة",
     scenarioLabel: "السيناريو:",
     langToggle: "English",
     severity: "الخطورة",
@@ -355,9 +348,6 @@ export default function NudgePage() {
   const [loadStep, setLoadStep] = useState(0);
   const [report, setReport] = useState<NudgeReport | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [followUp, setFollowUp] = useState("");
-  const [followUpLoading, setFollowUpLoading] = useState(false);
-  const [followUpAnswer, setFollowUpAnswer] = useState<string | null>(null);
   const [, navigate] = useLocation();
 
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -417,29 +407,6 @@ export default function NudgePage() {
     }
   };
 
-  const handleFollowUp = async () => {
-    if (!followUp.trim() || !report) return;
-    setFollowUpLoading(true);
-    setFollowUpAnswer(null);
-    try {
-      const res = await fetch("/api/nudge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ followUpQuestion: followUp.trim(), previousJson: report }),
-      });
-      const json = await res.json();
-      if (json.ok && json.followUp) {
-        setFollowUpAnswer(json.followUp);
-        setFollowUp("");
-      } else {
-        setFollowUpAnswer(t.errorMsg);
-      }
-    } catch {
-      setFollowUpAnswer(t.errorMsg);
-    } finally {
-      setFollowUpLoading(false);
-    }
-  };
 
   const riskBadge = (level: string) => {
     const c = riskColor(level);
@@ -829,39 +796,6 @@ export default function NudgePage() {
                 </button>
               </div>
 
-              {/* Follow-up answer */}
-              {followUpAnswer && (
-                <div className="bg-white rounded-xl border border-blue-200 shadow-sm p-5" data-testid="followup-answer">
-                  <p className="text-[11px] font-bold text-blue-600 uppercase tracking-wider mb-2">{t.followUpTitle}</p>
-                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{followUpAnswer}</p>
-                </div>
-              )}
-
-              {/* Follow-up input */}
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={followUp}
-                    onChange={e => setFollowUp(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleFollowUp(); } }}
-                    placeholder={t.followUpPlaceholder}
-                    className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-gray-50"
-                    disabled={followUpLoading}
-                    data-testid="input-followup"
-                  />
-                  <button
-                    onClick={handleFollowUp}
-                    disabled={!followUp.trim() || followUpLoading}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-sm font-semibold disabled:opacity-50 transition-all"
-                    style={{ backgroundColor: ZATCA_ACCENT }}
-                    data-testid="button-followup-submit"
-                  >
-                    {followUpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    {t.followUpBtn}
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 

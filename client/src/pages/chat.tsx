@@ -357,7 +357,6 @@ const translations = {
     stepGenerating: "Generating analysis",
     stepExecuting: "Executing checks",
     stepSaving: "Saving to result.xlsx",
-    askFollowUp: "Ask Follow-up",
     quickActions: "Quick Actions",
     sheetsInResult: "sheets",
     fileUploaded: "File uploaded",
@@ -365,7 +364,6 @@ const translations = {
     noActivityYet: "No activity yet",
     sentAt: "Sent:",
     completedAt: "Completed:",
-    followUp: "Ask Follow-up",
     excelFile: "Excel File:",
     downloadUserGuide: "Download User Guide",
     userGuide: "User Guide",
@@ -565,7 +563,6 @@ const translations = {
     stepGenerating: "إنشاء التحليل",
     stepExecuting: "تنفيذ الفحوصات",
     stepSaving: "حفظ في result.xlsx",
-    askFollowUp: "اطرح سؤال متابعة",
     quickActions: "إجراءات سريعة",
     sheetsInResult: "أوراق",
     fileUploaded: "تم تحميل الملف",
@@ -573,7 +570,6 @@ const translations = {
     noActivityYet: "لا يوجد نشاط بعد",
     sentAt: "أُرسل:",
     completedAt: "اكتمل:",
-    followUp: "متابعة",
     excelFile: "ملف Excel:",
     downloadUserGuide: "تنزيل دليل المستخدم",
     userGuide: "دليل المستخدم",
@@ -2652,7 +2648,6 @@ export default function ChatPage() {
                         allInsightsReports={insightsReports}
                         profiledColumns={profiledColumns}
                         uploadedFileName={uploadedFileName}
-                        onAskFollowUp={(text) => { setInputValue(text); textareaRef.current?.focus(); }}
                         nudgeReport={thread.assistantMsg ? (nudgeReports[thread.assistantMsg.id] || undefined) : undefined}
                       />
                     );
@@ -3687,7 +3682,7 @@ function ThreadCard({
   thread, idx, isCollapsed, onToggle, tag, isRtl, t, lang,
   isActiveStreaming, liveSteps, completedSteps, streamingContent, timeTick,
   summaryOverride, onDownloadResult, dataModel, dqAnalysis, informaticaOutput, insightsReport,
-  allInsightsReports, profiledColumns = [], uploadedFileName, onAskFollowUp, nudgeReport,
+  allInsightsReports, profiledColumns = [], uploadedFileName, nudgeReport,
 }: {
   thread: ThreadPair; idx: number; isCollapsed: boolean; onToggle: () => void;
   tag: string | null; isRtl: boolean; t: Translation; lang: Lang;
@@ -3697,7 +3692,6 @@ function ThreadCard({
   insightsReport?: InsightsReport | null;
   allInsightsReports?: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
   profiledColumns?: BackendColumnProfile[]; uploadedFileName?: string | null;
-  onAskFollowUp?: (text: string) => void;
   nudgeReport?: NudgeReport | null;
 }) {
   const { userMsg, assistantMsg } = thread;
@@ -4085,19 +4079,6 @@ function ThreadCard({
                 >
                   <Download className="w-2.5 h-2.5" />
                   {t.resultXlsx}
-                </Button>
-              )}
-              {onAskFollowUp && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="gap-1 text-[10px] h-6 px-2 border"
-                  style={{ color: "#2563EB", borderColor: "#2563EB30" }}
-                  onClick={() => onAskFollowUp("")}
-                  data-testid={`button-followup-${userMsg.id}`}
-                >
-                  <MessageSquare className="w-2.5 h-2.5" />
-                  {t.followUp}
                 </Button>
               )}
             </div>
