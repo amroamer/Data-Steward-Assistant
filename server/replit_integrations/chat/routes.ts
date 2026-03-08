@@ -1736,6 +1736,7 @@ export function registerChatRoutes(app: Express): void {
         const part1Resp = await anthropic.messages.create({
           model: "claude-sonnet-4-6",
           max_tokens: 16000,
+          temperature: 0,
           system: buildSystemPrompt(DQ_DIMENSIONS_SYSTEM_PROMPT),
           messages: chatMessages,
         });
@@ -1750,6 +1751,7 @@ export function registerChatRoutes(app: Express): void {
         const part2Resp = await anthropic.messages.create({
           model: "claude-sonnet-4-6",
           max_tokens: 16000,
+          temperature: 0,
           system: buildSystemPrompt(DQ_BUSINESS_LOGIC_SYSTEM_PROMPT),
           messages: chatMessages,
         });
@@ -1802,6 +1804,7 @@ export function registerChatRoutes(app: Express): void {
         const stream = anthropic.messages.stream({
           model: "claude-sonnet-4-6",
           max_tokens: 16000,
+          temperature: 0,
           system: buildSystemPrompt(systemPrompt),
           messages: chatMessages,
         });
@@ -1906,6 +1909,7 @@ Return this exact structure:
         const followUpResponse = await anthropic.messages.create({
           model: "claude-sonnet-4-6",
           max_tokens: 2000,
+          temperature: 0,
           system: buildSystemPrompt(NUDGE_SYSTEM_PROMPT),
           messages: followUpMessages,
         });
@@ -1930,6 +1934,7 @@ Return this exact structure:
       const response = await anthropic.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 8000,
+        temperature: 0,
         system: buildSystemPrompt(NUDGE_SYSTEM_PROMPT),
         messages,
       });

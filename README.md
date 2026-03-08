@@ -150,7 +150,7 @@ The feature-specific system prompts (DQ, Insights, Informatica, Nudge) are prese
 | Charts | Recharts (donut charts) |
 | Excel | SheetJS (xlsx) |
 | Backend | Express.js, TypeScript |
-| AI | Anthropic Claude Sonnet (claude-sonnet-4-6, max 16,000 tokens); global `ZATCA_SYSTEM_PROMPT` injected via `buildSystemPrompt()` into all 5 Claude call sites |
+| AI | Anthropic Claude Sonnet (claude-sonnet-4-6, max 16,000 tokens, `temperature: 0`); global `ZATCA_SYSTEM_PROMPT` injected via `buildSystemPrompt()` into all 5 Claude call sites; `temperature: 0` ensures deterministic, repeatable outputs across all agent modes |
 | Database | PostgreSQL on Neon (serverless) |
 | ORM | Drizzle ORM + drizzle-zod |
 | File Handling | Multer, pdf-parse, Mammoth, Sharp |
