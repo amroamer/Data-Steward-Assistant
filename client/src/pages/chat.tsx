@@ -1617,6 +1617,51 @@ export default function ChatPage() {
     if (Object.keys(overrides).length > 0) {
       setSummaryOverrides(prev => ({ ...prev, ...overrides }));
     }
+
+    const rebuiltLog: ActivityLogEntry[] = [];
+    const fmtTs = (iso: string) => {
+      const d = new Date(iso);
+      return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    };
+    for (const msg of activeConversation.messages) {
+      const ts = msg.createdAt ? fmtTs(msg.createdAt) : "";
+      if (msg.role === "user") {
+        const text = msg.content.replace(/\n\nUploaded:.*$/, "").replace(/\n\n--- Pasted Data ---[\s\S]*$/, "").trim();
+        rebuiltLog.push({ icon: "📤", text: `${t.commandLabel} ${text.substring(0, 50)}${text.length > 50 ? "…" : ""}`, timestamp: ts });
+        const uploadMatch = msg.content.match(/Uploaded:\s*(.+)/);
+        if (uploadMatch) {
+          rebuiltLog.push({ icon: "📥", text: `${t.fileUploaded}: ${uploadMatch[1].trim()}`, timestamp: ts });
+        }
+      } else {
+        if (msg.content.includes("__NUDGE_REPORT_ID_")) {
+          rebuiltLog.push({ icon: "🎯", text: lang === "ar" ? "اكتمل تحليل التحفيز" : "Nudge analysis complete", timestamp: ts });
+          continue;
+        }
+        if (detectInsightsJSON(msg.content) || looksLikeInsightsJSON(msg.content)) {
+          rebuiltLog.push({ icon: "📊", text: t.tagInsights, timestamp: ts });
+        }
+        if (detectPiiScanJSON(msg.content)) {
+          rebuiltLog.push({ icon: "🛡️", text: t.tagPiiScan, timestamp: ts });
+        }
+        if (detectDqAnalysisJSON(msg.content)) {
+          rebuiltLog.push({ icon: "🔬", text: t.tagDataQuality, timestamp: ts });
+        }
+        if (detectDataModelJSON(msg.content)) {
+          rebuiltLog.push({ icon: "🏗️", text: t.tagDataModel, timestamp: ts });
+        }
+        if (detectInformaticaJSON(msg.content)) {
+          rebuiltLog.push({ icon: "🔧", text: t.tagInformatica, timestamp: ts });
+        }
+        const analyses = detectAndExtractAllAnalyses(msg.content);
+        for (const r of analyses) {
+          if (r.analysisType === "data_classification") rebuiltLog.push({ icon: "📋", text: t.tagDataClassification, timestamp: ts });
+          else if (r.analysisType === "business_definitions") rebuiltLog.push({ icon: "📖", text: t.tagBusinessDefs, timestamp: ts });
+        }
+      }
+    }
+    if (rebuiltLog.length > 0) {
+      setActivityLog(rebuiltLog);
+    }
   }, [activeConversation?.messages]);
 
   const addActivityEntry = useCallback((icon: string, text: string) => {
