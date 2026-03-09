@@ -110,6 +110,10 @@ export interface ResultRow {
   field_name: string;
   business_term?: string;
   business_definition?: string;
+  business_term_en?: string;
+  business_definition_en?: string;
+  business_term_ar?: string;
+  business_definition_ar?: string;
   data_type?: string;
   example?: string;
   classification_level?: string;
@@ -125,8 +129,8 @@ export interface ResultRow {
 
 const ANALYSIS_COLUMNS: Record<AnalysisType, { keys: string[]; headers: string[] }> = {
   business_definitions: {
-    keys: ["business_term", "business_definition", "data_type", "example"],
-    headers: ["Business Term", "Business Definition", "Data Type", "Example"],
+    keys: ["business_term_en", "business_definition_en", "business_term_ar", "business_definition_ar", "data_type", "example"],
+    headers: ["Business Term (EN)", "Business Definition (EN)", "Business Term (AR)", "Business Definition (AR)", "Data Type", "Example"],
   },
   data_classification: {
     keys: ["classification_level", "classification_rationale", "data_owner", "sensitivity_category"],
@@ -199,8 +203,10 @@ function detectTableAnalysisType(table: ParsedTable): AnalysisType | null {
 
 const HEADER_MAPPINGS: Record<AnalysisType, Record<string, string[]>> = {
   business_definitions: {
-    business_term: ["business_term", "term"],
-    business_definition: ["business_definition", "definition", "description"],
+    business_term_en: ["business_term_en", "business_term__en_", "term_en", "business_term"],
+    business_definition_en: ["business_definition_en", "business_definition__en_", "definition_en", "business_definition", "definition", "description"],
+    business_term_ar: ["business_term_ar", "business_term__ar_", "term_ar"],
+    business_definition_ar: ["business_definition_ar", "business_definition__ar_", "definition_ar"],
     data_type: ["data_type", "type", "datatype"],
     example: ["example", "sample", "sample_value", "example_value"],
   },

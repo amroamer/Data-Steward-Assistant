@@ -32,7 +32,7 @@ To eliminate the manual effort in data governance by giving every data owner an 
 Classify data fields according to the Saudi National Data Management Office framework. Output includes classification level (Top Secret / Secret / Confidential / Restricted / Public), rationale, data owner, and sensitivity category — delivered as a structured markdown table and exported to Excel.
 
 ### 2. Business Definitions
-Generate comprehensive business definitions for every data field: description, data type recommendation, expected format, valid values, business rules, and relationships to other fields. Output as a clean markdown table.
+Generate comprehensive business definitions for every data field: description, data type recommendation, expected format, valid values, business rules, and relationships to other fields. Output as a bilingual markdown table with columns **Business Term (EN)**, **Business Definition (EN)**, **Business Term (AR)**, **Business Definition (AR)**, Data Type, and Example — always returning both English and Arabic in a single response.
 
 ### 3. 4-Layer Data Quality Rules
 Full DQ rule generation split across two AI calls to handle depth and scale:
