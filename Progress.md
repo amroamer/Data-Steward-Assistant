@@ -113,6 +113,7 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 - ✅ Upload strip ("Upload a file to get started") moved from empty-state hero into the command console — always visible when no file is selected, hidden when file is attached or paste mode is active
 - ✅ Dark navy input bar with Courier New monospace font
 - ✅ Execute button (`#2E7D32`)
+- ✅ **Stop Generation button** — red `#C62828` "⏹ Stop" replaces Execute/Analyse during generation; `AbortController` cancels in-flight fetch; orange cancellation card with Try Again / Clear on abort
 - ✅ File upload via paperclip icon (Excel, PDF, Word, images)
 - ✅ Camera capture on touch/mobile devices
 - ✅ Text paste mode toggle (textarea for raw field names / CSV data)
@@ -184,6 +185,7 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 
 | Date | Change |
 |---|---|
+| 2026-03-09 | **Stop Generation** — global "⏹ Stop" button on both Data Owner Agent (`chat.tsx`) and Nudge Agent (`nudge.tsx`) pages; `AbortController` cancels in-flight fetch requests instantly; Execute/Analyse button swaps to Stop button during generation (no layout shift); orange cancellation card shown on abort with "Try Again" (re-submits same request) and "Clear" buttons; never shows red error card for intentional stops; full EN + AR translations |
 | 2026-03-09 | **Error Card UI** — created `client/src/components/error-card.tsx` (❌ icon, #FFEBEE bg, #C62828 left border, "Try Again" button); replaced all 5 error toasts inside `sendMessage` in `chat.tsx` with `setChatError`; error card renders below the thread list where the result would appear and clears on retry; replaced basic error div in `nudge.tsx` with `ErrorCard`; removed orphaned `AlertCircle` import from nudge.tsx; `tryAgain` translation added EN+AR in both pages |
 | 2026-03-08 | **ZATCA_SYSTEM_PROMPT Upgrade** — replaced flat-text prompt with tighter XML-structured version; added tone rules (no filler openers), SDAIA NDMO interim regulations references, COM-B/TDF in nudge scope, 4 explicit output format rules (JSON purity, conversational brevity, schema compliance, length discipline); updated ZATCA_SYSTEM_PROMPT.txt to match |
 | 2026-03-08 | **Remove Follow-up Button** — removed "Ask Follow-up" button from chat ThreadCard footer and entire follow-up section (input + answer display) from Nudge Agent page; removed associated state, handler, translation strings, and orphaned `Send` icon import |

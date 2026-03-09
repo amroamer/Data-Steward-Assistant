@@ -78,6 +78,10 @@ const translations = {
     backToAgent: "Back to Agent",
     useCases: "Use Cases",
     analyseBtn: "Analyse",
+    stopButton: "⏹ Stop",
+    generationStopped: "Generation Stopped",
+    stoppedMessage: "The analysis was stopped before it completed. No results were saved.",
+    clearInput: "Clear",
     inputPlaceholder: "Describe a tax non-compliance scenario in natural language...",
     examplesTitle: "Examples you can try:",
     examples: [
@@ -145,6 +149,10 @@ const translations = {
     backToAgent: "العودة إلى الوكيل",
     useCases: "حالات الاستخدام",
     analyseBtn: "تحليل",
+    stopButton: "⏹ إيقاف",
+    generationStopped: "تم إيقاف المعالجة",
+    stoppedMessage: "تم إيقاف التحليل قبل اكتماله. لم يتم حفظ أي نتائج.",
+    clearInput: "مسح",
     inputPlaceholder: "صف سيناريو عدم امتثال ضريبي بلغة طبيعية...",
     examplesTitle: "أمثلة يمكنك تجربتها:",
     examples: [
@@ -350,10 +358,12 @@ export default function NudgePage() {
   const [loadStep, setLoadStep] = useState(0);
   const [report, setReport] = useState<NudgeReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [wasCancelled, setWasCancelled] = useState(false);
   const [, navigate] = useLocation();
 
   const resultsRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -383,7 +393,12 @@ export default function NudgePage() {
     setLoadStep(0);
     setError(null);
     setReport(null);
-    setFollowUpAnswer(null);
+    setWasCancelled(false);
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
 
     const stepsPromise = simulateSteps();
 
@@ -391,6 +406,7 @@ export default function NudgePage() {
       const res = await fetch("/api/nudge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: abortControllerRef.current.signal,
         body: JSON.stringify({ scenario: scenario.trim() }),
       });
       const json = await res.json();
@@ -400,12 +416,17 @@ export default function NudgePage() {
       } else {
         setError(t.errorMsg);
       }
-    } catch {
-      await stepsPromise;
-      setError(t.errorMsg);
+    } catch (err: any) {
+      if (err?.name === "AbortError") {
+        setWasCancelled(true);
+      } else {
+        await stepsPromise;
+        setError(t.errorMsg);
+      }
     } finally {
       setLoading(false);
       setLoadStep(0);
+      abortControllerRef.current = null;
     }
   };
 
@@ -543,6 +564,37 @@ export default function NudgePage() {
                       <span className={`text-sm ${i < loadStep ? "text-gray-400 line-through" : i === loadStep ? "text-gray-800 font-medium" : "text-gray-300"}`}>{step}</span>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cancellation card */}
+          {wasCancelled && !loading && !error && (
+            <div className="max-w-2xl mx-auto px-4 py-6">
+              <div style={{ borderLeft: "4px solid #E65100", backgroundColor: "#FFF3E0", borderRadius: "8px", padding: "16px 20px" }}>
+                <div className="flex items-start gap-3">
+                  <span style={{ color: "#E65100", fontSize: "18px", flexShrink: 0 }}>⏹</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm" style={{ color: "#BF360C" }}>{t.generationStopped}</p>
+                    <p className="text-sm mt-1" style={{ color: "#6D4C41" }}>{t.stoppedMessage}</p>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={handleAnalyse}
+                        style={{ backgroundColor: "#2563EB", color: "white", border: "none", borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                        data-testid="button-cancelled-try-again"
+                      >
+                        {t.tryAgain}
+                      </button>
+                      <button
+                        onClick={() => { setWasCancelled(false); setScenario(""); }}
+                        style={{ backgroundColor: "#9E9E9E", color: "white", border: "none", borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                        data-testid="button-cancelled-clear"
+                      >
+                        {t.clearInput}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -817,16 +869,28 @@ export default function NudgePage() {
                   disabled={loading}
                   data-testid="input-scenario"
                 />
-                <button
-                  onClick={handleAnalyse}
-                  disabled={!scenario.trim() || loading}
-                  className="flex items-center gap-2 px-5 py-3 rounded-xl text-white text-sm font-semibold disabled:opacity-50 transition-all hover:opacity-90 active:scale-95 flex-shrink-0"
-                  style={{ backgroundColor: ZATCA_ACCENT }}
-                  data-testid="button-analyse"
-                >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                  {t.analyseBtn}
-                </button>
+                {loading ? (
+                  <button
+                    type="button"
+                    onClick={() => { if (abortControllerRef.current) abortControllerRef.current.abort(); }}
+                    className="flex items-center gap-2 px-5 py-3 rounded-xl text-white text-sm font-bold flex-shrink-0"
+                    style={{ backgroundColor: "#C62828", border: "none", cursor: "pointer", letterSpacing: "0.5px" }}
+                    data-testid="button-stop-generation"
+                  >
+                    {t.stopButton}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleAnalyse}
+                    disabled={!scenario.trim()}
+                    className="flex items-center gap-2 px-5 py-3 rounded-xl text-white text-sm font-semibold disabled:opacity-50 transition-all hover:opacity-90 active:scale-95 flex-shrink-0"
+                    style={{ backgroundColor: ZATCA_ACCENT }}
+                    data-testid="button-analyse"
+                  >
+                    <Zap className="w-4 h-4" />
+                    {t.analyseBtn}
+                  </button>
+                )}
               </div>
             </div>
           </div>

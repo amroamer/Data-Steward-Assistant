@@ -458,6 +458,10 @@ const translations = {
     refDocTypeError: "Only PDF and TXT files are supported",
     refDocSizeError: "File too large. Max 10 MB",
     refDocDupeError: "This file is already loaded",
+    stopButton: "⏹ Stop",
+    generationStopped: "Generation Stopped",
+    stoppedMessage: "The analysis was stopped before it completed. No results were saved.",
+    clearInput: "Clear",
   },
   ar: {
     newChat: "وكيل مالك بيانات جديد",
@@ -665,6 +669,10 @@ const translations = {
     refDocTypeError: "يُدعم PDF وTXT فقط",
     refDocSizeError: "الملف كبير جدًا. الحد الأقصى 10 ميجابايت",
     refDocDupeError: "هذا الملف محمل بالفعل",
+    stopButton: "⏹ إيقاف",
+    generationStopped: "تم إيقاف المعالجة",
+    stoppedMessage: "تم إيقاف التحليل قبل اكتماله. لم يتم حفظ أي نتائج.",
+    clearInput: "مسح",
   },
 } as const;
 
@@ -1422,6 +1430,8 @@ export default function ChatPage() {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [showExcelPreview, setShowExcelPreview] = useState(false);
   const [chatError, setChatError] = useState<{ message: string; retry: () => void } | null>(null);
+  const [wasCancelled, setWasCancelled] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastRequestRef = useRef<{ content: string; file?: File | null; extraText?: string } | null>(null);
@@ -1768,7 +1778,13 @@ export default function ChatPage() {
   const sendMessage = async (content: string, file?: File | null, extraText?: string) => {
     if (!content.trim() && !file && !extraText?.trim()) return;
     setChatError(null);
+    setWasCancelled(false);
     lastRequestRef.current = { content, file, extraText };
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
     const finalContent = extraText?.trim()
       ? `${content}\n\n--- Pasted Data ---\n${extraText.trim()}`
       : content;
@@ -1824,6 +1840,7 @@ export default function ChatPage() {
         const res = await fetch("/api/nudge", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: abortControllerRef.current?.signal,
           body: JSON.stringify({ scenario: finalContent }),
         });
         clearInterval(stepInterval);
@@ -1849,13 +1866,19 @@ export default function ChatPage() {
           setChatError({ message: t.nudgeErrorMsg as string, retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
           setAgentStatus("idle");
         }
-      } catch {
+      } catch (err: any) {
         clearInterval(stepInterval);
-        setChatError({ message: t.nudgeErrorMsg as string, retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
-        setAgentStatus("idle");
+        if (err?.name === "AbortError") {
+          setWasCancelled(true);
+          setAgentStatus("idle");
+        } else {
+          setChatError({ message: t.nudgeErrorMsg as string, retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
+          setAgentStatus("idle");
+        }
       } finally {
         setIsStreaming(false);
         setStreamingContent("");
+        abortControllerRef.current = null;
       }
       return;
     }
@@ -1893,6 +1916,7 @@ export default function ChatPage() {
 
       const response = await fetch(`/api/conversations/${conversationId}/messages`, {
         method: "POST",
+        signal: abortControllerRef.current?.signal,
         body: formData,
       });
 
@@ -2049,12 +2073,18 @@ export default function ChatPage() {
           }
         }
       }
-    } catch (error) {
-      setChatError({ message: t.toastErrorDesc, retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
-      setAgentStatus("idle");
+    } catch (error: any) {
+      if (error?.name === "AbortError") {
+        setWasCancelled(true);
+        setAgentStatus("idle");
+      } else {
+        setChatError({ message: t.toastErrorDesc, retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
+        setAgentStatus("idle");
+      }
     } finally {
       setIsStreaming(false);
       setStreamingContent("");
+      abortControllerRef.current = null;
     }
   };
 
@@ -2655,6 +2685,35 @@ export default function ChatPage() {
                       />
                     );
                   })}
+                  {wasCancelled && !isStreaming && !chatError && (
+                    <div className="px-4 py-4 max-w-4xl mx-auto w-full">
+                      <div style={{ borderLeft: "4px solid #E65100", backgroundColor: "#FFF3E0", borderRadius: "8px", padding: "16px 20px" }}>
+                        <div className="flex items-start gap-3">
+                          <span style={{ color: "#E65100", fontSize: "18px", flexShrink: 0 }}>⏹</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm" style={{ color: "#BF360C" }}>{t.generationStopped}</p>
+                            <p className="text-sm mt-1" style={{ color: "#6D4C41" }}>{t.stoppedMessage}</p>
+                            <div className="flex gap-2 mt-3">
+                              <button
+                                onClick={() => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); }}
+                                style={{ backgroundColor: "#2563EB", color: "white", border: "none", borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                                data-testid="button-cancelled-try-again"
+                              >
+                                {t.tryAgain}
+                              </button>
+                              <button
+                                onClick={() => { setWasCancelled(false); setInputValue(""); setSelectedFile(null); setPastedText(""); }}
+                                style={{ backgroundColor: "#9E9E9E", color: "white", border: "none", borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                                data-testid="button-cancelled-clear"
+                              >
+                                {t.clearInput}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {chatError && (
                     <div className="px-4 py-4 max-w-4xl mx-auto w-full">
                       <ErrorCard
@@ -2842,22 +2901,28 @@ export default function ChatPage() {
                   disabled={isStreaming}
                   data-testid="input-message"
                 />
-                <Button
-                  type="submit"
-                  className="h-9 px-4 flex-shrink-0 rounded-lg gap-1.5 text-xs font-medium text-white ripple-button"
-                  style={{ backgroundColor: "#2E7D32" }}
-                  disabled={isStreaming || (!inputValue.trim() && !selectedFile && !pastedText.trim())}
-                  data-testid="button-send-message"
-                >
-                  {isStreaming ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      {t.executeCmd}
-                      <Play className="w-3.5 h-3.5" />
-                    </>
-                  )}
-                </Button>
+                {isStreaming ? (
+                  <button
+                    type="button"
+                    onClick={() => { if (abortControllerRef.current) abortControllerRef.current.abort(); }}
+                    className="h-9 px-4 flex-shrink-0 rounded-lg text-xs font-bold text-white flex items-center gap-1.5"
+                    style={{ backgroundColor: "#C62828", border: "none", cursor: "pointer", letterSpacing: "0.5px" }}
+                    data-testid="button-stop-generation"
+                  >
+                    {t.stopButton}
+                  </button>
+                ) : (
+                  <Button
+                    type="submit"
+                    className="h-9 px-4 flex-shrink-0 rounded-lg gap-1.5 text-xs font-medium text-white ripple-button"
+                    style={{ backgroundColor: "#2E7D32" }}
+                    disabled={!inputValue.trim() && !selectedFile && !pastedText.trim()}
+                    data-testid="button-send-message"
+                  >
+                    {t.executeCmd}
+                    <Play className="w-3.5 h-3.5" />
+                  </Button>
+                )}
               </form>
             </div>
           </div>
