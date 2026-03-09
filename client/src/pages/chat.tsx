@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { ErrorCard } from "@/components/error-card";
 import {
   Plus,
   Send,
@@ -285,6 +286,7 @@ const translations = {
     toastUpdated: "result.xlsx updated",
     toastError: "Error",
     toastErrorDesc: "Failed to send message. Please try again.",
+    tryAgain: "Try Again",
     invalidFile: "Invalid file",
     invalidFileDesc: "Please upload an Excel, CSV, PDF, Word, or image file.",
     cardDataClassification: "Data Classification",
@@ -491,6 +493,7 @@ const translations = {
     toastUpdated: "تم تحديث result.xlsx",
     toastError: "خطأ",
     toastErrorDesc: "فشل إرسال الرسالة. يرجى المحاولة مرة أخرى.",
+    tryAgain: "حاول مجدداً",
     invalidFile: "ملف غير صالح",
     invalidFileDesc: "يرجى تحميل ملف Excel أو CSV أو PDF أو Word أو صورة.",
     cardDataClassification: "تصنيف البيانات",
@@ -1418,8 +1421,10 @@ export default function ChatPage() {
   const [pastedText, setPastedText] = useState("");
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [showExcelPreview, setShowExcelPreview] = useState(false);
+  const [chatError, setChatError] = useState<{ message: string; retry: () => void } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastRequestRef = useRef<{ content: string; file?: File | null; extraText?: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1762,6 +1767,8 @@ export default function ChatPage() {
 
   const sendMessage = async (content: string, file?: File | null, extraText?: string) => {
     if (!content.trim() && !file && !extraText?.trim()) return;
+    setChatError(null);
+    lastRequestRef.current = { content, file, extraText };
     const finalContent = extraText?.trim()
       ? `${content}\n\n--- Pasted Data ---\n${extraText.trim()}`
       : content;
@@ -1839,12 +1846,12 @@ export default function ChatPage() {
           setAgentStatus("done");
           setThinkingSteps(prev => prev.map(s => ({ ...s, status: "done" as const })));
         } else {
-          toast({ title: t.toastError, description: t.nudgeErrorMsg as string, variant: "destructive" });
+          setChatError({ message: t.nudgeErrorMsg as string, retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
           setAgentStatus("idle");
         }
       } catch {
         clearInterval(stepInterval);
-        toast({ title: t.toastError, description: t.nudgeErrorMsg as string, variant: "destructive" });
+        setChatError({ message: t.nudgeErrorMsg as string, retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
         setAgentStatus("idle");
       } finally {
         setIsStreaming(false);
@@ -1923,11 +1930,7 @@ export default function ChatPage() {
                   setStreamingContent("");
                   await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
                   await queryClient.invalidateQueries({ queryKey: ["/api/conversations", agentMode] });
-                  toast({
-                    title: lang === "ar" ? "خطأ" : "Error",
-                    description: data.content || (lang === "ar" ? "حدث خطأ أثناء معالجة الصورة" : "An error occurred while processing the image"),
-                    variant: "destructive",
-                  });
+                  setChatError({ message: data.content || (lang === "ar" ? "حدث خطأ أثناء معالجة الصورة" : "An error occurred while processing the image."), retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
                   return;
                 }
                 if (data.content) {
@@ -2039,7 +2042,7 @@ export default function ChatPage() {
                   }
                 }
                 if (data.error) {
-                  toast({ title: t.toastError, description: data.error, variant: "destructive" });
+                  setChatError({ message: data.error, retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
                 }
               } catch {}
             }
@@ -2047,7 +2050,7 @@ export default function ChatPage() {
         }
       }
     } catch (error) {
-      toast({ title: t.toastError, description: t.toastErrorDesc, variant: "destructive" });
+      setChatError({ message: t.toastErrorDesc, retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
       setAgentStatus("idle");
     } finally {
       setIsStreaming(false);
@@ -2652,6 +2655,15 @@ export default function ChatPage() {
                       />
                     );
                   })}
+                  {chatError && (
+                    <div className="px-4 py-4 max-w-4xl mx-auto w-full">
+                      <ErrorCard
+                        message={chatError.message}
+                        onRetry={chatError.retry}
+                        retryLabel={t.tryAgain}
+                      />
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
               )}

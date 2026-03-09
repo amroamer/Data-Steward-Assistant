@@ -184,6 +184,7 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 
 | Date | Change |
 |---|---|
+| 2026-03-09 | **Error Card UI** — created `client/src/components/error-card.tsx` (❌ icon, #FFEBEE bg, #C62828 left border, "Try Again" button); replaced all 5 error toasts inside `sendMessage` in `chat.tsx` with `setChatError`; error card renders below the thread list where the result would appear and clears on retry; replaced basic error div in `nudge.tsx` with `ErrorCard`; removed orphaned `AlertCircle` import from nudge.tsx; `tryAgain` translation added EN+AR in both pages |
 | 2026-03-08 | **ZATCA_SYSTEM_PROMPT Upgrade** — replaced flat-text prompt with tighter XML-structured version; added tone rules (no filler openers), SDAIA NDMO interim regulations references, COM-B/TDF in nudge scope, 4 explicit output format rules (JSON purity, conversational brevity, schema compliance, length discipline); updated ZATCA_SYSTEM_PROMPT.txt to match |
 | 2026-03-08 | **Remove Follow-up Button** — removed "Ask Follow-up" button from chat ThreadCard footer and entire follow-up section (input + answer display) from Nudge Agent page; removed associated state, handler, translation strings, and orphaned `Send` icon import |
 | 2026-03-08 | **Deterministic Outputs** — set `temperature: 0` on all 5 Claude API call sites (DQ Rules Part 1, DQ Rules Part 2, main agent stream, Nudge follow-up, Nudge main); same input now always produces the same output across all agent modes |

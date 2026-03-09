@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import * as XLSX from "xlsx";
+import { ErrorCard } from "@/components/error-card";
 import {
   ArrowLeft,
   Target,
@@ -8,7 +9,6 @@ import {
   ChevronDown,
   ChevronUp,
   Globe,
-  AlertCircle,
   CheckCircle2,
   Loader2,
   LayoutGrid,
@@ -100,6 +100,7 @@ const translations = {
     step5: "Building intervention plan",
     step6: "Generating report",
     errorMsg: "Something went wrong. Please try rephrasing your scenario.",
+    tryAgain: "Try Again",
     sectionDiagnosis: "🔍 Why is this happening?",
     sectionSegments: "👥 Who are we dealing with?",
     sectionLevers: "🎯 What should we do?",
@@ -166,6 +167,7 @@ const translations = {
     step5: "بناء خطة التدخل",
     step6: "إنشاء التقرير",
     errorMsg: "حدث خطأ ما. يرجى إعادة صياغة السيناريو.",
+    tryAgain: "حاول مجدداً",
     sectionDiagnosis: "🔍 لماذا يحدث هذا؟",
     sectionSegments: "👥 مع من نتعامل؟",
     sectionLevers: "🎯 ماذا يجب أن نفعل؟",
@@ -549,10 +551,11 @@ export default function NudgePage() {
           {/* Error */}
           {error && !loading && (
             <div className="max-w-2xl mx-auto px-4 py-6">
-              <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4" data-testid="error-message">
-                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
+              <ErrorCard
+                message={error}
+                onRetry={handleAnalyse}
+                retryLabel={t.tryAgain}
+              />
             </div>
           )}
 
