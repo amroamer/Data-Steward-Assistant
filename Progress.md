@@ -184,6 +184,7 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 
 | Date | Change |
 |---|---|
+| 2026-03-08 | **ZATCA_SYSTEM_PROMPT Upgrade** — replaced flat-text prompt with tighter XML-structured version; added tone rules (no filler openers), SDAIA NDMO interim regulations references, COM-B/TDF in nudge scope, 4 explicit output format rules (JSON purity, conversational brevity, schema compliance, length discipline); updated ZATCA_SYSTEM_PROMPT.txt to match |
 | 2026-03-08 | **Remove Follow-up Button** — removed "Ask Follow-up" button from chat ThreadCard footer and entire follow-up section (input + answer display) from Nudge Agent page; removed associated state, handler, translation strings, and orphaned `Send` icon import |
 | 2026-03-08 | **Deterministic Outputs** — set `temperature: 0` on all 5 Claude API call sites (DQ Rules Part 1, DQ Rules Part 2, main agent stream, Nudge follow-up, Nudge main); same input now always produces the same output across all agent modes |
 | 2026-03-06 | **Upload Strip Relocation** — moved drag-and-drop upload area from empty-state hero into command console bar; compact strip always visible above textarea when no file selected; User Guide updated |
