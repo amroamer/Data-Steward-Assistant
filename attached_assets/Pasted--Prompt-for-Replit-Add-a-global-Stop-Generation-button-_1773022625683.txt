@@ -1,0 +1,211 @@
+**Prompt for Replit:**
+
+Add a global **Stop Generation** button that allows the user to cancel an in-progress Claude API call at any point during generation. This applies to every feature on both the Data Owner Agent page and the Nudge Agent page.
+
+---
+
+**How It Works**
+
+When the agent is processing — meaning a Claude API call is in progress and the loading animation is showing — display a **"⏹ Stop"** button. When the user clicks it the API call is aborted immediately, the loading animation stops, and a cancellation message is shown.
+
+---
+
+**Implementation**
+
+Use the browser's built-in `AbortController` to cancel in-flight fetch requests.
+
+Update the shared `callClaude()` function to accept and use an abort signal:
+
+```javascript
+async function callClaude(
+  userPrompt,
+  conversationHistory = [],
+  returnJson = false,
+  referenceDocument = null,
+  abortSignal = null          // NEW parameter
+) {
+
+  // ... all existing message building logic stays exactly as it is ...
+
+  let response;
+  try {
+    response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: abortSignal,    // NEW — pass the abort signal to fetch
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        temperature: 0,
+        system: ZATCA_SYSTEM_PROMPT,
+        messages: messages
+      })
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new Error(`API error ${response.status}: ${errorBody.error?.message || "Unknown error"}`);
+    }
+
+  } catch (networkError) {
+    // Check if this was an intentional abort — handle it separately from real errors
+    if (networkError.name === "AbortError") {
+      throw { type: "ABORTED", message: "Generation stopped by user." };
+    }
+    throw new Error("Network error — could not reach Claude API. Please check your connection and try again.");
+  }
+
+  // ... all existing response parsing logic stays exactly as it is ...
+}
+```
+
+---
+
+**Global Abort State**
+
+Add a global abort controller ref at the top level of the app, shared across both pages:
+
+```javascript
+const abortControllerRef = useRef(null);
+const [isGenerating, setIsGenerating] = useState(false);
+```
+
+Before every `callClaude()` call anywhere in the app:
+
+```javascript
+// Cancel any existing in-progress call first
+if (abortControllerRef.current) {
+  abortControllerRef.current.abort();
+}
+
+// Create a fresh controller for this call
+abortControllerRef.current = new AbortController();
+setIsGenerating(true);
+
+try {
+  const result = await callClaude(
+    prompt,
+    [],
+    true,
+    referenceDocument,
+    abortControllerRef.current.signal   // pass the signal
+  );
+  // use result
+} catch (error) {
+  if (error.type === "ABORTED") {
+    // Show cancellation message — not an error card
+    showCancellationMessage();
+  } else {
+    showErrorCard(error.message);
+  }
+} finally {
+  setIsGenerating(false);
+  abortControllerRef.current = null;
+}
+```
+
+---
+
+**Stop Button UI**
+
+Show the Stop button in the command console area whenever `isGenerating` is true. Hide it completely when `isGenerating` is false.
+
+```javascript
+{isGenerating && (
+  <button
+    onClick={() => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    }}
+    style={{
+      backgroundColor: "#C62828",
+      color: "white",
+      border: "none",
+      borderRadius: "8px",
+      padding: "10px 20px",
+      fontSize: "13px",
+      fontWeight: "700",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      letterSpacing: "0.5px"
+    }}
+  >
+    ⏹ Stop
+  </button>
+)}
+```
+
+Position the Stop button:
+- On the **Data Owner Agent page** — replace the "Execute ▶" button in the command console with the Stop button while generation is in progress. When generation finishes, show "Execute ▶" again
+- On the **Nudge Agent page** — same pattern, replace the "Analyse" button with the Stop button during generation
+
+The transition between Execute/Analyse and Stop should be instant with no layout shift — both buttons occupy the same position and the same size.
+
+---
+
+**Cancellation Message**
+
+When the user clicks Stop, replace the loading animation immediately with a styled cancellation card:
+
+```
+⏹ Generation Stopped
+
+The analysis was stopped before it completed.
+No results were saved. You can modify your input and try again.
+
+[ Try Again ]  [ Clear ]
+```
+
+Style the cancellation card:
+- Left border in ZATCA orange (`#E65100`)
+- Light orange background (`#FFF3E0`)
+- ⏹ icon in ZATCA orange
+- **"Try Again"** button in ZATCA blue — re-submits the exact same request
+- **"Clear"** button in grey — clears the input and returns to the empty state
+- Never show this as a red error card — stopping is an intentional user action not an error
+
+---
+
+**Loading Animation Behaviour**
+
+When the user clicks Stop:
+- Stop the loading animation immediately
+- Do not complete any steps that were still pending
+- Do not save any partial results to result.xlsx or any nudge report file
+- Do not show partial on-screen results
+- Clear the in-progress state entirely
+
+---
+
+**In Arabic Mode**
+
+Translate the Stop button and cancellation card using the existing translations object:
+
+```javascript
+// Add to translations object
+en: {
+  stopButton: "⏹ Stop",
+  generationStopped: "Generation Stopped",
+  stoppedMessage: "The analysis was stopped before it completed. No results were saved.",
+  tryAgain: "Try Again",
+  clear: "Clear"
+},
+ar: {
+  stopButton: "⏹ إيقاف",
+  generationStopped: "تم إيقاف المعالجة",
+  stoppedMessage: "تم إيقاف التحليل قبل اكتماله. لم يتم حفظ أي نتائج.",
+  tryAgain: "حاول مجدداً",
+  clear: "مسح"
+}
+```
+
+---
+
+**What Must Not Change**
+
+- All existing feature logic, Excel generation, UI layout, ZATCA branding, session state, page routing, reference document system, and the system prompt stay exactly as they are
+- The `callClaude()` function internal logic — message building, JSON parsing, validation, XML wrapping — stays exactly as it is
+- Only the fetch call gains a `signal` parameter and the abort handling is added around every `callClaude()` invocation
