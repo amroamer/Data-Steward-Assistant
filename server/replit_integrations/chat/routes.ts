@@ -2230,15 +2230,31 @@ Overall verdict: CLEARED / CLEARED WITH CONDITIONS / CLEARED AFTER REMEDIATION /
       if (!fields || !Array.isArray(fields) || fields.length === 0) {
         return res.status(400).json({ ok: false, error: "fields_required" });
       }
-      const sampleStr = (sampleRows || []).slice(0, 5).map((r: Record<string, unknown>) =>
+      const samples = (sampleRows || []).slice(0, 5);
+      const sampleStr = samples.map((r: Record<string, unknown>) =>
         fields.map(f => `${f}: ${r[f] ?? ""}`).join(" | ")
       ).join("\n");
+
+      const inferType = (f: string): string => {
+        for (const row of samples) {
+          const v = row[f];
+          if (v === null || v === undefined || v === "") continue;
+          if (typeof v === "number") return "numeric";
+          if (typeof v === "boolean") return "boolean";
+          const s = String(v);
+          if (!isNaN(Number(s)) && s.trim() !== "") return "numeric";
+          if (/^\d{4}-\d{2}-\d{2}/.test(s)) return "date/datetime";
+          return "text";
+        }
+        return "text";
+      };
+      const fieldsWithTypes = fields.map(f => `${f} (${inferType(f)})`).join(", ");
 
       const userMsg = `<task>Power BI Dashboard Design</task>
 <business_question>${businessQuestion || "General data overview"}</business_question>
 <audience>${audience || "Internal ZATCA Team"}</audience>
 <dashboard_type>${dashboardType || "Analytical"}</dashboard_type>
-<fields>${fields.join(", ")}</fields>
+<fields>${fieldsWithTypes}</fields>
 <sample_data>${sampleStr}</sample_data>
 <instructions>
 Design a complete Power BI dashboard with:

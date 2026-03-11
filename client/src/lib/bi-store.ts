@@ -385,9 +385,6 @@ export function exportTestRunSheet(cases: Record<string, unknown>[], testStatus:
       String(tc.ndmo_reference || "N/A"),
     ];
   });
-  if (wb.Sheets["test_cases"]) delete wb.Sheets["test_cases"];
-  const idx = wb.SheetNames.indexOf("test_cases");
-  if (idx !== -1) wb.SheetNames.splice(idx, 1);
   appendToSheet(wb, "test_cases", headers, rows, undefined, [10, 18, 25, 10, 35, 25, 40, 25, 35, 20, 10, 10, 20], { severityCol: 3, actualResultCol: 9 });
 }
 
@@ -415,9 +412,6 @@ export function exportDashboardTestRunSheet(cases: Record<string, unknown>[], te
       String(tc.power_bi_specific_note || ""),
     ];
   });
-  if (wb.Sheets["dashboard_test_cases"]) delete wb.Sheets["dashboard_test_cases"];
-  const idx = wb.SheetNames.indexOf("dashboard_test_cases");
-  if (idx !== -1) wb.SheetNames.splice(idx, 1);
   appendToSheet(wb, "dashboard_test_cases", headers, rows, undefined, [12, 18, 20, 25, 10, 35, 25, 40, 25, 35, 20, 10, 10, 20, 30], { severityCol: 4, actualResultCol: 10 });
 }
 
