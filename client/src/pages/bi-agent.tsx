@@ -798,6 +798,7 @@ function ReportResult({ data, isRtl }: { data: Record<string, unknown>; isRtl: b
   const blIssues = (data.business_logic_issues || []) as Record<string, unknown>[];
   const prIssues = (data.presentation_issues || []) as Record<string, unknown>[];
   const checklist = (data.pre_send_checklist || []) as string[];
+  const recColOrder = (data.recommended_column_order || []) as string[];
   const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
 
   const sendColor = sendRec === "SEND NOW" ? "#2E7D32" : sendRec === "SEND AFTER FIXES" ? "#E65100" : "#B71C1C";
@@ -874,6 +875,17 @@ function ReportResult({ data, isRtl }: { data: Record<string, unknown>; isRtl: b
               {item}
             </label>
           ))}
+        </div>
+      )}
+
+      {recColOrder.length > 0 && (
+        <div style={{ background: "rgba(26,75,140,0.08)", border: "1px solid #1A4B8C55", borderRadius: 12, padding: "16px 20px", marginTop: 16 }} data-testid="recommended-column-order">
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#90B4D4", marginBottom: 10 }}>📋 {isRtl ? "ترتيب الأعمدة المقترح" : "Recommended Column Order"}</div>
+          <ol style={{ paddingLeft: 20, margin: 0 }}>
+            {recColOrder.map((col, i) => (
+              <li key={i} style={{ fontSize: 12, color: "#C8D8EA", padding: "3px 0" }}>{col}</li>
+            ))}
+          </ol>
         </div>
       )}
     </>

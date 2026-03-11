@@ -135,34 +135,66 @@ function applyActualResultYellowFill(ws: XLSX.WorkSheet, startRow: number, rowCo
   }
 }
 
+function autoSizeColumns(allRows: (string | number | boolean)[][], headers: string[], minWidths?: number[]): { wch: number }[] {
+  return headers.map((h, c) => {
+    let max = h.length;
+    for (const row of allRows) {
+      if (row[c] !== undefined && row[c] !== null) {
+        const len = String(row[c]).length;
+        if (len > max) max = len;
+      }
+    }
+    const min = minWidths && minWidths[c] ? minWidths[c] : 8;
+    return { wch: Math.max(min, Math.min(max + 2, 60)) };
+  });
+}
+
+function applyAllStyles(ws: XLSX.WorkSheet, headerRowIdx: number, headers: string[], allDataRows: (string | number | boolean)[][], options?: AppendSheetOptions) {
+  applyHeaderStyle(ws, headerRowIdx, headers.length);
+  applyAltRowFill(ws, headerRowIdx + 1, headerRowIdx + allDataRows.length, headers.length);
+  if (options?.severityCol !== undefined) {
+    applySeverityFill(ws, allDataRows, headerRowIdx + 1, options.severityCol, headers.length);
+  }
+  if (options?.actualResultCol !== undefined) {
+    applyActualResultYellowFill(ws, headerRowIdx + 1, allDataRows.length, options.actualResultCol);
+  }
+}
+
 function appendToSheet(wb: XLSX.WorkBook, sheetName: string, headers: string[], rows: (string | number | boolean)[][], summaryRows?: (string | number | boolean)[][], colWidths?: number[], options?: AppendSheetOptions) {
   const existing = wb.Sheets[sheetName];
-  let headerRowIdx: number;
 
   if (existing) {
     const oldData = XLSX.utils.sheet_to_json<(string | number | boolean)[]>(existing, { header: 1 });
-    const separator = [`--- Run ${new Date().toLocaleString()} ---`, ...Array(headers.length - 1).fill("")];
+    const separator: (string | number | boolean)[] = [`--- Run ${new Date().toLocaleString()} ---`, ...Array(headers.length - 1).fill("")];
     const combined = [...oldData, separator, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(combined);
-    if (colWidths) ws["!cols"] = colWidths.map(w => ({ wch: w }));
-    ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+
+    const headerRowIdx = oldData.findIndex(row => row.length > 0 && String(row[0]) === headers[0]);
+    if (headerRowIdx >= 0) {
+      const dataRows = combined.slice(headerRowIdx + 1);
+      ws["!cols"] = autoSizeColumns(combined, headers, colWidths);
+      ws["!freeze"] = { xSplit: 0, ySplit: headerRowIdx + 1 };
+      applyHeaderStyle(ws, headerRowIdx, headers.length);
+      applyAltRowFill(ws, headerRowIdx + 1, headerRowIdx + dataRows.length, headers.length);
+      if (options?.severityCol !== undefined) {
+        applySeverityFill(ws, dataRows, headerRowIdx + 1, options.severityCol, headers.length);
+      }
+      if (options?.actualResultCol !== undefined) {
+        applyActualResultYellowFill(ws, headerRowIdx + 1, dataRows.length, options.actualResultCol);
+      }
+    } else {
+      ws["!cols"] = autoSizeColumns(combined, headers, colWidths);
+    }
     wb.Sheets[sheetName] = ws;
   } else {
     const allRows = summaryRows ? [...summaryRows, [], headers, ...rows] : [headers, ...rows];
-    headerRowIdx = summaryRows ? summaryRows.length + 1 : 0;
+    const headerRowIdx = summaryRows ? summaryRows.length + 1 : 0;
     const ws = XLSX.utils.aoa_to_sheet(allRows);
-    if (colWidths) ws["!cols"] = colWidths.map(w => ({ wch: w }));
+    ws["!cols"] = autoSizeColumns(allRows, headers, colWidths);
     ws["!freeze"] = { xSplit: 0, ySplit: headerRowIdx + 1 };
 
-    applyHeaderStyle(ws, headerRowIdx, headers.length);
-    applyAltRowFill(ws, headerRowIdx + 1, headerRowIdx + rows.length, headers.length);
+    applyAllStyles(ws, headerRowIdx, headers, rows, options);
 
-    if (options?.severityCol !== undefined) {
-      applySeverityFill(ws, rows, headerRowIdx + 1, options.severityCol, headers.length);
-    }
-    if (options?.actualResultCol !== undefined) {
-      applyActualResultYellowFill(ws, headerRowIdx + 1, rows.length, options.actualResultCol);
-    }
     if (options?.verdictRow && summaryRows) {
       const vFill = VERDICT_FILLS[options.verdictRow.value];
       if (vFill) {
@@ -175,6 +207,11 @@ function appendToSheet(wb: XLSX.WorkBook, sheetName: string, headers: string[], 
 
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   }
+}
+
+export function appendBiSheet(sheetName: string, headers: string[], rows: (string | number | boolean)[][], summaryRows?: (string | number | boolean)[][], colWidths?: number[], options?: AppendSheetOptions) {
+  const wb = getOrCreateWorkbook();
+  appendToSheet(wb, sheetName, headers, rows, summaryRows, colWidths, options);
 }
 
 export function addSharingEligibilitySheet(data: Record<string, unknown>) {
