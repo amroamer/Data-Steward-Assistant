@@ -1,0 +1,595 @@
+Here is the full Replit build prompt:
+
+---
+
+```
+Build a new page called "Business Intelligence Agent" (🧠 BI Agent) in the existing ZATCA Data Owner Agent React app. Add it to the left sidebar navigation alongside the existing pages. Use the same three-panel layout, ZATCA brand colors (primary #1A4B8C, green #2E7D32, orange #E65100, dark navy #0D2E5C), and the same global callClaude() wrapper with temperature 0 and AbortController stop generation.
+
+════════════════════════════════════════
+PAGE: BUSINESS INTELLIGENCE AGENT
+════════════════════════════════════════
+
+The page has five features accessible as tabs at the top of the center panel:
+1. Sharing Eligibility
+2. Dashboard Designer
+3. Report Tester
+4. Test Case Generator
+5. Dashboard Tester
+
+Each tab has its own command console at the bottom (same dark navy input bar as the Data Owner Agent page), its own output area in the right panel, and writes results to a dedicated Excel file called bi_agent_report.xlsx (cumulative, additive — never overwrite existing sheets, always append or update).
+
+The left panel shows:
+- Session list (same behavior as Data Owner Agent)
+- Active tab indicator
+- bi_agent_report.xlsx download button (ZATCA green, always visible once any result exists)
+- Reference document upload (PDF or TXT, same injection behavior as Data Owner Agent)
+
+════════════════════════════════════════
+FEATURE 1: SHARING ELIGIBILITY
+Tab label: 🔍 Sharing Eligibility
+════════════════════════════════════════
+
+INPUT:
+- Excel/CSV file upload (drag and drop zone)
+- Free-text field: "Who is this report going to?" (e.g. "Ministry of Finance", "external vendor PwC", "published on open data portal")
+
+CLAUDE PROMPT (inject into callClaude as user message, with system prompt below):
+
+System: You are a ZATCA data governance consultant. You classify dataset fields per NDMO National Data Governance Interim Regulations (June 2020) Section 4.3 and apply sharing rules per Section 6. Respond only in valid JSON. No prose, no markdown, no backticks.
+
+User message structure:
+<task>Data Sharing Eligibility Assessment</task>
+<stakeholder>[free text from analyst]</stakeholder>
+<fields>[comma-separated field names]</fields>
+<sample_data>[up to 5 rows formatted as field: value | field: value]</sample_data>
+<instructions>
+Classify each field per NDMO Section 4.3:
+TOP SECRET (TS) — High: national security, intelligence, military, critical infrastructure
+SECRET (S) — Medium: enforcement/investigation data, significant financial or individual harm
+CONFIDENTIAL (C) — Low: all PII (NID, name, address, phone, TIN, CR, salary, VAT filings, tax declarations, medical, biometrics, account numbers), internal operational data
+PUBLIC (P) — None: published statistics, press releases, open service info
+
+Infer stakeholder tier from the description:
+INTERNAL_ZATCA — ZATCA employee same directorate
+INTERNAL_GOV — another government entity (GAZT, SAMA, MOF, SDAIA, etc.)
+PRIVATE_SECTOR — licensed company or vendor
+PUBLIC — general public or open publication
+
+Apply sharing rules per NDMO Section 6:
+PUBLIC fields → all tiers: SEND
+CONFIDENTIAL:
+  INTERNAL_ZATCA → SEND
+  INTERNAL_GOV → CONDITIONAL (DSA + BDE approval)
+  PRIVATE_SECTOR → CONDITIONAL (DSA + PII anonymization per PDPL)
+  PUBLIC → BLOCK
+SECRET:
+  INTERNAL_ZATCA → CONDITIONAL (need-to-know + director approval)
+  INTERNAL_GOV → CONDITIONAL (NDMO coordination + security clearance)
+  PRIVATE_SECTOR → BLOCK
+  PUBLIC → BLOCK
+TOP SECRET → all tiers: BLOCK
+
+Overall verdict: CLEARED / CLEARED WITH CONDITIONS / CLEARED AFTER REMEDIATION / BLOCKED
+</instructions>
+<json_schema>
+{
+  "stakeholder_tier": "INTERNAL_ZATCA|INTERNAL_GOV|PRIVATE_SECTOR|PUBLIC",
+  "stakeholder_description": "string",
+  "overall_verdict": "CLEARED|CLEARED WITH CONDITIONS|CLEARED AFTER REMEDIATION|BLOCKED",
+  "verdict_rationale": "string",
+  "governing_field": "string",
+  "overall_classification": "Top Secret|Secret|Confidential|Public",
+  "blocking_fields": ["string"],
+  "conditional_fields": ["string"],
+  "safe_fields": ["string"],
+  "field_assessments": [{
+    "field_name": "string",
+    "sample_values": ["string"],
+    "classification_level": "Top Secret|Secret|Confidential|Public",
+    "classification_code": "TS|S|C|P",
+    "confidential_sub_level": "A|B|C|N/A",
+    "is_pii": true,
+    "stakeholder_verdict": "SEND|BLOCK|CONDITIONAL",
+    "ndmo_rule_applied": "string",
+    "remediation_action": "REMOVE|MASK|AGGREGATE|PSEUDONYMIZE|GET APPROVAL|NO ACTION",
+    "remediation_detail": "string"
+  }],
+  "approval_checklist": [{
+    "item": "string",
+    "required_for_fields": ["string"],
+    "owner": "string",
+    "blocking": true
+  }],
+  "safe_version_possible": true,
+  "safe_version_instructions": "string",
+  "estimated_remediation_effort": "Low|Medium|High",
+  "pdpl_exposure": true,
+  "pdpl_exposure_note": "string"
+}
+</json_schema>
+
+ON-SCREEN OUTPUT:
+1. Large verdict banner: CLEARED → green (#2E7D32) | CLEARED WITH CONDITIONS → orange (#E65100) | CLEARED AFTER REMEDIATION → amber (#F59E0B) | BLOCKED → red (#B71C1C). Show verdict label, rationale, overall classification badge, governing field name.
+2. Three recipient cards side by side: General Public / Private Sector / Gov Entities. Each shows: verdict icon (✓ / ◐ / ✕), conditions list below if applicable.
+3. Approval checklist — checkboxes the analyst ticks off before re-running. Each item shows owner and which fields it applies to.
+4. Remediation plan — orange bordered box, bullet per field: action type badge + plain-English instruction.
+5. Field-by-field table: field name | classification badge | PII flag | stakeholder verdict badge | remediation action | NDMO rule cited. Click row to expand full detail.
+6. PDPL exposure warning card if pdpl_exposure is true — red left border, PDPL violation risk summary.
+
+EXCEL OUTPUT (sheet: sharing_eligibility):
+Columns: field_name | classification | classification_code | is_pii | stakeholder_verdict | remediation_action | remediation_detail | ndmo_rule_applied
+Top summary rows: overall verdict, stakeholder, governing field, PDPL exposure flag.
+Header: ZATCA blue #1A4B8C white bold. Alt rows: #EBF2FB. Verdict row color: match verdict color.
+
+════════════════════════════════════════
+FEATURE 2: DASHBOARD DESIGNER
+Tab label: 📐 Dashboard Designer
+════════════════════════════════════════
+
+INPUT:
+- Excel/CSV file upload (same drag-drop zone)
+- Free-text field: "What business question should this dashboard answer?" (e.g. "monthly VAT compliance trends by region", "taxpayer filing behavior segmentation")
+- Dropdown: Dashboard audience → Internal ZATCA Team / Senior Management / External Stakeholder
+- Dropdown: Dashboard type → Operational (daily monitoring) / Analytical (trends and patterns) / Executive (KPI summary)
+
+CLAUDE PROMPT:
+
+System: You are a senior Power BI dashboard architect and ZATCA data analyst. Design a complete, production-ready Power BI dashboard specification from a uploaded dataset. Respond only in valid JSON. No prose, no markdown, no backticks.
+
+User message structure:
+<task>Power BI Dashboard Design</task>
+<business_question>[free text]</business_question>
+<audience>[selected audience]</audience>
+<dashboard_type>[selected type]</dashboard_type>
+<fields>[comma-separated field names with data types inferred from samples]</fields>
+<sample_data>[up to 5 rows]</sample_data>
+<instructions>
+Design a complete Power BI dashboard with the following:
+
+1. RECOMMENDED VISUALS: For each visual specify:
+   - visual_id (VIS-001, VIS-002…)
+   - visual_type: Bar Chart / Line Chart / Donut Chart / KPI Card / Matrix / Scatter Plot / Map / Treemap / Waterfall / Gauge / Slicer / Table
+   - title
+   - fields_used (from uploaded dataset)
+   - x_axis / y_axis / legend / tooltip fields where applicable
+   - dax_measure: the exact DAX formula if a calculated measure is needed
+   - insight_purpose: what business question this visual answers
+   - placement: Top-Left / Top-Center / Top-Right / Mid-Left / Mid-Center / Mid-Right / Bottom-Full
+
+2. SLICERS AND FILTERS: List all recommended slicers with field name, slicer type (Dropdown / Between / Relative Date / Search), and which visuals it controls.
+
+3. DAX MEASURES: Full list of all recommended DAX measures with measure name, formula, and description.
+
+4. DATA MODEL HINTS: Any calculated columns, relationships, or transformations needed in Power Query before building the dashboard.
+
+5. LAYOUT PLAN: Describe the dashboard layout — number of pages, what goes on each page, visual placement grid.
+
+6. COLOR THEME: Recommend a Power BI theme JSON configuration using ZATCA brand colors (#1A4B8C primary, #2E7D32 green, #E65100 orange, #0D2E5C dark navy, #F59E0B amber).
+
+7. KPIs: List the top 5 KPIs to surface, with field used, DAX formula, target value logic, and color thresholds (green/amber/red).
+</instructions>
+<json_schema>
+{
+  "dashboard_title": "string",
+  "dashboard_type": "Operational|Analytical|Executive",
+  "audience": "string",
+  "pages": [{
+    "page_number": 1,
+    "page_title": "string",
+    "page_purpose": "string",
+    "visuals": [{
+      "visual_id": "VIS-001",
+      "visual_type": "string",
+      "title": "string",
+      "fields_used": ["string"],
+      "x_axis": "string",
+      "y_axis": "string",
+      "legend": "string",
+      "tooltip_fields": ["string"],
+      "dax_measure": "string",
+      "insight_purpose": "string",
+      "placement": "string"
+    }]
+  }],
+  "slicers": [{
+    "field_name": "string",
+    "slicer_type": "string",
+    "controls_visuals": ["VIS-001"]
+  }],
+  "dax_measures": [{
+    "measure_name": "string",
+    "formula": "string",
+    "description": "string"
+  }],
+  "power_query_steps": ["string"],
+  "kpis": [{
+    "kpi_name": "string",
+    "field_used": "string",
+    "dax_formula": "string",
+    "target_logic": "string",
+    "green_threshold": "string",
+    "amber_threshold": "string",
+    "red_threshold": "string"
+  }],
+  "color_theme_json": {},
+  "layout_summary": "string",
+  "recommended_page_count": 1
+}
+</json_schema>
+
+ON-SCREEN OUTPUT:
+1. Dashboard title and audience badge at top.
+2. Page tabs (one per page in the design). Each tab shows:
+   - Visual cards in a CSS grid. Each card: visual type icon + title + fields used chips + insight purpose + DAX formula in monospace if applicable. Color-coded by visual type (KPI Card → ZATCA blue, Chart → green, Slicer → grey, Table → navy).
+3. KPI strip — 5 KPI cards in a row: name, formula preview, green/amber/red thresholds as colored dots.
+4. DAX Measures accordion — expandable list, each item shows measure name + full formula in dark monospace code block.
+5. Power Query Steps — numbered list in amber-bordered box.
+6. Slicers panel — which slicers control which visuals, shown as a simple matrix.
+7. "Copy Theme JSON" button — copies the color_theme_json to clipboard.
+
+EXCEL OUTPUT (sheet: dashboard_design):
+One section per page. Columns: visual_id | visual_type | title | fields_used | dax_measure | insight_purpose | placement.
+Separate sheet: dax_measures → measure_name | formula | description (monospace Courier New size 9 for formula column).
+Separate sheet: kpis → kpi_name | dax_formula | target_logic | green_threshold | amber_threshold | red_threshold.
+
+════════════════════════════════════════
+FEATURE 3: REPORT TESTER
+Tab label: 🔬 Report Tester
+════════════════════════════════════════
+
+INPUT:
+- Excel/CSV file upload
+- Free-text: "Who is this report going to?" (stakeholder description)
+- Free-text: "What is this report supposed to show?" (report purpose/business question)
+- Dropdown: Report format → Tabular / Summary / Pivot / Mixed
+
+CLAUDE PROMPT:
+
+System: You are a ZATCA BI quality assurance lead. You review BI reports before they go to stakeholders. You check for data governance compliance (NDMO), data quality issues, business logic integrity, and presentation quality. Respond only in valid JSON. No prose, no markdown, no backticks.
+
+User message structure:
+<task>BI Report Pre-Send Quality Test</task>
+<report_purpose>[free text]</report_purpose>
+<stakeholder>[free text]</stakeholder>
+<report_format>[selected format]</report_format>
+<fields>[field names and inferred types]</fields>
+<sample_data>[up to 10 rows]</sample_data>
+<instructions>
+Run a four-dimension quality test on this report:
+
+DIMENSION 1 — DATA GOVERNANCE CLEARANCE
+Apply NDMO Section 4.3 + Section 6 sharing rules for the specified stakeholder.
+Produce a go/no-go verdict: CLEARED / CLEARED WITH CONDITIONS / CLEARED AFTER REMEDIATION / BLOCKED.
+List every field that blocks or conditions sending.
+
+DIMENSION 2 — DATA QUALITY ISSUES
+Scan sample rows for:
+- Nulls and missing values (flag fields with >10% nulls in sample)
+- Duplicate rows
+- Type mismatches (numbers stored as text, dates as strings)
+- Outliers or impossible values (negative ages, future dates in past-tense fields, amounts = 0 where unexpected)
+- Inconsistent formatting (mixed case names, inconsistent date formats, mixed currency symbols)
+- Referential integrity issues (IDs that appear broken or inconsistent)
+Severity: Critical / High / Medium / Low
+
+DIMENSION 3 — BUSINESS LOGIC INTEGRITY
+Given the report purpose, check:
+- Are the right fields present to answer the business question?
+- Are any key fields missing that a stakeholder would expect?
+- Are totals and subtotals logically consistent with row-level data?
+- Are any field names misleading or ambiguous for the stated audience?
+- Are date ranges and granularity appropriate for the report purpose?
+
+DIMENSION 4 — PRESENTATION QUALITY
+- Are column headers clear and professional (no raw database names like CUST_ID_FK)?
+- Are number formats appropriate (currency with SAR symbol, percentages with % sign, dates in DD/MM/YYYY)?
+- Is the sort order logical for the stated purpose?
+- Are there redundant columns that add no value for the stakeholder?
+- Recommend a better column order for readability.
+</instructions>
+<json_schema>
+{
+  "report_purpose": "string",
+  "stakeholder_description": "string",
+  "governance_verdict": "CLEARED|CLEARED WITH CONDITIONS|CLEARED AFTER REMEDIATION|BLOCKED",
+  "governance_summary": "string",
+  "overall_quality_score": 0,
+  "quality_grade": "A|B|C|D|F",
+  "dimension_scores": {
+    "data_governance": 0,
+    "data_quality": 0,
+    "business_logic": 0,
+    "presentation": 0
+  },
+  "governance_issues": [{
+    "field_name": "string",
+    "classification_code": "TS|S|C|P",
+    "verdict": "SEND|BLOCK|CONDITIONAL",
+    "remediation": "string"
+  }],
+  "data_quality_issues": [{
+    "issue_id": "DQ-001",
+    "field_name": "string",
+    "issue_type": "Null|Duplicate|Type Mismatch|Outlier|Format|Referential",
+    "severity": "Critical|High|Medium|Low",
+    "description": "string",
+    "affected_rows": "string",
+    "fix_recommendation": "string"
+  }],
+  "business_logic_issues": [{
+    "issue_id": "BL-001",
+    "issue_type": "Missing Field|Misleading Name|Inconsistent Total|Wrong Granularity|Irrelevant Field",
+    "description": "string",
+    "severity": "Critical|High|Medium|Low",
+    "recommendation": "string"
+  }],
+  "presentation_issues": [{
+    "issue_id": "PR-001",
+    "field_name": "string",
+    "issue_type": "Raw Column Name|Wrong Format|Poor Sort|Redundant Column|Recommended Rename",
+    "current_value": "string",
+    "recommended_value": "string"
+  }],
+  "recommended_column_order": ["string"],
+  "send_recommendation": "SEND NOW|SEND AFTER FIXES|DO NOT SEND",
+  "pre_send_checklist": ["string"]
+}
+</json_schema>
+
+ON-SCREEN OUTPUT:
+1. Verdict banner: SEND NOW → green | SEND AFTER FIXES → orange | DO NOT SEND → red. Show governance verdict + overall quality score as a large number (0–100) with letter grade.
+2. Four dimension score bars — horizontal progress bars, one per dimension, color coded: ≥80 green, 60–79 amber, <60 red.
+3. Issues accordion — four sections (Governance, Data Quality, Business Logic, Presentation). Each issue: severity badge + description + fix recommendation. Critical issues shown with red left border. Collapse/expand per section.
+4. Pre-send checklist — checkboxes the analyst ticks off. Each item as an actionable task.
+5. Recommended column order — drag-and-drop sortable list showing the suggested column sequence.
+
+EXCEL OUTPUT (sheet: report_test_results):
+One row per issue. Columns: dimension | issue_id | field_name | severity | description | fix_recommendation.
+Color rows: Critical → red fill, High → orange, Medium → yellow, Low → green.
+Summary block at top: governance verdict, quality score, grade, send recommendation.
+
+════════════════════════════════════════
+FEATURE 4: TEST CASE GENERATOR
+Tab label: 📋 Test Cases
+════════════════════════════════════════
+
+INPUT:
+- Excel/CSV file upload
+- Free-text: "What does this report measure or track?" (report purpose)
+- Dropdown: Test depth → Basic (10–15 cases) / Standard (20–30 cases) / Comprehensive (40–50 cases)
+- Multi-select checkboxes: Test categories to include →
+  ☑ Data completeness
+  ☑ Data accuracy
+  ☑ Business rules
+  ☑ Edge cases
+  ☑ Security & governance
+  ☑ Performance thresholds
+  ☑ Formatting & presentation
+
+CLAUDE PROMPT:
+
+System: You are a senior BI QA engineer at ZATCA. You write structured test cases for BI reports following best practices. You are thorough, specific, and write test cases that a junior analyst can execute without ambiguity. Respond only in valid JSON. No prose, no markdown, no backticks.
+
+User message structure:
+<task>BI Report Test Case Generation</task>
+<report_purpose>[free text]</report_purpose>
+<test_depth>[Basic|Standard|Comprehensive]</test_depth>
+<test_categories>[selected categories]</test_categories>
+<fields>[field names and inferred types]</fields>
+<sample_data>[up to 10 rows]</sample_data>
+<instructions>
+Generate structured test cases for this BI report. Each test case must be specific to the actual fields in the dataset — never generic.
+
+Test case structure:
+- TC-ID: TC-001, TC-002… sequentially
+- category: Data Completeness / Data Accuracy / Business Rules / Edge Cases / Security & Governance / Performance / Formatting
+- test_name: short descriptive name
+- objective: one sentence — what this test verifies
+- preconditions: what must be true before running this test
+- test_steps: numbered list of exact steps the tester should follow
+- test_data: what specific data or values to use (reference actual field names and sample values)
+- expected_result: exactly what should happen if the report is correct
+- actual_result: leave blank (field for tester to fill in)
+- pass_fail_criteria: the precise condition that determines PASS or FAIL
+- severity: Critical / High / Medium / Low
+- estimated_duration_minutes: integer
+- ndmo_reference: if this test relates to data governance, cite the NDMO section (e.g. "NDMO Section 4.3 — Data Classification"). Otherwise "N/A".
+
+Categories to cover (based on selected inputs):
+
+DATA COMPLETENESS: Are all expected fields populated? Are required fields ever null? Do row counts match expected totals? Is there data for all expected time periods?
+
+DATA ACCURACY: Do calculated fields match manual calculation from raw fields? Are aggregations correct? Are there rounding errors? Do currency fields show correct SAR values?
+
+BUSINESS RULES: Do values fall within valid business ranges (e.g. tax rates between 0–15%)? Are date fields logically consistent (end date after start date)? Are statuses valid per business rules? Are foreign key references valid?
+
+EDGE CASES: What happens with zero values? What happens with maximum possible values? What happens with special characters in text fields? What happens with data at date boundaries (first/last day of month/year)?
+
+SECURITY & GOVERNANCE: Are PII fields classified correctly per NDMO? Are Top Secret or Secret fields present that should not appear in this report? Does the report comply with PDPL for the intended audience? Are there any unmasked NID, salary, or account number fields?
+
+PERFORMANCE: Does the report load within acceptable time? Are there fields with high cardinality that could cause slow rendering? Are date filters applied to limit data volume?
+
+FORMATTING: Are dates in DD/MM/YYYY format? Are currency values showing SAR symbol? Are column headers in Title Case and business-friendly? Are negative numbers shown correctly?
+</instructions>
+<json_schema>
+{
+  "report_purpose": "string",
+  "test_depth": "Basic|Standard|Comprehensive",
+  "total_test_cases": 0,
+  "test_cases": [{
+    "tc_id": "TC-001",
+    "category": "string",
+    "test_name": "string",
+    "objective": "string",
+    "preconditions": "string",
+    "test_steps": ["string"],
+    "test_data": "string",
+    "expected_result": "string",
+    "actual_result": "",
+    "pass_fail_criteria": "string",
+    "severity": "Critical|High|Medium|Low",
+    "estimated_duration_minutes": 0,
+    "ndmo_reference": "string"
+  }],
+  "coverage_summary": {
+    "data_completeness": 0,
+    "data_accuracy": 0,
+    "business_rules": 0,
+    "edge_cases": 0,
+    "security_governance": 0,
+    "performance": 0,
+    "formatting": 0
+  },
+  "total_estimated_duration_minutes": 0,
+  "critical_test_count": 0,
+  "recommended_execution_order": ["TC-001"]
+}
+</json_schema>
+
+ON-SCREEN OUTPUT:
+1. Summary strip: total test cases | critical count | estimated total duration | categories covered.
+2. Category tabs — one tab per category. Each tab lists its test cases as expandable cards.
+3. Each test case card: TC-ID badge | severity badge | test name | objective | estimated duration chip. Expand to show: preconditions, numbered test steps, test data, expected result, pass/fail criteria, NDMO reference if applicable.
+4. Coverage donut chart (use recharts) — one segment per category, color coded.
+5. "Mark as Passed / Failed" buttons on each card — local state tracking. Tally shown in a progress bar at top: X passed / Y failed / Z not run.
+6. "Export Test Run" button — downloads the Excel with actual_result and pass/fail columns filled from the analyst's local selections.
+
+EXCEL OUTPUT (sheet: test_cases):
+One row per test case.
+Columns: tc_id | category | test_name | severity | objective | preconditions | test_steps (joined by newline) | test_data | expected_result | actual_result (blank) | pass_fail | estimated_duration_minutes | ndmo_reference.
+Freeze top row. Auto-width. Severity color coding. actual_result column: light yellow fill (#FFFDE7) — tester fills this in.
+Second sheet: test_summary → coverage counts per category + total duration.
+
+════════════════════════════════════════
+FEATURE 5: DASHBOARD TESTER
+Tab label: 🖥 Dashboard Tester
+════════════════════════════════════════
+
+INPUT:
+- Excel/CSV file upload (the data that powers the dashboard)
+- Free-text: "Describe the dashboard you want to test" (e.g. "VAT compliance dashboard for senior management — 3 pages, KPI cards, trend lines, regional breakdown")
+- Free-text: "List the visuals in the dashboard" (free text — analyst describes what visuals exist, e.g. "KPI card showing total VAT collected, bar chart by region, line chart by month, slicer for year")
+- Dropdown: Dashboard audience → Internal ZATCA Team / Senior Management / External Stakeholder
+- Dropdown: Test depth → Basic / Standard / Comprehensive
+
+CLAUDE PROMPT:
+
+System: You are a senior Power BI QA specialist at ZATCA. You write structured test cases specifically for Power BI dashboards — covering visual accuracy, DAX correctness, slicer behavior, drill-through, governance, and performance. Respond only in valid JSON. No prose, no markdown, no backticks.
+
+User message structure:
+<task>Power BI Dashboard Test Case Generation</task>
+<dashboard_description>[free text]</dashboard_description>
+<visuals_list>[free text]</visuals_list>
+<audience>[selected audience]</audience>
+<test_depth>[Basic|Standard|Comprehensive]</test_depth>
+<fields>[field names and inferred types]</fields>
+<sample_data>[up to 10 rows]</sample_data>
+<instructions>
+Generate structured test cases specifically for Power BI dashboard testing. Cover these categories:
+
+VISUAL ACCURACY: Does each visual show the correct data? Do chart axes use the right fields? Do KPI cards calculate correctly against raw data? Are donut/bar totals consistent with underlying table?
+
+DAX VALIDATION: Are calculated measures producing correct results? Test each DAX measure with a manual calculation from sample data. Are running totals, YTD, and period-over-period measures correct?
+
+SLICER & FILTER BEHAVIOR: Does each slicer filter the correct visuals? Does selecting a value in one slicer cascade correctly to dependent slicers? Does clearing a slicer restore the full dataset? Do cross-filters between visuals behave as expected?
+
+DRILL-THROUGH & NAVIGATION: Do drill-through pages open with the correct filtered context? Do back navigation buttons work? Do bookmarks restore the correct state?
+
+DATA GOVERNANCE: Are any PII or classified fields visible to the wrong audience? Are sensitive fields masked or hidden per NDMO classification? Does the dashboard comply with PDPL for the intended audience tier?
+
+PERFORMANCE: Does the dashboard load within 3 seconds for the expected data volume? Do slicers respond within 1 second? Are visuals with high cardinality fields slow to render?
+
+FORMATTING & UX: Are all number formats correct (SAR currency, percentage, date DD/MM/YYYY)? Is the color theme consistent? Are tooltips meaningful? Are visual titles clear for the stated audience? Is the layout readable on a 1920x1080 screen?
+
+REFRESH & DATA FRESHNESS: Is the data refresh date shown on the dashboard? Does the dashboard reflect the most recent data after a refresh? Are stale data warnings present?
+
+Each test case must reference the actual fields and visuals described by the analyst.
+</instructions>
+<json_schema>
+{
+  "dashboard_description": "string",
+  "audience": "string",
+  "total_test_cases": 0,
+  "test_cases": [{
+    "tc_id": "DBT-001",
+    "category": "Visual Accuracy|DAX Validation|Slicer & Filter|Drill-Through|Governance|Performance|Formatting|Refresh",
+    "visual_tested": "string",
+    "test_name": "string",
+    "objective": "string",
+    "preconditions": "string",
+    "test_steps": ["string"],
+    "test_data": "string",
+    "expected_result": "string",
+    "actual_result": "",
+    "pass_fail_criteria": "string",
+    "severity": "Critical|High|Medium|Low",
+    "estimated_duration_minutes": 0,
+    "ndmo_reference": "string",
+    "power_bi_specific_note": "string"
+  }],
+  "coverage_summary": {
+    "visual_accuracy": 0,
+    "dax_validation": 0,
+    "slicer_filter": 0,
+    "drill_through": 0,
+    "governance": 0,
+    "performance": 0,
+    "formatting": 0,
+    "refresh": 0
+  },
+  "total_estimated_duration_minutes": 0,
+  "critical_test_count": 0,
+  "governance_risk_level": "Low|Medium|High|Critical",
+  "governance_risk_note": "string"
+}
+</json_schema>
+
+ON-SCREEN OUTPUT:
+Same card layout as Feature 4 (Test Case Generator) but:
+- TC-IDs prefixed DBT-
+- Extra field on each card: "Visual Tested" chip in ZATCA blue
+- Extra field: "Power BI Note" — specific Power BI UI navigation instructions (e.g. "Right-click the visual → Drill through → Page 2")
+- Governance Risk badge at top: Low → green | Medium → amber | High → orange | Critical → red
+- Category tabs: Visual Accuracy / DAX / Slicers / Drill-Through / Governance / Performance / Formatting / Refresh
+
+EXCEL OUTPUT (sheet: dashboard_test_cases):
+Same structure as Feature 4 but with two extra columns: visual_tested | power_bi_specific_note.
+TC-IDs use DBT- prefix.
+
+════════════════════════════════════════
+SHARED BEHAVIORS ACROSS ALL FEATURES
+════════════════════════════════════════
+
+FILE UPLOAD: All five features share the same file upload component. Once a file is uploaded on any tab, it persists across all tabs for the current session (the analyst should not have to re-upload when switching tabs). Show a persistent file chip in the command console: "📊 filename.xlsx · N rows · M fields [✕ to clear]".
+
+STOP GENERATION: All Claude calls use AbortController. Stop button replaces the run button during generation (same pattern as Data Owner Agent).
+
+CHAT HISTORY: Every run appends a collapsible thread to the center panel. Thread header shows: feature name tag + first 60 chars of report purpose or business question + timestamp. Collapse/expand all buttons above the thread list.
+
+EXCEL ACCUMULATION: bi_agent_report.xlsx accumulates sheets across all five features in a single session. Sheet names:
+- sharing_eligibility
+- dashboard_design
+- dax_measures
+- kpis
+- report_test_results
+- test_cases
+- test_summary
+- dashboard_test_cases
+
+If a sheet already exists and the analyst runs the same feature again, APPEND new results below the existing rows (add a timestamp separator row between runs).
+
+ARABIC/ENGLISH TOGGLE: Inherit the same globe-icon RTL toggle as the rest of the app. All static labels in the translations object. AI output not translated.
+
+LOADING ANIMATION: Use the same multi-step progress tracker as the rest of the app. Steps for BI Agent:
+Feature 1: Parsing fields → Classifying data → Applying NDMO rules → Generating verdict
+Feature 2: Analysing dataset → Designing visuals → Writing DAX measures → Building layout
+Feature 3: Checking governance → Scanning data quality → Reviewing business logic → Checking presentation
+Feature 4: Analysing fields → Writing completeness tests → Writing accuracy tests → Writing governance tests → Finalising test suite
+Feature 5: Analysing dashboard → Writing visual tests → Writing DAX tests → Writing governance tests → Finalising test suite
+
+COMMENT IN CODE at top of BI Agent page file:
+// BI AGENT PAGE
+// Features: Sharing Eligibility | Dashboard Designer | Report Tester | Test Case Generator | Dashboard Tester
+// Excel output: bi_agent_report.xlsx (cumulative, never overwrites result.xlsx)
+// All Claude calls: temperature 0, AbortController, XML-wrapped prompts
+```
