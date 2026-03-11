@@ -2109,4 +2109,522 @@ Respond with ONLY valid JSON matching this exact schema:
       return res.status(500).json({ ok: false, error: "server_error" });
     }
   });
+
+  app.post("/api/bi/sharing-eligibility", async (req: Request, res: Response) => {
+    try {
+      const { fields, sampleRows, stakeholder } = req.body as {
+        fields?: string[];
+        sampleRows?: Record<string, unknown>[];
+        stakeholder?: string;
+      };
+      if (!fields || !Array.isArray(fields) || fields.length === 0) {
+        return res.status(400).json({ ok: false, error: "fields_required" });
+      }
+      const sampleStr = (sampleRows || []).slice(0, 5).map((r: Record<string, unknown>) =>
+        fields.map(f => `${f}: ${r[f] ?? ""}`).join(" | ")
+      ).join("\n");
+
+      const userMsg = `<task>Data Sharing Eligibility Assessment</task>
+<stakeholder>${stakeholder || "Unknown"}</stakeholder>
+<fields>${fields.join(", ")}</fields>
+<sample_data>${sampleStr}</sample_data>
+<instructions>
+Classify each field per NDMO Section 4.3:
+TOP SECRET (TS) — High: national security, intelligence, military, critical infrastructure
+SECRET (S) — Medium: enforcement/investigation data, significant financial or individual harm
+CONFIDENTIAL (C) — Low: all PII (NID, name, address, phone, TIN, CR, salary, VAT filings, tax declarations, medical, biometrics, account numbers), internal operational data
+PUBLIC (P) — None: published statistics, press releases, open service info
+
+Infer stakeholder tier from the description:
+INTERNAL_ZATCA — ZATCA employee same directorate
+INTERNAL_GOV — another government entity (GAZT, SAMA, MOF, SDAIA, etc.)
+PRIVATE_SECTOR — licensed company or vendor
+PUBLIC — general public or open publication
+
+Apply sharing rules per NDMO Section 6:
+PUBLIC fields → all tiers: SEND
+CONFIDENTIAL:
+  INTERNAL_ZATCA → SEND
+  INTERNAL_GOV → CONDITIONAL (DSA + BDE approval)
+  PRIVATE_SECTOR → CONDITIONAL (DSA + PII anonymization per PDPL)
+  PUBLIC → BLOCK
+SECRET:
+  INTERNAL_ZATCA → CONDITIONAL (need-to-know + director approval)
+  INTERNAL_GOV → CONDITIONAL (NDMO coordination + security clearance)
+  PRIVATE_SECTOR → BLOCK
+  PUBLIC → BLOCK
+TOP SECRET → all tiers: BLOCK
+
+Overall verdict: CLEARED / CLEARED WITH CONDITIONS / CLEARED AFTER REMEDIATION / BLOCKED
+</instructions>
+<json_schema>
+{
+  "stakeholder_tier": "INTERNAL_ZATCA|INTERNAL_GOV|PRIVATE_SECTOR|PUBLIC",
+  "stakeholder_description": "string",
+  "overall_verdict": "CLEARED|CLEARED WITH CONDITIONS|CLEARED AFTER REMEDIATION|BLOCKED",
+  "verdict_rationale": "string",
+  "governing_field": "string",
+  "overall_classification": "Top Secret|Secret|Confidential|Public",
+  "blocking_fields": ["string"],
+  "conditional_fields": ["string"],
+  "safe_fields": ["string"],
+  "field_assessments": [{
+    "field_name": "string",
+    "sample_values": ["string"],
+    "classification_level": "Top Secret|Secret|Confidential|Public",
+    "classification_code": "TS|S|C|P",
+    "confidential_sub_level": "A|B|C|N/A",
+    "is_pii": true,
+    "stakeholder_verdict": "SEND|BLOCK|CONDITIONAL",
+    "ndmo_rule_applied": "string",
+    "remediation_action": "REMOVE|MASK|AGGREGATE|PSEUDONYMIZE|GET APPROVAL|NO ACTION",
+    "remediation_detail": "string"
+  }],
+  "approval_checklist": [{
+    "item": "string",
+    "required_for_fields": ["string"],
+    "owner": "string",
+    "blocking": true
+  }],
+  "safe_version_possible": true,
+  "safe_version_instructions": "string",
+  "estimated_remediation_effort": "Low|Medium|High",
+  "pdpl_exposure": true,
+  "pdpl_exposure_note": "string"
+}
+</json_schema>`;
+
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 8000,
+        temperature: 0,
+        system: "You are a ZATCA data governance consultant. You classify dataset fields per NDMO National Data Governance Interim Regulations (June 2020) Section 4.3 and apply sharing rules per Section 6. Respond only in valid JSON. No prose, no markdown, no backticks.",
+        messages: [{ role: "user" as const, content: userMsg }],
+      });
+
+      const rawText = response.content.filter((b) => b.type === "text").map((b) => (b as { type: "text"; text: string }).text).join("");
+      const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
+      try {
+        const start = cleaned.indexOf("{");
+        const end = cleaned.lastIndexOf("}");
+        const parsed = JSON.parse(cleaned.slice(start, end + 1));
+        return res.json({ ok: true, data: parsed });
+      } catch {
+        return res.json({ ok: false, error: "invalid_json", raw: cleaned.substring(0, 500) });
+      }
+    } catch (error) {
+      console.error("Error in /api/bi/sharing-eligibility:", error);
+      return res.status(500).json({ ok: false, error: "server_error" });
+    }
+  });
+
+  app.post("/api/bi/dashboard-designer", async (req: Request, res: Response) => {
+    try {
+      const { fields, sampleRows, businessQuestion, audience, dashboardType } = req.body as {
+        fields?: string[];
+        sampleRows?: Record<string, unknown>[];
+        businessQuestion?: string;
+        audience?: string;
+        dashboardType?: string;
+      };
+      if (!fields || !Array.isArray(fields) || fields.length === 0) {
+        return res.status(400).json({ ok: false, error: "fields_required" });
+      }
+      const sampleStr = (sampleRows || []).slice(0, 5).map((r: Record<string, unknown>) =>
+        fields.map(f => `${f}: ${r[f] ?? ""}`).join(" | ")
+      ).join("\n");
+
+      const userMsg = `<task>Power BI Dashboard Design</task>
+<business_question>${businessQuestion || "General data overview"}</business_question>
+<audience>${audience || "Internal ZATCA Team"}</audience>
+<dashboard_type>${dashboardType || "Analytical"}</dashboard_type>
+<fields>${fields.join(", ")}</fields>
+<sample_data>${sampleStr}</sample_data>
+<instructions>
+Design a complete Power BI dashboard with:
+1. RECOMMENDED VISUALS: visual_id (VIS-001…), visual_type, title, fields_used, x_axis/y_axis/legend/tooltip, dax_measure, insight_purpose, placement (Top-Left/Top-Center/Top-Right/Mid-Left/Mid-Center/Mid-Right/Bottom-Full).
+2. SLICERS AND FILTERS: field_name, slicer_type (Dropdown/Between/Relative Date/Search), controls_visuals.
+3. DAX MEASURES: measure_name, formula, description.
+4. DATA MODEL HINTS: calculated columns, relationships, Power Query transformations.
+5. LAYOUT PLAN: pages, visual placement grid.
+6. COLOR THEME: Power BI theme JSON using ZATCA brand colors (#1A4B8C, #2E7D32, #E65100, #0D2E5C, #F59E0B).
+7. KPIs: top 5 KPIs with field, DAX formula, target logic, green/amber/red thresholds.
+</instructions>
+<json_schema>
+{
+  "dashboard_title": "string",
+  "dashboard_type": "Operational|Analytical|Executive",
+  "audience": "string",
+  "pages": [{
+    "page_number": 1,
+    "page_title": "string",
+    "page_purpose": "string",
+    "visuals": [{
+      "visual_id": "VIS-001",
+      "visual_type": "string",
+      "title": "string",
+      "fields_used": ["string"],
+      "x_axis": "string",
+      "y_axis": "string",
+      "legend": "string",
+      "tooltip_fields": ["string"],
+      "dax_measure": "string",
+      "insight_purpose": "string",
+      "placement": "string"
+    }]
+  }],
+  "slicers": [{
+    "field_name": "string",
+    "slicer_type": "string",
+    "controls_visuals": ["VIS-001"]
+  }],
+  "dax_measures": [{
+    "measure_name": "string",
+    "formula": "string",
+    "description": "string"
+  }],
+  "power_query_steps": ["string"],
+  "kpis": [{
+    "kpi_name": "string",
+    "field_used": "string",
+    "dax_formula": "string",
+    "target_logic": "string",
+    "green_threshold": "string",
+    "amber_threshold": "string",
+    "red_threshold": "string"
+  }],
+  "color_theme_json": {},
+  "layout_summary": "string",
+  "recommended_page_count": 1
+}
+</json_schema>`;
+
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 8000,
+        temperature: 0,
+        system: "You are a senior Power BI dashboard architect and ZATCA data analyst. Design a complete, production-ready Power BI dashboard specification from an uploaded dataset. Respond only in valid JSON. No prose, no markdown, no backticks.",
+        messages: [{ role: "user" as const, content: userMsg }],
+      });
+
+      const rawText = response.content.filter((b) => b.type === "text").map((b) => (b as { type: "text"; text: string }).text).join("");
+      const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
+      try {
+        const start = cleaned.indexOf("{");
+        const end = cleaned.lastIndexOf("}");
+        const parsed = JSON.parse(cleaned.slice(start, end + 1));
+        return res.json({ ok: true, data: parsed });
+      } catch {
+        return res.json({ ok: false, error: "invalid_json", raw: cleaned.substring(0, 500) });
+      }
+    } catch (error) {
+      console.error("Error in /api/bi/dashboard-designer:", error);
+      return res.status(500).json({ ok: false, error: "server_error" });
+    }
+  });
+
+  app.post("/api/bi/report-tester", async (req: Request, res: Response) => {
+    try {
+      const { fields, sampleRows, stakeholder, reportPurpose, reportFormat } = req.body as {
+        fields?: string[];
+        sampleRows?: Record<string, unknown>[];
+        stakeholder?: string;
+        reportPurpose?: string;
+        reportFormat?: string;
+      };
+      if (!fields || !Array.isArray(fields) || fields.length === 0) {
+        return res.status(400).json({ ok: false, error: "fields_required" });
+      }
+      const sampleStr = (sampleRows || []).slice(0, 10).map((r: Record<string, unknown>) =>
+        fields.map(f => `${f}: ${r[f] ?? ""}`).join(" | ")
+      ).join("\n");
+
+      const userMsg = `<task>BI Report Pre-Send Quality Test</task>
+<report_purpose>${reportPurpose || "General report review"}</report_purpose>
+<stakeholder>${stakeholder || "Unknown"}</stakeholder>
+<report_format>${reportFormat || "Mixed"}</report_format>
+<fields>${fields.join(", ")}</fields>
+<sample_data>${sampleStr}</sample_data>
+<instructions>
+Run a four-dimension quality test on this report:
+
+DIMENSION 1 — DATA GOVERNANCE CLEARANCE
+Apply NDMO Section 4.3 + Section 6 sharing rules for the specified stakeholder. Produce a go/no-go verdict: CLEARED / CLEARED WITH CONDITIONS / CLEARED AFTER REMEDIATION / BLOCKED. List every field that blocks or conditions sending.
+
+DIMENSION 2 — DATA QUALITY ISSUES
+Scan sample rows for: Nulls/missing values, Duplicate rows, Type mismatches, Outliers or impossible values, Inconsistent formatting, Referential integrity issues. Severity: Critical / High / Medium / Low.
+
+DIMENSION 3 — BUSINESS LOGIC INTEGRITY
+Check: Are the right fields present? Are key fields missing? Are totals consistent? Are field names misleading? Are date ranges appropriate?
+
+DIMENSION 4 — PRESENTATION QUALITY
+Check: Column headers clear? Number formats appropriate (SAR, %, DD/MM/YYYY)? Sort order logical? Redundant columns? Recommend column order.
+</instructions>
+<json_schema>
+{
+  "report_purpose": "string",
+  "stakeholder_description": "string",
+  "governance_verdict": "CLEARED|CLEARED WITH CONDITIONS|CLEARED AFTER REMEDIATION|BLOCKED",
+  "governance_summary": "string",
+  "overall_quality_score": 0,
+  "quality_grade": "A|B|C|D|F",
+  "dimension_scores": {
+    "data_governance": 0,
+    "data_quality": 0,
+    "business_logic": 0,
+    "presentation": 0
+  },
+  "governance_issues": [{
+    "field_name": "string",
+    "classification_code": "TS|S|C|P",
+    "verdict": "SEND|BLOCK|CONDITIONAL",
+    "remediation": "string"
+  }],
+  "data_quality_issues": [{
+    "issue_id": "DQ-001",
+    "field_name": "string",
+    "issue_type": "Null|Duplicate|Type Mismatch|Outlier|Format|Referential",
+    "severity": "Critical|High|Medium|Low",
+    "description": "string",
+    "affected_rows": "string",
+    "fix_recommendation": "string"
+  }],
+  "business_logic_issues": [{
+    "issue_id": "BL-001",
+    "issue_type": "Missing Field|Misleading Name|Inconsistent Total|Wrong Granularity|Irrelevant Field",
+    "description": "string",
+    "severity": "Critical|High|Medium|Low",
+    "recommendation": "string"
+  }],
+  "presentation_issues": [{
+    "issue_id": "PR-001",
+    "field_name": "string",
+    "issue_type": "Raw Column Name|Wrong Format|Poor Sort|Redundant Column|Recommended Rename",
+    "current_value": "string",
+    "recommended_value": "string"
+  }],
+  "recommended_column_order": ["string"],
+  "send_recommendation": "SEND NOW|SEND AFTER FIXES|DO NOT SEND",
+  "pre_send_checklist": ["string"]
+}
+</json_schema>`;
+
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 8000,
+        temperature: 0,
+        system: "You are a ZATCA BI quality assurance lead. You review BI reports before they go to stakeholders. You check for data governance compliance (NDMO), data quality issues, business logic integrity, and presentation quality. Respond only in valid JSON. No prose, no markdown, no backticks.",
+        messages: [{ role: "user" as const, content: userMsg }],
+      });
+
+      const rawText = response.content.filter((b) => b.type === "text").map((b) => (b as { type: "text"; text: string }).text).join("");
+      const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
+      try {
+        const start = cleaned.indexOf("{");
+        const end = cleaned.lastIndexOf("}");
+        const parsed = JSON.parse(cleaned.slice(start, end + 1));
+        return res.json({ ok: true, data: parsed });
+      } catch {
+        return res.json({ ok: false, error: "invalid_json", raw: cleaned.substring(0, 500) });
+      }
+    } catch (error) {
+      console.error("Error in /api/bi/report-tester:", error);
+      return res.status(500).json({ ok: false, error: "server_error" });
+    }
+  });
+
+  app.post("/api/bi/test-case-generator", async (req: Request, res: Response) => {
+    try {
+      const { fields, sampleRows, reportPurpose, testDepth, testCategories } = req.body as {
+        fields?: string[];
+        sampleRows?: Record<string, unknown>[];
+        reportPurpose?: string;
+        testDepth?: string;
+        testCategories?: string[];
+      };
+      if (!fields || !Array.isArray(fields) || fields.length === 0) {
+        return res.status(400).json({ ok: false, error: "fields_required" });
+      }
+      const sampleStr = (sampleRows || []).slice(0, 10).map((r: Record<string, unknown>) =>
+        fields.map(f => `${f}: ${r[f] ?? ""}`).join(" | ")
+      ).join("\n");
+
+      const userMsg = `<task>BI Report Test Case Generation</task>
+<report_purpose>${reportPurpose || "General report"}</report_purpose>
+<test_depth>${testDepth || "Standard"}</test_depth>
+<test_categories>${(testCategories || ["Data completeness", "Data accuracy", "Business rules", "Edge cases", "Security & governance", "Performance thresholds", "Formatting & presentation"]).join(", ")}</test_categories>
+<fields>${fields.join(", ")}</fields>
+<sample_data>${sampleStr}</sample_data>
+<instructions>
+Generate structured test cases for this BI report. Each test case must be specific to the actual fields in the dataset.
+
+Test case structure:
+- TC-ID: TC-001, TC-002…
+- category: Data Completeness / Data Accuracy / Business Rules / Edge Cases / Security & Governance / Performance / Formatting
+- test_name, objective, preconditions, test_steps (numbered), test_data, expected_result, actual_result (blank), pass_fail_criteria
+- severity: Critical / High / Medium / Low
+- estimated_duration_minutes: integer
+- ndmo_reference: cite NDMO section if applicable, otherwise "N/A"
+
+Categories: DATA COMPLETENESS, DATA ACCURACY, BUSINESS RULES, EDGE CASES, SECURITY & GOVERNANCE, PERFORMANCE, FORMATTING.
+</instructions>
+<json_schema>
+{
+  "report_purpose": "string",
+  "test_depth": "Basic|Standard|Comprehensive",
+  "total_test_cases": 0,
+  "test_cases": [{
+    "tc_id": "TC-001",
+    "category": "string",
+    "test_name": "string",
+    "objective": "string",
+    "preconditions": "string",
+    "test_steps": ["string"],
+    "test_data": "string",
+    "expected_result": "string",
+    "actual_result": "",
+    "pass_fail_criteria": "string",
+    "severity": "Critical|High|Medium|Low",
+    "estimated_duration_minutes": 0,
+    "ndmo_reference": "string"
+  }],
+  "coverage_summary": {
+    "data_completeness": 0,
+    "data_accuracy": 0,
+    "business_rules": 0,
+    "edge_cases": 0,
+    "security_governance": 0,
+    "performance": 0,
+    "formatting": 0
+  },
+  "total_estimated_duration_minutes": 0,
+  "critical_test_count": 0,
+  "recommended_execution_order": ["TC-001"]
+}
+</json_schema>`;
+
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 8000,
+        temperature: 0,
+        system: "You are a senior BI QA engineer at ZATCA. You write structured test cases for BI reports following best practices. You are thorough, specific, and write test cases that a junior analyst can execute without ambiguity. Respond only in valid JSON. No prose, no markdown, no backticks.",
+        messages: [{ role: "user" as const, content: userMsg }],
+      });
+
+      const rawText = response.content.filter((b) => b.type === "text").map((b) => (b as { type: "text"; text: string }).text).join("");
+      const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
+      try {
+        const start = cleaned.indexOf("{");
+        const end = cleaned.lastIndexOf("}");
+        const parsed = JSON.parse(cleaned.slice(start, end + 1));
+        return res.json({ ok: true, data: parsed });
+      } catch {
+        return res.json({ ok: false, error: "invalid_json", raw: cleaned.substring(0, 500) });
+      }
+    } catch (error) {
+      console.error("Error in /api/bi/test-case-generator:", error);
+      return res.status(500).json({ ok: false, error: "server_error" });
+    }
+  });
+
+  app.post("/api/bi/dashboard-tester", async (req: Request, res: Response) => {
+    try {
+      const { fields, sampleRows, dashboardDescription, visualsList, audience, testDepth } = req.body as {
+        fields?: string[];
+        sampleRows?: Record<string, unknown>[];
+        dashboardDescription?: string;
+        visualsList?: string;
+        audience?: string;
+        testDepth?: string;
+      };
+      if (!fields || !Array.isArray(fields) || fields.length === 0) {
+        return res.status(400).json({ ok: false, error: "fields_required" });
+      }
+      const sampleStr = (sampleRows || []).slice(0, 10).map((r: Record<string, unknown>) =>
+        fields.map(f => `${f}: ${r[f] ?? ""}`).join(" | ")
+      ).join("\n");
+
+      const userMsg = `<task>Power BI Dashboard Test Case Generation</task>
+<dashboard_description>${dashboardDescription || "Power BI dashboard"}</dashboard_description>
+<visuals_list>${visualsList || "Not specified"}</visuals_list>
+<audience>${audience || "Internal ZATCA Team"}</audience>
+<test_depth>${testDepth || "Standard"}</test_depth>
+<fields>${fields.join(", ")}</fields>
+<sample_data>${sampleStr}</sample_data>
+<instructions>
+Generate structured test cases for Power BI dashboard testing. Cover these categories:
+
+VISUAL ACCURACY: Does each visual show correct data? Do chart axes use the right fields? Do KPI cards calculate correctly?
+DAX VALIDATION: Are calculated measures producing correct results? Test each DAX measure manually.
+SLICER & FILTER BEHAVIOR: Does each slicer filter correctly? Do cross-filters behave as expected?
+DRILL-THROUGH & NAVIGATION: Do drill-through pages open with correct context? Do back buttons work?
+DATA GOVERNANCE: Are PII or classified fields visible to the wrong audience? NDMO compliance?
+PERFORMANCE: Dashboard load within 3 seconds? Slicer response within 1 second?
+FORMATTING & UX: Number formats correct? Color theme consistent? Tooltips meaningful?
+REFRESH & DATA FRESHNESS: Is refresh date shown? Does dashboard reflect latest data?
+
+Each test case must reference actual fields and visuals described by the analyst.
+</instructions>
+<json_schema>
+{
+  "dashboard_description": "string",
+  "audience": "string",
+  "total_test_cases": 0,
+  "test_cases": [{
+    "tc_id": "DBT-001",
+    "category": "Visual Accuracy|DAX Validation|Slicer & Filter|Drill-Through|Governance|Performance|Formatting|Refresh",
+    "visual_tested": "string",
+    "test_name": "string",
+    "objective": "string",
+    "preconditions": "string",
+    "test_steps": ["string"],
+    "test_data": "string",
+    "expected_result": "string",
+    "actual_result": "",
+    "pass_fail_criteria": "string",
+    "severity": "Critical|High|Medium|Low",
+    "estimated_duration_minutes": 0,
+    "ndmo_reference": "string",
+    "power_bi_specific_note": "string"
+  }],
+  "coverage_summary": {
+    "visual_accuracy": 0,
+    "dax_validation": 0,
+    "slicer_filter": 0,
+    "drill_through": 0,
+    "governance": 0,
+    "performance": 0,
+    "formatting": 0,
+    "refresh": 0
+  },
+  "total_estimated_duration_minutes": 0,
+  "critical_test_count": 0,
+  "governance_risk_level": "Low|Medium|High|Critical",
+  "governance_risk_note": "string"
+}
+</json_schema>`;
+
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 8000,
+        temperature: 0,
+        system: "You are a senior Power BI QA specialist at ZATCA. You write structured test cases specifically for Power BI dashboards — covering visual accuracy, DAX correctness, slicer behavior, drill-through, governance, and performance. Respond only in valid JSON. No prose, no markdown, no backticks.",
+        messages: [{ role: "user" as const, content: userMsg }],
+      });
+
+      const rawText = response.content.filter((b) => b.type === "text").map((b) => (b as { type: "text"; text: string }).text).join("");
+      const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
+      try {
+        const start = cleaned.indexOf("{");
+        const end = cleaned.lastIndexOf("}");
+        const parsed = JSON.parse(cleaned.slice(start, end + 1));
+        return res.json({ ok: true, data: parsed });
+      } catch {
+        return res.json({ ok: false, error: "invalid_json", raw: cleaned.substring(0, 500) });
+      }
+    } catch (error) {
+      console.error("Error in /api/bi/dashboard-tester:", error);
+      return res.status(500).json({ ok: false, error: "server_error" });
+    }
+  });
 }

@@ -387,6 +387,7 @@ const translations = {
     previewFile: "Preview file",
     useCases: "Use Cases",
     sharingEligibility: "Sharing",
+    biAgent: "BI Agent",
     nudgeAgent: "Nudge Agent",
     newChatNudge: "New Nudge Agent",
     agentNudge: "Nudge Agent",
@@ -599,6 +600,7 @@ const translations = {
     previewFile: "معاينة الملف",
     useCases: "حالات الاستخدام",
     sharingEligibility: "المشاركة",
+    biAgent: "وكيل BI",
     nudgeAgent: "وكيل التحفيز",
     newChatNudge: "وكيل تحفيز جديد",
     agentNudge: "وكيل التحفيز",
@@ -2565,6 +2567,15 @@ export default function ChatPage() {
           >
             <Share2 className="w-3.5 h-3.5" />
             {t.sharingEligibility}
+          </Link>
+          <Link
+            href="/bi-agent"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
+            style={{ color: "#6B7280" }}
+            data-testid="link-bi-agent"
+          >
+            <Brain className="w-3.5 h-3.5" />
+            {t.biAgent}
           </Link>
           <Link
             href="/user-guide"
