@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, Fragment } from "react";
 import * as XLSX from "xlsx";
 import { useLocation } from "wouter";
 
@@ -139,7 +139,7 @@ function VerdictBadge({ verdict, small }: { verdict: string; small?: boolean }) 
         fontFamily: "monospace",
       }}
     >
-      <span>{m.icon}</span> {verdict}
+      <span>{m.icon}</span> {m.label}
     </span>
   );
 }
@@ -490,7 +490,7 @@ export default function SharingEligibilityPage() {
                       {result.field_assessments.map((f, idx) => {
                         const expanded = expandedField === f.field_name;
                         return (
-                          <tbody key={f.field_name}>
+                          <Fragment key={f.field_name}>
                             <tr
                               onClick={() => setExpandedField(expanded ? null : f.field_name)}
                               style={{
@@ -539,7 +539,7 @@ export default function SharingEligibilityPage() {
                                 </td>
                               </tr>
                             )}
-                          </tbody>
+                          </Fragment>
                         );
                       })}
                     </tbody>
