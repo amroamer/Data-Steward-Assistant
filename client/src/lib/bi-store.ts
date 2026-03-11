@@ -14,52 +14,144 @@ export interface FieldAssessment {
 }
 
 export interface SharingEligibilityData {
-  overall_verdict: string;
-  verdict_rationale: string;
   stakeholder_tier: string;
   stakeholder_description: string;
+  overall_verdict: string;
+  verdict_rationale: string;
   governing_field: string;
   overall_classification: string;
-  pdpl_exposure: boolean;
-  pdpl_exposure_note?: string;
+  blocking_fields: string[];
+  conditional_fields: string[];
+  safe_fields: string[];
   field_assessments: FieldAssessment[];
   approval_checklist?: { item: string; required_for_fields: string[]; owner: string; blocking: boolean }[];
   safe_version_possible?: boolean;
   safe_version_instructions?: string;
+  estimated_remediation_effort?: string;
+  pdpl_exposure: boolean;
+  pdpl_exposure_note?: string;
+}
+
+export interface DashboardVisual {
+  visual_id: string;
+  visual_type: string;
+  title: string;
+  fields_used: string[];
+  x_axis?: string;
+  y_axis?: string;
+  legend?: string;
+  tooltip_fields?: string[];
+  dax_measure: string;
+  insight_purpose: string;
+  placement: string;
 }
 
 export interface DashboardDesignData {
   dashboard_title: string;
   dashboard_type: string;
   audience: string;
-  pages: { page_number: number; page_title: string; visuals: { visual_id: string; visual_type: string; title: string; fields_used: string[]; dax_measure: string; insight_purpose: string; placement: string }[] }[];
+  pages: { page_number: number; page_title: string; page_purpose: string; visuals: DashboardVisual[] }[];
+  slicers: { field_name: string; slicer_type: string; controls_visuals: string[] }[];
   dax_measures: { measure_name: string; formula: string; description: string }[];
-  kpis: { kpi_name: string; dax_formula: string; target_logic: string; green_threshold: string; amber_threshold: string; red_threshold: string }[];
-  slicers?: { field_name: string; slicer_type: string; controls_visuals: string[] }[];
+  power_query_steps: string[];
+  kpis: { kpi_name: string; field_used: string; dax_formula: string; target_logic: string; green_threshold: string; amber_threshold: string; red_threshold: string }[];
+  color_theme_json: Record<string, unknown>;
+  layout_summary: string;
+  recommended_page_count: number;
+}
+
+export interface GovernanceIssue {
+  field_name: string;
+  classification_code: string;
+  verdict: string;
+  remediation: string;
+}
+
+export interface DataQualityIssue {
+  issue_id: string;
+  field_name: string;
+  issue_type: string;
+  severity: string;
+  description: string;
+  affected_rows: string;
+  fix_recommendation: string;
+}
+
+export interface BusinessLogicIssue {
+  issue_id: string;
+  issue_type: string;
+  description: string;
+  severity: string;
+  recommendation: string;
+}
+
+export interface PresentationIssue {
+  issue_id: string;
+  field_name: string;
+  issue_type: string;
+  current_value: string;
+  recommended_value: string;
 }
 
 export interface ReportTestData {
+  report_purpose: string;
+  stakeholder_description: string;
   governance_verdict: string;
+  governance_summary: string;
   overall_quality_score: number;
   quality_grade: string;
+  dimension_scores: { data_governance: number; data_quality: number; business_logic: number; presentation: number };
+  governance_issues: GovernanceIssue[];
+  data_quality_issues: DataQualityIssue[];
+  business_logic_issues: BusinessLogicIssue[];
+  presentation_issues: PresentationIssue[];
+  recommended_column_order: string[];
   send_recommendation: string;
-  governance_issues: Record<string, unknown>[];
-  data_quality_issues: Record<string, unknown>[];
-  business_logic_issues: Record<string, unknown>[];
-  presentation_issues: Record<string, unknown>[];
+  pre_send_checklist: string[];
+}
+
+export interface TestCase {
+  tc_id: string;
+  category: string;
+  test_name: string;
+  objective: string;
+  preconditions: string;
+  test_steps: string[];
+  test_data: string;
+  expected_result: string;
+  actual_result: string;
+  pass_fail_criteria: string;
+  severity: string;
+  estimated_duration_minutes: number;
+  ndmo_reference: string;
 }
 
 export interface TestCaseData {
-  test_cases: { tc_id: string; category: string; test_name: string; severity: string; objective: string; preconditions: string; test_steps: string[]; test_data: string; expected_result: string; estimated_duration_minutes: number; ndmo_reference: string }[];
+  report_purpose: string;
+  test_depth: string;
+  total_test_cases: number;
+  test_cases: TestCase[];
   coverage_summary: Record<string, number>;
   total_estimated_duration_minutes: number;
   critical_test_count: number;
+  recommended_execution_order: string[];
 }
 
-export interface DashboardTestData extends TestCaseData {
+export interface DashboardTestCase extends TestCase {
+  visual_tested: string;
+  power_bi_specific_note: string;
+}
+
+export interface DashboardTestData {
+  dashboard_description: string;
+  audience: string;
+  total_test_cases: number;
+  test_cases: DashboardTestCase[];
+  coverage_summary: Record<string, number>;
+  total_estimated_duration_minutes: number;
+  critical_test_count: number;
   governance_risk_level: string;
   governance_risk_note: string;
-  test_cases: (TestCaseData["test_cases"][0] & { visual_tested: string; power_bi_specific_note: string })[];
 }
 
 interface AppendSheetOptions {

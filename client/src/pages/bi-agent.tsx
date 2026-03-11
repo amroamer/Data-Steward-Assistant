@@ -898,6 +898,7 @@ function TestCaseResult({ data, isRtl, testStatus, setTestStatus }: { data: Reco
   const failed = cases.filter(tc => testStatus[String(tc.tc_id)] === "fail").length;
   const notRun = totalCases - passed - failed;
 
+  const TC_CATEGORIES_AR: Record<string, string> = { "Data Completeness": "اكتمال البيانات", "Data Accuracy": "دقة البيانات", "Business Rules": "قواعد العمل", "Edge Cases": "حالات حدية", "Security & Governance": "الأمن والحوكمة", "Performance": "الأداء", "Formatting": "التنسيق" };
   const categories = [...new Set(cases.map(tc => String(tc.category || "")))];
   const filtered = activeCategory ? cases.filter(tc => String(tc.category) === activeCategory) : cases;
 
@@ -947,7 +948,7 @@ function TestCaseResult({ data, isRtl, testStatus, setTestStatus }: { data: Reco
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         <button onClick={() => setActiveCategory(null)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #1E4080", background: activeCategory === null ? "rgba(26,75,140,0.3)" : "transparent", color: activeCategory === null ? "#E8EDF5" : "#5A8AB8", cursor: "pointer", fontSize: 10 }}>{isRtl ? "الكل" : "All"}</button>
         {categories.map(cat => (
-          <button key={cat} onClick={() => setActiveCategory(cat)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #1E4080", background: activeCategory === cat ? "rgba(26,75,140,0.3)" : "transparent", color: activeCategory === cat ? "#E8EDF5" : "#5A8AB8", cursor: "pointer", fontSize: 10 }} data-testid={`cat-filter-${cat}`}>{cat}</button>
+          <button key={cat} onClick={() => setActiveCategory(cat)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #1E4080", background: activeCategory === cat ? "rgba(26,75,140,0.3)" : "transparent", color: activeCategory === cat ? "#E8EDF5" : "#5A8AB8", cursor: "pointer", fontSize: 10 }} data-testid={`cat-filter-${cat}`}>{isRtl ? TC_CATEGORIES_AR[cat] || cat : cat}</button>
         ))}
       </div>
 
@@ -1012,7 +1013,8 @@ function DashboardTestResult({ data, isRtl, testStatus, setTestStatus }: { data:
   const govRisk = String(data.governance_risk_level || "Low");
   const govRiskColor = govRisk === "Critical" ? "#B71C1C" : govRisk === "High" ? "#E65100" : govRisk === "Medium" ? "#F59E0B" : "#2E7D32";
 
-  const DASHBOARD_CATEGORIES = ["Visual Accuracy", "DAX Validation", "Slicer & Filter", "Drill-Through", "Governance", "Performance", "Formatting", "Refresh"];
+  const DASHBOARD_CATEGORIES_EN = ["Visual Accuracy", "DAX Validation", "Slicer & Filter", "Drill-Through", "Governance", "Performance", "Formatting", "Refresh"];
+  const DASHBOARD_CATEGORIES_AR: Record<string, string> = { "Visual Accuracy": "دقة المرئيات", "DAX Validation": "تحقق DAX", "Slicer & Filter": "الفلاتر والمقسمات", "Drill-Through": "التنقل التفصيلي", "Governance": "الحوكمة", "Performance": "الأداء", "Formatting": "التنسيق", "Refresh": "التحديث" };
   const filtered = activeCategory ? cases.filter(tc => String(tc.category) === activeCategory) : cases;
 
   const donutData = Object.entries(coverage).filter(([, v]) => v > 0).map(([k, v]) => ({ name: k.replace(/_/g, " "), value: v }));
@@ -1060,8 +1062,8 @@ function DashboardTestResult({ data, isRtl, testStatus, setTestStatus }: { data:
 
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         <button onClick={() => setActiveCategory(null)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #1E4080", background: activeCategory === null ? "rgba(26,75,140,0.3)" : "transparent", color: activeCategory === null ? "#E8EDF5" : "#5A8AB8", cursor: "pointer", fontSize: 10 }}>{isRtl ? "الكل" : "All"}</button>
-        {DASHBOARD_CATEGORIES.map(cat => (
-          <button key={cat} onClick={() => setActiveCategory(cat)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #1E4080", background: activeCategory === cat ? "rgba(26,75,140,0.3)" : "transparent", color: activeCategory === cat ? "#E8EDF5" : "#5A8AB8", cursor: "pointer", fontSize: 10 }} data-testid={`dashcat-filter-${cat}`}>{cat}</button>
+        {DASHBOARD_CATEGORIES_EN.map(cat => (
+          <button key={cat} onClick={() => setActiveCategory(cat)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #1E4080", background: activeCategory === cat ? "rgba(26,75,140,0.3)" : "transparent", color: activeCategory === cat ? "#E8EDF5" : "#5A8AB8", cursor: "pointer", fontSize: 10 }} data-testid={`dashcat-filter-${cat}`}>{isRtl ? DASHBOARD_CATEGORIES_AR[cat] || cat : cat}</button>
         ))}
       </div>
 
