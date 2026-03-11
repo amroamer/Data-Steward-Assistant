@@ -1690,7 +1690,6 @@ export default function ChatPage() {
   const [biTestCategories, setBiTestCategories] = useState<string[]>(["Data completeness", "Data accuracy", "Business rules", "Edge cases", "Security & governance", "Performance thresholds", "Formatting & presentation"]);
   const [biVisualsList, setBiVisualsList] = useState("");
   const [biDashDesc, setBiDashDesc] = useState("");
-  const [biTestCaseStatus, setBiTestCaseStatus] = useState<Record<string, "pass" | "fail" | null>>({});
   const [biLoading, setBiLoading] = useState(false);
   const [biLoadingStep, setBiLoadingStep] = useState(0);
   const [biError, setBiError] = useState<string | null>(null);
