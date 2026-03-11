@@ -88,6 +88,7 @@ import {
   mergeResults,
   mergeDqResults,
   generateResultExcel,
+  buildResultWorkbook,
   generateAnalysisSummary,
   getIncludedAnalysisLabels,
   getAnalysisLabel,
@@ -1429,6 +1430,7 @@ export default function ChatPage() {
   const [pastedText, setPastedText] = useState("");
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [showExcelPreview, setShowExcelPreview] = useState(false);
+  const [previewResultFile, setPreviewResultFile] = useState<File | null>(null);
   const [chatError, setChatError] = useState<{ message: string; retry: () => void } | null>(null);
   const [wasCancelled, setWasCancelled] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -2282,6 +2284,15 @@ export default function ChatPage() {
     }
   };
 
+  const handlePreviewResult = () => {
+    if (resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis || latestInformaticaOutput) {
+      const wb = buildResultWorkbook(resultRows, includedAnalyses, latestDataModel || undefined, latestPiiScan || undefined, latestDqAnalysis || undefined, latestInformaticaOutput || undefined);
+      const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+      const file = new File([bytes], "result.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      setPreviewResultFile(file);
+    }
+  };
+
   const handleDeleteConversation = (id: number) => {
     setFadingOutConvId(id);
     setTimeout(() => {
@@ -2405,6 +2416,7 @@ export default function ChatPage() {
               insightsReports={insightsReports}
               uploadedFileName={uploadedFileName}
               onDownloadResult={handleDownloadResult}
+              onPreviewResult={handlePreviewResult}
               activityLog={activityLog}
               sheetCount={sheetCount}
             />
@@ -2414,6 +2426,9 @@ export default function ChatPage() {
 
       {showExcelPreview && selectedFile && (
         <ExcelPreview file={selectedFile} onClose={() => setShowExcelPreview(false)} />
+      )}
+      {previewResultFile && (
+        <ExcelPreview file={previewResultFile} onClose={() => setPreviewResultFile(null)} />
       )}
 
       {!isMobile && (
@@ -3007,6 +3022,7 @@ export default function ChatPage() {
               insightsReports={insightsReports}
               uploadedFileName={uploadedFileName}
               onDownloadResult={handleDownloadResult}
+              onPreviewResult={handlePreviewResult}
               activityLog={activityLog}
               sheetCount={sheetCount}
             />
@@ -3018,13 +3034,13 @@ export default function ChatPage() {
 }
 
 function OutputsPanel({
-  t, isRtl, resultRows, includedAnalyses, latestDataModel, latestPiiScan, latestDqAnalysis, latestInformaticaOutput, insightsReports, uploadedFileName, onDownloadResult, activityLog, sheetCount,
+  t, isRtl, resultRows, includedAnalyses, latestDataModel, latestPiiScan, latestDqAnalysis, latestInformaticaOutput, insightsReports, uploadedFileName, onDownloadResult, onPreviewResult, activityLog, sheetCount,
 }: {
   t: Translation; isRtl: boolean;
   resultRows: ResultRow[]; includedAnalyses: AnalysisType[];
   latestDataModel: DataModelJSON | null; latestPiiScan: PiiScanResult | null; latestDqAnalysis: DqAnalysisResult | null; latestInformaticaOutput: InformaticaOutput | null;
   insightsReports: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
-  uploadedFileName: string | null; onDownloadResult: () => void; activityLog: ActivityLogEntry[]; sheetCount: number;
+  uploadedFileName: string | null; onDownloadResult: () => void; onPreviewResult: () => void; activityLog: ActivityLogEntry[]; sheetCount: number;
 }) {
   const [outputsExpanded, setOutputsExpanded] = useState({
     live: true,
@@ -3081,6 +3097,9 @@ function OutputsPanel({
                             <p className="text-xs font-semibold" style={{ color: "#1A1A2E" }}>result.xlsx</p>
                             <p className="text-[10px]" style={{ color: "#6B7280" }}>{sheetCount} {t.sheetsInResult}{uploadedFileName ? ` — ${uploadedFileName}` : ""}</p>
                           </div>
+                          <Button size="sm" className="h-7 px-2 text-[10px] text-white" style={{ backgroundColor: "#2563EB" }} onClick={(e) => { e.stopPropagation(); onPreviewResult(); }} data-testid="button-preview-result">
+                            <Eye className="w-3 h-3" />
+                          </Button>
                           <Button size="sm" className="h-7 px-2 text-[10px] text-white" style={{ backgroundColor: "#2E7D32" }} onClick={(e) => { e.stopPropagation(); onDownloadResult(); }} data-testid="button-download-result">
                             <Download className="w-3 h-3" />
                           </Button>

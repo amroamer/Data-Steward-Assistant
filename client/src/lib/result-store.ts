@@ -721,7 +721,7 @@ function appendInformaticaSheet(wb: XLSX.WorkBook, output: InformaticaOutput): v
   XLSX.utils.book_append_sheet(wb, ws, "informatica_output");
 }
 
-export function generateResultExcel(rows: ResultRow[], includedAnalyses: AnalysisType[], dataModel?: DataModelJSON, piiScan?: PiiScanResult, dqAnalysis?: DqAnalysisResult, informaticaOutput?: InformaticaOutput): void {
+export function buildResultWorkbook(rows: ResultRow[], includedAnalyses: AnalysisType[], dataModel?: DataModelJSON, piiScan?: PiiScanResult, dqAnalysis?: DqAnalysisResult, informaticaOutput?: InformaticaOutput): XLSX.WorkBook {
   const orderedAnalyses = ANALYSIS_ORDER.filter((a) => includedAnalyses.includes(a));
 
   const wb = XLSX.utils.book_new();
@@ -807,6 +807,11 @@ export function generateResultExcel(rows: ResultRow[], includedAnalyses: Analysi
     appendInformaticaSheet(wb, informaticaOutput);
   }
 
+  return wb;
+}
+
+export function generateResultExcel(rows: ResultRow[], includedAnalyses: AnalysisType[], dataModel?: DataModelJSON, piiScan?: PiiScanResult, dqAnalysis?: DqAnalysisResult, informaticaOutput?: InformaticaOutput): void {
+  const wb = buildResultWorkbook(rows, includedAnalyses, dataModel, piiScan, dqAnalysis, informaticaOutput);
   XLSX.writeFile(wb, "result.xlsx");
 }
 
