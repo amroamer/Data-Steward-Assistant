@@ -885,6 +885,11 @@ const featureCardKeys: { titleKey: TranslationKey; descKey: TranslationKey }[] =
   { titleKey: "cardNudgeZakat", descKey: "cardNudgeZakatDesc" },
   { titleKey: "cardNudgeUnderreport", descKey: "cardNudgeUnderreportDesc" },
   { titleKey: "cardNudgeAudit", descKey: "cardNudgeAuditDesc" },
+  { titleKey: "biCardSharing", descKey: "biCardSharingDesc" },
+  { titleKey: "biCardDashboard", descKey: "biCardDashboardDesc" },
+  { titleKey: "biCardReport", descKey: "biCardReportDesc" },
+  { titleKey: "biCardTestCases", descKey: "biCardTestCasesDesc" },
+  { titleKey: "biCardDashTest", descKey: "biCardDashTestDesc" },
 ];
 
 const FEATURE_CARDS = [
