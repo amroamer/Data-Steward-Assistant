@@ -167,7 +167,7 @@ function normalizeHeader(header: string): string {
 }
 
 const FIELD_NAME_EXACT = ["field_name", "field", "column_name", "column", "data_element", "attribute", "name"];
-const FIELD_NAME_PARTIAL = ["field", "name", "column", "element", "attribute"];
+const FIELD_NAME_PARTIAL = ["field", "name", "column", "element", "attribute", "term"];
 
 function hasFieldNameColumn(headers: string[]): boolean {
   for (const pattern of FIELD_NAME_EXACT) {

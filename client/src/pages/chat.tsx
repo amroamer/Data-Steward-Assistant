@@ -4011,7 +4011,7 @@ function ThreadCard({
                 </div>
                 <Loader2 className="w-3 h-3 animate-spin" style={{ color: "#E65100" }} />
               </div>
-              {/^\s*```(?:json)?\s*\{[\s\S]*"(?:analysis_summary|scan_summary|fact_tables|report_title|informatica_sql)"/.test(streamingContent) ? (
+              {(/^\s*```(?:json)?\s*\{[\s\S]*"(?:analysis_summary|scan_summary|fact_tables|report_title|informatica_sql)"/.test(streamingContent) || /\|\s*Business Term/i.test(streamingContent)) ? (
                 <div className="flex items-center gap-2 text-[11px]" style={{ color: "#6B7280" }}>
                   <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" style={{ color: "#2563EB" }} />
                   <span>Generating analysis — results will appear in the Outputs panel when complete...</span>
