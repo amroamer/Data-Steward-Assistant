@@ -334,17 +334,17 @@ export default function BiAgentPage() {
                         <div style={{ flex: 1 }}>
                           <label style={{ fontSize: 11, color: "#5A8AB8", display: "block", marginBottom: 4 }}>{isRtl ? "الجمهور" : "Audience"}</label>
                           <select value={audience} onChange={e => setAudience(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #2A4A6E", background: "#0A1628", color: "#E8EDF5", fontSize: 13 }} data-testid="select-audience">
-                            <option value="Internal ZATCA Team">Internal ZATCA Team</option>
-                            <option value="Senior Management">Senior Management</option>
-                            <option value="External Stakeholder">External Stakeholder</option>
+                            <option value="Internal ZATCA Team">{isRtl ? "فريق هيئة الزكاة الداخلي" : "Internal ZATCA Team"}</option>
+                            <option value="Senior Management">{isRtl ? "الإدارة العليا" : "Senior Management"}</option>
+                            <option value="External Stakeholder">{isRtl ? "أصحاب المصلحة الخارجيين" : "External Stakeholder"}</option>
                           </select>
                         </div>
                         <div style={{ flex: 1 }}>
                           <label style={{ fontSize: 11, color: "#5A8AB8", display: "block", marginBottom: 4 }}>{isRtl ? "نوع اللوحة" : "Dashboard type"}</label>
                           <select value={dashboardType} onChange={e => setDashboardType(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #2A4A6E", background: "#0A1628", color: "#E8EDF5", fontSize: 13 }} data-testid="select-dashboard-type">
-                            <option value="Operational">Operational (daily monitoring)</option>
-                            <option value="Analytical">Analytical (trends and patterns)</option>
-                            <option value="Executive">Executive (KPI summary)</option>
+                            <option value="Operational">{isRtl ? "تشغيلي (مراقبة يومية)" : "Operational (daily monitoring)"}</option>
+                            <option value="Analytical">{isRtl ? "تحليلي (اتجاهات وأنماط)" : "Analytical (trends and patterns)"}</option>
+                            <option value="Executive">{isRtl ? "تنفيذي (ملخص KPI)" : "Executive (KPI summary)"}</option>
                           </select>
                         </div>
                       </div>
@@ -355,10 +355,10 @@ export default function BiAgentPage() {
                     <div style={{ marginBottom: 14 }}>
                       <label style={{ fontSize: 11, color: "#5A8AB8", display: "block", marginBottom: 4 }}>{isRtl ? "صيغة التقرير" : "Report format"}</label>
                       <select value={reportFormat} onChange={e => setReportFormat(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #2A4A6E", background: "#0A1628", color: "#E8EDF5", fontSize: 13 }} data-testid="select-report-format">
-                        <option value="Tabular">Tabular</option>
-                        <option value="Summary">Summary</option>
-                        <option value="Pivot">Pivot</option>
-                        <option value="Mixed">Mixed</option>
+                        <option value="Tabular">{isRtl ? "جدولي" : "Tabular"}</option>
+                        <option value="Summary">{isRtl ? "ملخص" : "Summary"}</option>
+                        <option value="Pivot">{isRtl ? "محوري" : "Pivot"}</option>
+                        <option value="Mixed">{isRtl ? "مختلط" : "Mixed"}</option>
                       </select>
                     </div>
                   )}
@@ -367,9 +367,9 @@ export default function BiAgentPage() {
                     <div style={{ marginBottom: 14 }}>
                       <label style={{ fontSize: 11, color: "#5A8AB8", display: "block", marginBottom: 4 }}>{isRtl ? "عمق الاختبار" : "Test depth"}</label>
                       <select value={testDepth} onChange={e => setTestDepth(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #2A4A6E", background: "#0A1628", color: "#E8EDF5", fontSize: 13 }} data-testid="select-test-depth">
-                        <option value="Basic">Basic (10–15 cases)</option>
-                        <option value="Standard">Standard (20–30 cases)</option>
-                        <option value="Comprehensive">Comprehensive (40–50 cases)</option>
+                        <option value="Basic">{isRtl ? "أساسي (10–15 حالة)" : "Basic (10–15 cases)"}</option>
+                        <option value="Standard">{isRtl ? "معياري (20–30 حالة)" : "Standard (20–30 cases)"}</option>
+                        <option value="Comprehensive">{isRtl ? "شامل (40–50 حالة)" : "Comprehensive (40–50 cases)"}</option>
                       </select>
                     </div>
                   )}
@@ -392,19 +392,19 @@ export default function BiAgentPage() {
                     <>
                       <div style={{ marginBottom: 14 }}>
                         <label style={{ fontSize: 11, color: "#5A8AB8", display: "block", marginBottom: 4 }}>{isRtl ? "وصف لوحة المعلومات" : "Dashboard description"}</label>
-                        <input value={dashDesc} onChange={e => setDashDesc(e.target.value)} placeholder="e.g. VAT compliance dashboard — 3 pages, KPI cards, trend lines" style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #2A4A6E", background: "#0A1628", color: "#E8EDF5", fontSize: 13, boxSizing: "border-box" }} data-testid="input-dash-desc" />
+                        <input value={dashDesc} onChange={e => setDashDesc(e.target.value)} placeholder={isRtl ? "مثال: لوحة امتثال ضريبة القيمة المضافة — 3 صفحات، بطاقات KPI" : "e.g. VAT compliance dashboard — 3 pages, KPI cards, trend lines"} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #2A4A6E", background: "#0A1628", color: "#E8EDF5", fontSize: 13, boxSizing: "border-box" }} data-testid="input-dash-desc" />
                       </div>
                       <div style={{ marginBottom: 14 }}>
                         <label style={{ fontSize: 11, color: "#5A8AB8", display: "block", marginBottom: 4 }}>{isRtl ? "المرئيات" : "List the visuals"}</label>
-                        <input value={visualsList} onChange={e => setVisualsList(e.target.value)} placeholder="e.g. KPI card total VAT, bar chart by region, line chart by month" style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #2A4A6E", background: "#0A1628", color: "#E8EDF5", fontSize: 13, boxSizing: "border-box" }} data-testid="input-visuals-list" />
+                        <input value={visualsList} onChange={e => setVisualsList(e.target.value)} placeholder={isRtl ? "مثال: بطاقة KPI إجمالي الضريبة، مخطط شريطي حسب المنطقة" : "e.g. KPI card total VAT, bar chart by region, line chart by month"} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #2A4A6E", background: "#0A1628", color: "#E8EDF5", fontSize: 13, boxSizing: "border-box" }} data-testid="input-visuals-list" />
                       </div>
                       <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
                         <div style={{ flex: 1 }}>
                           <label style={{ fontSize: 11, color: "#5A8AB8", display: "block", marginBottom: 4 }}>{isRtl ? "الجمهور" : "Audience"}</label>
                           <select value={audience} onChange={e => setAudience(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #2A4A6E", background: "#0A1628", color: "#E8EDF5", fontSize: 13 }} data-testid="select-dashtest-audience">
-                            <option value="Internal ZATCA Team">Internal ZATCA Team</option>
-                            <option value="Senior Management">Senior Management</option>
-                            <option value="External Stakeholder">External Stakeholder</option>
+                            <option value="Internal ZATCA Team">{isRtl ? "فريق هيئة الزكاة الداخلي" : "Internal ZATCA Team"}</option>
+                            <option value="Senior Management">{isRtl ? "الإدارة العليا" : "Senior Management"}</option>
+                            <option value="External Stakeholder">{isRtl ? "أصحاب المصلحة الخارجيين" : "External Stakeholder"}</option>
                           </select>
                         </div>
                       </div>

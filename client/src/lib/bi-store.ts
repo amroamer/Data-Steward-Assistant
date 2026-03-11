@@ -392,7 +392,11 @@ export function addReportTestSheet(data: Record<string, unknown>) {
   const headers = ["Dimension", "Issue ID", "Field", "Severity", "Description", "Fix Recommendation"];
   const rows: (string | number | boolean)[][] = [];
   const govIssues = (data.governance_issues || []) as Record<string, unknown>[];
-  govIssues.forEach(i => rows.push(["Governance", "", String(i.field_name || ""), String(i.verdict || ""), `${i.classification_code}: ${i.remediation || ""}`, String(i.remediation || "")]));
+  govIssues.forEach(i => {
+    const v = String(i.verdict || "");
+    const sev = v === "BLOCK" ? "Critical" : v === "CONDITIONAL" ? "High" : "Low";
+    rows.push(["Governance", "", String(i.field_name || ""), sev, `[${v}] ${i.classification_code}: ${i.remediation || ""}`, String(i.remediation || "")]);
+  });
   const dqIssues = (data.data_quality_issues || []) as Record<string, unknown>[];
   dqIssues.forEach(i => rows.push(["Data Quality", String(i.issue_id || ""), String(i.field_name || ""), String(i.severity || ""), String(i.description || ""), String(i.fix_recommendation || "")]));
   const blIssues = (data.business_logic_issues || []) as Record<string, unknown>[];
