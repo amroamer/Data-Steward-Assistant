@@ -454,10 +454,21 @@ export default function BiAgentPage() {
                   {threads.map(t => {
                     const tDef = TABS.find(tb => tb.key === t.tab)!;
                     return (
-                      <div key={t.id} onClick={() => setExpandedThread(t.id)} style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 8, cursor: "pointer", background: t.id === expandedThread ? "rgba(26,75,140,0.2)" : "rgba(255,255,255,0.03)", border: `1px solid ${t.id === expandedThread ? "#1A4B8C" : "#1E4080"}`, display: "flex", alignItems: "center", gap: 10, transition: "all 0.15s" }} data-testid={`center-thread-${t.id}`}>
-                        <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: "rgba(26,75,140,0.3)", color: "#90B4D4" }}>{tDef.icon} {isRtl ? tDef.labelAr : tDef.label}</span>
-                        <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</span>
-                        <span style={{ fontSize: 10, color: "#5A8AB8", whiteSpace: "nowrap" }}>{t.timestamp}</span>
+                      <div key={t.id} onClick={() => setExpandedThread(t.id === expandedThread ? null : t.id)} style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 8, cursor: "pointer", background: t.id === expandedThread ? "rgba(26,75,140,0.2)" : "rgba(255,255,255,0.03)", border: `1px solid ${t.id === expandedThread ? "#1A4B8C" : "#1E4080"}`, transition: "all 0.15s" }} data-testid={`center-thread-${t.id}`}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ fontSize: 10, color: "#5A8AB8", transition: "transform 0.15s", transform: t.id === expandedThread ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+                          <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: "rgba(26,75,140,0.3)", color: "#90B4D4" }}>{tDef.icon} {isRtl ? tDef.labelAr : tDef.label}</span>
+                          <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</span>
+                          <span style={{ fontSize: 10, color: "#5A8AB8", whiteSpace: "nowrap" }}>{t.timestamp}</span>
+                        </div>
+                        {t.id === expandedThread && (
+                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #1E408044", fontSize: 11, color: "#90B4D4" }}>
+                            {t.tab === "sharing" && <span>{isRtl ? "الحكم:" : "Verdict:"} {String((t.data as Record<string, unknown>).overall_verdict || "")}</span>}
+                            {t.tab === "dashboard" && <span>{isRtl ? "العنوان:" : "Title:"} {String((t.data as Record<string, unknown>).dashboard_title || "")}</span>}
+                            {t.tab === "report" && <span>{isRtl ? "التوصية:" : "Rec:"} {String((t.data as Record<string, unknown>).send_recommendation || "")}</span>}
+                            {(t.tab === "testcases" || t.tab === "dashtest") && <span>{isRtl ? "الحالات:" : "Cases:"} {String((t.data as Record<string, unknown>).total_test_cases || 0)}</span>}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -483,7 +494,7 @@ export default function BiAgentPage() {
                     </button>
                     {hasSheets() && (
                       <button onClick={() => downloadBiReport()} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 10 }} data-testid="button-download-result">
-                        ⬇ Excel
+                        ⬇ {isRtl ? "تحميل bi_agent_report.xlsx" : "Download bi_agent_report.xlsx"}
                       </button>
                     )}
                   </div>
