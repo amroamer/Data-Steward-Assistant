@@ -2198,7 +2198,7 @@ Overall verdict: CLEARED / CLEARED WITH CONDITIONS / CLEARED AFTER REMEDIATION /
         model: "claude-sonnet-4-6",
         max_tokens: 8000,
         temperature: 0,
-        system: "You are a ZATCA data governance consultant. You classify dataset fields per NDMO National Data Governance Interim Regulations (June 2020) Section 4.3 and apply sharing rules per Section 6. Respond only in valid JSON. No prose, no markdown, no backticks.",
+        system: buildSystemPrompt("You are a ZATCA data governance consultant. You classify dataset fields per NDMO National Data Governance Interim Regulations (June 2020) Section 4.3 and apply sharing rules per Section 6. Respond only in valid JSON. No prose, no markdown, no backticks."),
         messages: [{ role: "user" as const, content: userMsg }],
       });
 
@@ -2303,7 +2303,7 @@ Design a complete Power BI dashboard with:
         model: "claude-sonnet-4-6",
         max_tokens: 8000,
         temperature: 0,
-        system: "You are a senior Power BI dashboard architect and ZATCA data analyst. Design a complete, production-ready Power BI dashboard specification from an uploaded dataset. Respond only in valid JSON. No prose, no markdown, no backticks.",
+        system: buildSystemPrompt("You are a senior Power BI dashboard architect and ZATCA data analyst. Design a complete, production-ready Power BI dashboard specification from an uploaded dataset. Respond only in valid JSON. No prose, no markdown, no backticks."),
         messages: [{ role: "user" as const, content: userMsg }],
       });
 
@@ -2413,7 +2413,7 @@ Check: Column headers clear? Number formats appropriate (SAR, %, DD/MM/YYYY)? So
         model: "claude-sonnet-4-6",
         max_tokens: 8000,
         temperature: 0,
-        system: "You are a ZATCA BI quality assurance lead. You review BI reports before they go to stakeholders. You check for data governance compliance (NDMO), data quality issues, business logic integrity, and presentation quality. Respond only in valid JSON. No prose, no markdown, no backticks.",
+        system: buildSystemPrompt("You are a ZATCA BI quality assurance lead. You review BI reports before they go to stakeholders. You check for data governance compliance (NDMO), data quality issues, business logic integrity, and presentation quality. Respond only in valid JSON. No prose, no markdown, no backticks."),
         messages: [{ role: "user" as const, content: userMsg }],
       });
 
@@ -2507,7 +2507,7 @@ Categories: DATA COMPLETENESS, DATA ACCURACY, BUSINESS RULES, EDGE CASES, SECURI
         model: "claude-sonnet-4-6",
         max_tokens: 8000,
         temperature: 0,
-        system: "You are a senior BI QA engineer at ZATCA. You write structured test cases for BI reports following best practices. You are thorough, specific, and write test cases that a junior analyst can execute without ambiguity. Respond only in valid JSON. No prose, no markdown, no backticks.",
+        system: buildSystemPrompt("You are a senior BI QA engineer at ZATCA. You write structured test cases for BI reports following best practices. You are thorough, specific, and write test cases that a junior analyst can execute without ambiguity. Respond only in valid JSON. No prose, no markdown, no backticks."),
         messages: [{ role: "user" as const, content: userMsg }],
       });
 
@@ -2608,7 +2608,7 @@ Each test case must reference actual fields and visuals described by the analyst
         model: "claude-sonnet-4-6",
         max_tokens: 8000,
         temperature: 0,
-        system: "You are a senior Power BI QA specialist at ZATCA. You write structured test cases specifically for Power BI dashboards — covering visual accuracy, DAX correctness, slicer behavior, drill-through, governance, and performance. Respond only in valid JSON. No prose, no markdown, no backticks.",
+        system: buildSystemPrompt("You are a senior Power BI QA specialist at ZATCA. You write structured test cases specifically for Power BI dashboards — covering visual accuracy, DAX correctness, slicer behavior, drill-through, governance, and performance. Respond only in valid JSON. No prose, no markdown, no backticks."),
         messages: [{ role: "user" as const, content: userMsg }],
       });
 

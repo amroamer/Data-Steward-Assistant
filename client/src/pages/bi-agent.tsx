@@ -208,7 +208,7 @@ export default function BiAgentPage() {
   return (
     <div style={{ display: "flex", height: "100vh", background: "#0A1628", fontFamily: "'Segoe UI', system-ui, sans-serif", color: "#E8EDF5", direction: isRtl ? "rtl" : "ltr" }}>
 
-      <div style={{ width: 260, borderRight: "1px solid #1E4080", display: "flex", flexDirection: "column", background: "#0D1B2E" }}>
+      <div style={{ width: 240, borderRight: "1px solid #1E4080", display: "flex", flexDirection: "column", background: "#0D1B2E", flexShrink: 0 }}>
         <div style={{ padding: "16px 20px", borderBottom: "1px solid #1E4080" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: 8, background: "linear-gradient(135deg, #1A4B8C, #2E7D32)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🧠</div>
@@ -258,7 +258,7 @@ export default function BiAgentPage() {
         )}
 
         <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
-          <div style={{ fontSize: 10, color: "#5A8AB8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>{isRtl ? "السجل" : "History"}</div>
+          <div style={{ fontSize: 10, color: "#5A8AB8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>{isRtl ? "الجلسات" : "Sessions"}</div>
           {threads.length === 0 && <div style={{ fontSize: 11, color: "#3A5A7E", fontStyle: "italic" }}>{isRtl ? "لا توجد نتائج بعد" : "No results yet"}</div>}
           {threads.map(t => {
             const tDef = TABS.find(tb => tb.key === t.tab)!;
@@ -288,7 +288,7 @@ export default function BiAgentPage() {
 
         <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
-          <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", borderRight: "1px solid #1E4080" }}>
             <div style={{ flex: 1, padding: "24px 28px", overflowY: "auto" }}>
 
               {!file && (
@@ -300,8 +300,8 @@ export default function BiAgentPage() {
                 </div>
               )}
 
-              {file && !loading && !currentData && (
-                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid #1E4080", borderRadius: 12, padding: "20px 24px" }}>
+              {file && !loading && (
+                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid #1E4080", borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 16, color: "#90B4D4" }}>{tab.icon} {isRtl ? tab.labelAr : tab.label}</div>
 
                   {(activeTab === "sharing" || activeTab === "report") && (
@@ -442,26 +442,53 @@ export default function BiAgentPage() {
                 </div>
               )}
 
-              {currentData && currentThread && (
-                <div style={{ marginTop: 16 }}>
-                  {currentThread.tab === "sharing" && <SharingResult data={currentData} isRtl={isRtl} />}
-                  {currentThread.tab === "dashboard" && <DashboardResult data={currentData} isRtl={isRtl} />}
-                  {currentThread.tab === "report" && <ReportResult data={currentData} isRtl={isRtl} />}
-                  {currentThread.tab === "testcases" && <TestCaseResult data={currentData} isRtl={isRtl} testStatus={testCaseStatus} setTestStatus={setTestCaseStatus} />}
-                  {currentThread.tab === "dashtest" && <DashboardTestResult data={currentData} isRtl={isRtl} testStatus={testCaseStatus} setTestStatus={setTestCaseStatus} />}
-                  <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
-                    <button onClick={() => { setExpandedThread(null); }} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #2A4A6E", background: "transparent", color: "#90B4D4", cursor: "pointer", fontSize: 12 }} data-testid="button-new-run">
-                      ← {isRtl ? "تحليل جديد" : "New Analysis"}
+              {threads.length > 0 && (
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#5A8AB8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>{isRtl ? "سجل المحادثات" : "Thread History"}</div>
+                  {threads.map(t => {
+                    const tDef = TABS.find(tb => tb.key === t.tab)!;
+                    return (
+                      <div key={t.id} onClick={() => setExpandedThread(t.id)} style={{ padding: "10px 14px", borderRadius: 10, marginBottom: 8, cursor: "pointer", background: t.id === expandedThread ? "rgba(26,75,140,0.2)" : "rgba(255,255,255,0.03)", border: `1px solid ${t.id === expandedThread ? "#1A4B8C" : "#1E4080"}`, display: "flex", alignItems: "center", gap: 10, transition: "all 0.15s" }} data-testid={`center-thread-${t.id}`}>
+                        <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: "rgba(26,75,140,0.3)", color: "#90B4D4" }}>{tDef.icon} {isRtl ? tDef.labelAr : tDef.label}</span>
+                        <span style={{ flex: 1, fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</span>
+                        <span style={{ fontSize: 10, color: "#5A8AB8", whiteSpace: "nowrap" }}>{t.timestamp}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ width: 420, flexShrink: 0, overflowY: "auto", padding: "20px 20px", background: "#0D1B2E" }}>
+            {!currentData && (
+              <div style={{ textAlign: "center", padding: "60px 20px", color: "#3A5A7E" }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
+                <div style={{ fontSize: 13 }}>{isRtl ? "اختر محادثة لعرض النتائج" : "Select a thread to view results"}</div>
+              </div>
+            )}
+            {currentData && currentThread && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#90B4D4" }}>{isRtl ? "النتائج" : "Output"}</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => { setExpandedThread(null); }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #2A4A6E", background: "transparent", color: "#90B4D4", cursor: "pointer", fontSize: 10 }} data-testid="button-new-run">
+                      ✕
                     </button>
                     {hasSheets() && (
-                      <button onClick={() => downloadBiReport()} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 12 }} data-testid="button-download-result">
-                        ⬇ {isRtl ? "تحميل Excel" : "Download Excel"}
+                      <button onClick={() => downloadBiReport()} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 10 }} data-testid="button-download-result">
+                        ⬇ Excel
                       </button>
                     )}
                   </div>
                 </div>
-              )}
-            </div>
+                {currentThread.tab === "sharing" && <SharingResult data={currentData} isRtl={isRtl} />}
+                {currentThread.tab === "dashboard" && <DashboardResult data={currentData} isRtl={isRtl} />}
+                {currentThread.tab === "report" && <ReportResult data={currentData} isRtl={isRtl} />}
+                {currentThread.tab === "testcases" && <TestCaseResult data={currentData} isRtl={isRtl} testStatus={testCaseStatus} setTestStatus={setTestCaseStatus} />}
+                {currentThread.tab === "dashtest" && <DashboardTestResult data={currentData} isRtl={isRtl} testStatus={testCaseStatus} setTestStatus={setTestCaseStatus} />}
+              </div>
+            )}
           </div>
         </div>
       </div>
