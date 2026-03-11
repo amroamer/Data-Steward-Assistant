@@ -1865,11 +1865,17 @@ export function registerChatRoutes(app: Express): void {
       res.end();
     } catch (error) {
       console.error("Error sending message:", error);
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const isPdfPageLimit = errMsg.includes("100 PDF pages") || errMsg.includes("maximum of 100 PDF pages");
+      const userFacingError = isPdfPageLimit
+        ? "This PDF has too many pages. Claude supports a maximum of 100 pages per PDF. Please split the file or upload a shorter document."
+        : "Failed to process message";
+      const statusCode = isPdfPageLimit ? 400 : 500;
       if (res.headersSent) {
-        res.write(`data: ${JSON.stringify({ error: "Failed to process message" })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: userFacingError })}\n\n`);
         res.end();
       } else {
-        res.status(500).json({ error: "Failed to process message" });
+        res.status(statusCode).json({ error: userFacingError });
       }
     }
   });
