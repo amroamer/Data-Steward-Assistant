@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -1365,6 +1365,7 @@ function SidebarContent({
 }
 
 export default function ChatPage() {
+  const [, navigate] = useLocation();
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -2603,16 +2604,19 @@ export default function ChatPage() {
         {!isMobile && (
           <div className="flex items-center gap-1 px-4 py-2 border-b flex-shrink-0 bg-white" style={{ borderColor: "#E5E7EB" }} data-testid="agent-mode-tabs">
             {([
-              { id: "data-management", icon: Database, labelKey: "agentDataMgmt", descKey: "agentDataMgmtDesc", color: "#0094D3" },
-              { id: "data-model", icon: Layers, labelKey: "agentDataModel", descKey: "agentDataModelDesc", color: "#774896" },
-              { id: "insights", icon: Brain, labelKey: "agentInsights", descKey: "agentInsightsDesc", color: "#067647" },
-              { id: "nudge", icon: Target, labelKey: "agentNudge", descKey: "agentDataMgmtDesc", color: "#7C3AED" },
-            ] as const).map((tab) => (
+              { id: "data-management", icon: Database, labelKey: "agentDataMgmt", descKey: "agentDataMgmtDesc", color: "#0094D3", href: null as string | null },
+              { id: "data-model", icon: Layers, labelKey: "agentDataModel", descKey: "agentDataModelDesc", color: "#774896", href: null as string | null },
+              { id: "insights", icon: Brain, labelKey: "agentInsights", descKey: "agentInsightsDesc", color: "#067647", href: null as string | null },
+              { id: "nudge", icon: Target, labelKey: "agentNudge", descKey: "agentDataMgmtDesc", color: "#7C3AED", href: null as string | null },
+              { id: "bi", icon: Brain, labelKey: "biAgent", descKey: "agentDataMgmtDesc", color: "#1A4B8C", href: "/bi-agent" as string | null },
+            ]).map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => {
-                  if (agentMode !== tab.id) {
-                    setAgentMode(tab.id);
+                  if (tab.href) {
+                    navigate(tab.href);
+                  } else if (agentMode !== tab.id) {
+                    setAgentMode(tab.id as typeof agentMode);
                     setActiveConversationId(null);
                     resetResultState(true);
                     setCollapsedThreads(new Set());
@@ -2620,8 +2624,8 @@ export default function ChatPage() {
                 }}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                 style={{
-                  backgroundColor: agentMode === tab.id ? "#0D2E5C" : "transparent",
-                  color: agentMode === tab.id ? "white" : "#6B7280",
+                  backgroundColor: !tab.href && agentMode === tab.id ? "#0D2E5C" : "transparent",
+                  color: !tab.href && agentMode === tab.id ? "white" : "#6B7280",
                 }}
                 data-testid={`tab-agent-${tab.id}`}
               >
@@ -2629,15 +2633,6 @@ export default function ChatPage() {
                 <span>{t[tab.labelKey] as string}</span>
               </button>
             ))}
-            <a
-              href="/bi-agent"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-              style={{ color: "#6B7280" }}
-              data-testid="tab-agent-bi"
-            >
-              <Brain className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>{t.biAgent as string}</span>
-            </a>
           </div>
         )}
 
