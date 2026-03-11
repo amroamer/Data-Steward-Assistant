@@ -1,5 +1,73 @@
 import * as XLSX from "xlsx";
 
+export interface FieldAssessment {
+  field_name: string;
+  sample_values?: string[];
+  classification_level: string;
+  classification_code: string;
+  confidential_sub_level?: string;
+  is_pii: boolean;
+  stakeholder_verdict: string;
+  ndmo_rule_applied: string;
+  remediation_action: string;
+  remediation_detail: string;
+}
+
+export interface SharingEligibilityData {
+  overall_verdict: string;
+  verdict_rationale: string;
+  stakeholder_tier: string;
+  stakeholder_description: string;
+  governing_field: string;
+  overall_classification: string;
+  pdpl_exposure: boolean;
+  pdpl_exposure_note?: string;
+  field_assessments: FieldAssessment[];
+  approval_checklist?: { item: string; required_for_fields: string[]; owner: string; blocking: boolean }[];
+  safe_version_possible?: boolean;
+  safe_version_instructions?: string;
+}
+
+export interface DashboardDesignData {
+  dashboard_title: string;
+  dashboard_type: string;
+  audience: string;
+  pages: { page_number: number; page_title: string; visuals: { visual_id: string; visual_type: string; title: string; fields_used: string[]; dax_measure: string; insight_purpose: string; placement: string }[] }[];
+  dax_measures: { measure_name: string; formula: string; description: string }[];
+  kpis: { kpi_name: string; dax_formula: string; target_logic: string; green_threshold: string; amber_threshold: string; red_threshold: string }[];
+  slicers?: { field_name: string; slicer_type: string; controls_visuals: string[] }[];
+}
+
+export interface ReportTestData {
+  governance_verdict: string;
+  overall_quality_score: number;
+  quality_grade: string;
+  send_recommendation: string;
+  governance_issues: Record<string, unknown>[];
+  data_quality_issues: Record<string, unknown>[];
+  business_logic_issues: Record<string, unknown>[];
+  presentation_issues: Record<string, unknown>[];
+}
+
+export interface TestCaseData {
+  test_cases: { tc_id: string; category: string; test_name: string; severity: string; objective: string; preconditions: string; test_steps: string[]; test_data: string; expected_result: string; estimated_duration_minutes: number; ndmo_reference: string }[];
+  coverage_summary: Record<string, number>;
+  total_estimated_duration_minutes: number;
+  critical_test_count: number;
+}
+
+export interface DashboardTestData extends TestCaseData {
+  governance_risk_level: string;
+  governance_risk_note: string;
+  test_cases: (TestCaseData["test_cases"][0] & { visual_tested: string; power_bi_specific_note: string })[];
+}
+
+interface AppendSheetOptions {
+  severityCol?: number;
+  actualResultCol?: number;
+  verdictRow?: { rowIdx: number; value: string };
+}
+
 const HEADER_FILL = { fgColor: { rgb: "1A4B8C" } };
 const HEADER_FONT = { bold: true, color: { rgb: "FFFFFF" }, sz: 11 };
 const ALT_ROW_FILL = { fgColor: { rgb: "EBF2FB" } };
@@ -67,7 +135,7 @@ function applyActualResultYellowFill(ws: XLSX.WorkSheet, startRow: number, rowCo
   }
 }
 
-function appendToSheet(wb: XLSX.WorkBook, sheetName: string, headers: string[], rows: (string | number | boolean)[][], summaryRows?: (string | number | boolean)[][], colWidths?: number[], options?: { severityCol?: number; actualResultCol?: number; verdictRow?: { rowIdx: number; value: string } }) {
+function appendToSheet(wb: XLSX.WorkBook, sheetName: string, headers: string[], rows: (string | number | boolean)[][], summaryRows?: (string | number | boolean)[][], colWidths?: number[], options?: AppendSheetOptions) {
   const existing = wb.Sheets[sheetName];
   let headerRowIdx: number;
 
@@ -255,6 +323,64 @@ export function addDashboardTestSheet(data: Record<string, unknown>) {
     String(tc.ndmo_reference || "N/A"),
     String(tc.power_bi_specific_note || ""),
   ]);
+  appendToSheet(wb, "dashboard_test_cases", headers, rows, undefined, [12, 18, 20, 25, 10, 35, 25, 40, 25, 35, 20, 10, 10, 20, 30], { severityCol: 4, actualResultCol: 10 });
+}
+
+export function exportTestRunSheet(cases: Record<string, unknown>[], testStatus: Record<string, "pass" | "fail" | null>) {
+  const wb = getOrCreateWorkbook();
+  const headers = ["TC ID", "Category", "Test Name", "Severity", "Objective", "Preconditions", "Test Steps", "Test Data", "Expected Result", "Actual Result", "Pass/Fail", "Duration (min)", "NDMO Ref"];
+  const rows = cases.map(tc => {
+    const tcId = String(tc.tc_id || "");
+    const status = testStatus[tcId];
+    return [
+      tcId,
+      String(tc.category || ""),
+      String(tc.test_name || ""),
+      String(tc.severity || ""),
+      String(tc.objective || ""),
+      String(tc.preconditions || ""),
+      ((tc.test_steps || []) as string[]).join("\n"),
+      String(tc.test_data || ""),
+      String(tc.expected_result || ""),
+      status === "pass" ? "PASSED" : status === "fail" ? "FAILED" : "",
+      status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "",
+      Number(tc.estimated_duration_minutes || 0),
+      String(tc.ndmo_reference || "N/A"),
+    ];
+  });
+  if (wb.Sheets["test_cases"]) delete wb.Sheets["test_cases"];
+  const idx = wb.SheetNames.indexOf("test_cases");
+  if (idx !== -1) wb.SheetNames.splice(idx, 1);
+  appendToSheet(wb, "test_cases", headers, rows, undefined, [10, 18, 25, 10, 35, 25, 40, 25, 35, 20, 10, 10, 20], { severityCol: 3, actualResultCol: 9 });
+}
+
+export function exportDashboardTestRunSheet(cases: Record<string, unknown>[], testStatus: Record<string, "pass" | "fail" | null>) {
+  const wb = getOrCreateWorkbook();
+  const headers = ["TC ID", "Category", "Visual Tested", "Test Name", "Severity", "Objective", "Preconditions", "Test Steps", "Test Data", "Expected Result", "Actual Result", "Pass/Fail", "Duration (min)", "NDMO Ref", "Power BI Note"];
+  const rows = cases.map(tc => {
+    const tcId = String(tc.tc_id || "");
+    const status = testStatus[tcId];
+    return [
+      tcId,
+      String(tc.category || ""),
+      String(tc.visual_tested || ""),
+      String(tc.test_name || ""),
+      String(tc.severity || ""),
+      String(tc.objective || ""),
+      String(tc.preconditions || ""),
+      ((tc.test_steps || []) as string[]).join("\n"),
+      String(tc.test_data || ""),
+      String(tc.expected_result || ""),
+      status === "pass" ? "PASSED" : status === "fail" ? "FAILED" : "",
+      status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "",
+      Number(tc.estimated_duration_minutes || 0),
+      String(tc.ndmo_reference || "N/A"),
+      String(tc.power_bi_specific_note || ""),
+    ];
+  });
+  if (wb.Sheets["dashboard_test_cases"]) delete wb.Sheets["dashboard_test_cases"];
+  const idx = wb.SheetNames.indexOf("dashboard_test_cases");
+  if (idx !== -1) wb.SheetNames.splice(idx, 1);
   appendToSheet(wb, "dashboard_test_cases", headers, rows, undefined, [12, 18, 20, 25, 10, 35, 25, 40, 25, 35, 20, 10, 10, 20, 30], { severityCol: 4, actualResultCol: 10 });
 }
 

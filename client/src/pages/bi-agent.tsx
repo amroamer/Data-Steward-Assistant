@@ -12,6 +12,8 @@ import {
   addReportTestSheet,
   addTestCaseSheets,
   addDashboardTestSheet,
+  exportTestRunSheet,
+  exportDashboardTestRunSheet,
   downloadBiReport,
   hasSheets,
 } from "@/lib/bi-store";
@@ -75,6 +77,14 @@ interface ThreadEntry {
   timestamp: string;
   data: Record<string, unknown>;
   collapsed: boolean;
+}
+
+function exportTestRun(cases: Record<string, unknown>[], testStatus: Record<string, "pass" | "fail" | null>) {
+  exportTestRunSheet(cases, testStatus);
+}
+
+function exportDashboardTestRun(cases: Record<string, unknown>[], testStatus: Record<string, "pass" | "fail" | null>) {
+  exportDashboardTestRunSheet(cases, testStatus);
 }
 
 export default function BiAgentPage() {
@@ -518,17 +528,39 @@ function SharingResult({ data, isRtl }: { data: Record<string, unknown>; isRtl: 
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
         {[
-          { key: "blocking_fields", label: isRtl ? "محظورة" : "Blocked", color: "#B71C1C", icon: "✕" },
-          { key: "conditional_fields", label: isRtl ? "مشروطة" : "Conditional", color: "#E65100", icon: "◐" },
-          { key: "safe_fields", label: isRtl ? "آمنة" : "Safe", color: "#2E7D32", icon: "✓" },
-        ].map(cat => {
-          const items = (data[cat.key] || []) as string[];
+          { label: isRtl ? "عام" : "General Public", tier: "PUBLIC" },
+          { label: isRtl ? "قطاع خاص" : "Private Sector", tier: "PRIVATE_SECTOR" },
+          { label: isRtl ? "جهات حكومية" : "Gov. Entities", tier: "INTERNAL_GOV" },
+        ].map(rec => {
+          const tierAssess = assessments.map(f => {
+            const tier = rec.tier;
+            const cls = String(f.classification_code || "P");
+            if (cls === "P") return { field: String(f.field_name), verdict: "SEND" };
+            if (cls === "TS") return { field: String(f.field_name), verdict: "BLOCK" };
+            if (cls === "S") return { field: String(f.field_name), verdict: tier === "INTERNAL_ZATCA" ? "CONDITIONAL" : tier === "INTERNAL_GOV" ? "CONDITIONAL" : "BLOCK" };
+            if (tier === "PUBLIC") return { field: String(f.field_name), verdict: "BLOCK" };
+            if (tier === "PRIVATE_SECTOR") return { field: String(f.field_name), verdict: "CONDITIONAL" };
+            return { field: String(f.field_name), verdict: tier === "INTERNAL_ZATCA" ? "SEND" : "CONDITIONAL" };
+          });
+          const blocked = tierAssess.filter(a => a.verdict === "BLOCK");
+          const cond = tierAssess.filter(a => a.verdict === "CONDITIONAL");
+          const recVerdict = blocked.length > 0 ? "BLOCK" : cond.length > 0 ? "CONDITIONAL" : "SEND";
+          const recIcon = recVerdict === "SEND" ? "✓" : recVerdict === "BLOCK" ? "✕" : "◐";
+          const recColor = recVerdict === "SEND" ? "#2E7D32" : recVerdict === "BLOCK" ? "#B71C1C" : "#E65100";
           return (
-            <div key={cat.key} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${cat.color}55`, borderTop: `4px solid ${cat.color}`, borderRadius: 12, padding: "16px 14px" }} data-testid={`card-${cat.key}`}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: cat.color, marginBottom: 8 }}>{cat.icon} {cat.label} ({items.length})</div>
-              {items.map((f, i) => (
-                <div key={i} style={{ fontSize: 11, color: "#90B4D4", padding: "2px 0" }}>{f}</div>
-              ))}
+            <div key={rec.tier} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${recColor}55`, borderTop: `4px solid ${recColor}`, borderRadius: 12, padding: "16px 14px" }} data-testid={`recipient-${rec.tier}`}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: recColor, marginBottom: 8 }}>{recIcon} {rec.label}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: recColor, marginBottom: 6, textTransform: "uppercase" }}>{recVerdict}</div>
+              {cond.length > 0 && recVerdict !== "BLOCK" && (
+                <div style={{ fontSize: 10, color: "#C8D8EA" }}>
+                  {cond.map((c, i) => <div key={i} style={{ padding: "2px 0" }}>◐ {c.field}</div>)}
+                </div>
+              )}
+              {blocked.length > 0 && (
+                <div style={{ fontSize: 10, color: "#EF9A9A" }}>
+                  {blocked.map((b, i) => <div key={i} style={{ padding: "2px 0" }}>✕ {b.field}</div>)}
+                </div>
+              )}
             </div>
           );
         })}
@@ -546,6 +578,26 @@ function SharingResult({ data, isRtl }: { data: Record<string, unknown>; isRtl: 
               </div>
             </label>
           ))}
+        </div>
+      )}
+
+      {assessments.filter(f => f.remediation_action && f.remediation_action !== "NO ACTION").length > 0 && (
+        <div style={{ background: "rgba(230,81,0,0.06)", border: "2px solid #E6510044", borderRadius: 12, padding: "16px 20px", marginBottom: 20 }} data-testid="remediation-plan">
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#E65100", marginBottom: 10 }}>🔧 {isRtl ? "خطة المعالجة" : "Remediation Plan"}</div>
+          {assessments.filter(f => f.remediation_action && f.remediation_action !== "NO ACTION").map((f, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "6px 0", fontSize: 12, color: "#C8D8EA" }}>
+              <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700, background: "#E6510033", color: "#FFB74D", whiteSpace: "nowrap" }}>{String(f.remediation_action)}</span>
+              <div>
+                <span style={{ fontWeight: 600 }}>{String(f.field_name)}</span>
+                <span style={{ color: "#5A8AB8" }}> — {String(f.remediation_detail || "")}</span>
+              </div>
+            </div>
+          ))}
+          {data.safe_version_possible && (
+            <div style={{ marginTop: 12, padding: "10px 14px", background: "rgba(46,125,50,0.1)", border: "1px solid #2E7D3244", borderRadius: 8, fontSize: 11, color: "#81C784" }}>
+              <strong>{isRtl ? "نسخة آمنة ممكنة:" : "Safe version possible:"}</strong> {String(data.safe_version_instructions || "")}
+            </div>
+          )}
         </div>
       )}
 
@@ -891,6 +943,12 @@ function TestCaseResult({ data, isRtl, testStatus, setTestStatus }: { data: Reco
         ))}
       </div>
 
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <button onClick={() => { exportTestRun(cases, testStatus); downloadBiReport(); }} style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 11 }} data-testid="button-export-test-run">
+          ⬇ {isRtl ? "تصدير نتائج الاختبار" : "Export Test Run"}
+        </button>
+      </div>
+
       {filtered.map((tc, i) => {
         const tcId = String(tc.tc_id || "");
         const sev = String(tc.severity || "Medium");
@@ -946,7 +1004,7 @@ function DashboardTestResult({ data, isRtl, testStatus, setTestStatus }: { data:
   const govRisk = String(data.governance_risk_level || "Low");
   const govRiskColor = govRisk === "Critical" ? "#B71C1C" : govRisk === "High" ? "#E65100" : govRisk === "Medium" ? "#F59E0B" : "#2E7D32";
 
-  const categories = [...new Set(cases.map(tc => String(tc.category || "")))];
+  const DASHBOARD_CATEGORIES = ["Visual Accuracy", "DAX Validation", "Slicer & Filter", "Drill-Through", "Governance", "Performance", "Formatting", "Refresh"];
   const filtered = activeCategory ? cases.filter(tc => String(tc.category) === activeCategory) : cases;
 
   const donutData = Object.entries(coverage).filter(([, v]) => v > 0).map(([k, v]) => ({ name: k.replace(/_/g, " "), value: v }));
@@ -994,9 +1052,15 @@ function DashboardTestResult({ data, isRtl, testStatus, setTestStatus }: { data:
 
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         <button onClick={() => setActiveCategory(null)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #1E4080", background: activeCategory === null ? "rgba(26,75,140,0.3)" : "transparent", color: activeCategory === null ? "#E8EDF5" : "#5A8AB8", cursor: "pointer", fontSize: 10 }}>{isRtl ? "الكل" : "All"}</button>
-        {categories.map(cat => (
+        {DASHBOARD_CATEGORIES.map(cat => (
           <button key={cat} onClick={() => setActiveCategory(cat)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #1E4080", background: activeCategory === cat ? "rgba(26,75,140,0.3)" : "transparent", color: activeCategory === cat ? "#E8EDF5" : "#5A8AB8", cursor: "pointer", fontSize: 10 }} data-testid={`dashcat-filter-${cat}`}>{cat}</button>
         ))}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <button onClick={() => { exportDashboardTestRun(cases, testStatus); downloadBiReport(); }} style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 11 }} data-testid="button-export-dashtest-run">
+          ⬇ {isRtl ? "تصدير نتائج الاختبار" : "Export Test Run"}
+        </button>
       </div>
 
       {filtered.map((tc, i) => {
