@@ -1,0 +1,83 @@
+Now I have the official source. The correct NDMO classification levels from the document (Section 4.3, page 16-18) are:
+Top Secret (TS) → High impact
+Secret (S) → Medium impact
+Confidential (C) → Low impact (with sub-levels A, B, C)
+Public (P) → No impact
+This is completely different from what I had in my previous answer. Here is exactly how to fix your app.
+
+Update the Data Classification prompt in your callClaude() call:
+javascript<instructions>
+Classify each field strictly per the NDMO National Data Governance Interim Regulations (SDAIA, June 2020), Section 4.3.
+
+You must use EXACTLY these four classification levels and no others:
+
+1. TOP SECRET ("TS") — High Impact
+   Unauthorized disclosure causes exceptional, difficult-to-resolve harm to: national interest (diplomatic, military, intelligence, infrastructure, economy), KSA organizations at national scale, individuals' health/safety at massive scale, or catastrophic environmental damage.
+   ZATCA examples: encryption keys, terrorism investigation data, national security enforcement files.
+
+2. SECRET ("S") — Medium Impact
+   Unauthorized disclosure causes considerable harm to: national interest (reputation, diplomatic relations, major case investigations including terrorism funding), financial loss causing organizational bankruptcy, significant injury to individuals, or long-term environmental damage.
+   ZATCA examples: vital infrastructure information, strategic MoU details, bilateral agreement data.
+
+3. CONFIDENTIAL ("C") — Low Impact
+   Unauthorized disclosure causes contained harm to: government entity operations or KSA economy, limited financial/competitive loss, negative effect on individuals' interests, or short-term environmental damage.
+   Sub-levels:
+   - Confidential-A: impact at sector or general economic activity scale
+   - Confidential-B: impact across multiple entities or group of individuals
+   - Confidential-C: impact on a single entity or specific individual
+   ZATCA examples: PII (name, NID, address, phone, account numbers, biometrics), individual transaction statements, medical records, salary information, VAT filing details, tax declarations, internal policies, audit findings, vendor contracts, enforcement actions, CR numbers, TINs.
+
+4. PUBLIC ("P") — No Impact
+   Unauthorized disclosure has no impact on national interest, organizations, individuals, or environment.
+   ZATCA examples: published government statistics, press releases, public service info, publicly released financial results, job postings, organization contact info.
+
+CLASSIFICATION RULES:
+- If data is unclassified at time of assessment, treat it as Confidential until correctly classified (per Section 4.4)
+- If a dataset contains multiple classification levels, apply the HIGHEST level to the entire dataset (Principle 4: Highest Level of Protection)
+- Classification is based on potential IMPACT of unauthorized disclosure, not just data type
+- For ZATCA context: taxpayer PII and financial data → Confidential-B or C; aggregated tax statistics → Public; enforcement/investigation data → Secret or Top Secret
+
+For each field, perform the impact assessment across four categories: National Interest, Organizations, Individuals, Environment. The highest impact category determines the classification level.
+</instructions>
+
+<json_schema>
+{
+  "classification_results": [
+    {
+      "field_name": "...",
+      "classification_level": "Top Secret | Secret | Confidential | Public",
+      "classification_code": "TS | S | C | P",
+      "confidential_sub_level": "A | B | C | N/A",
+      "impact_level": "High | Medium | Low | None",
+      "impact_category": "National Interest | Organizations | Individuals | Environment | N/A",
+      "justification": "...",
+      "is_pii_under_pdpl": true,
+      "recommended_controls": "..."
+    }
+  ],
+  "dataset_classification": {
+    "overall_level": "Top Secret | Secret | Confidential | Public",
+    "overall_code": "TS | S | C | P",
+    "rationale": "Highest level found across all fields"
+  }
+}
+</json_schema>
+
+Update the Excel sheet color coding to match the actual NDMO levels:
+javascriptconst classificationColors = {
+  "Top Secret": { bg: "1A1A2E", font: "FFFFFF" },  // dark navy
+  "Secret":     { bg: "C0392B", font: "FFFFFF" },  // red
+  "Confidential": { bg: "E67E22", font: "FFFFFF" }, // orange
+  "Public":     { bg: "27AE60", font: "FFFFFF" }   // green
+};
+```
+
+---
+
+**Update the chat summary tiles** to show the correct four levels:
+```
+🔴 Top Secret (TS): N fields
+🟠 Secret (S): N fields  
+🟡 Confidential (C): N fields
+🟢 Public (P): N fields
+📋 Overall Dataset: [highest level]
