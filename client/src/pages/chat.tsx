@@ -71,6 +71,7 @@ import {
   Search,
   Zap,
   TrendingUp,
+  Share2,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -385,6 +386,7 @@ const translations = {
     agentDataModelDesc: "Design star schema & generate DDL scripts",
     previewFile: "Preview file",
     useCases: "Use Cases",
+    sharingEligibility: "Sharing",
     nudgeAgent: "Nudge Agent",
     newChatNudge: "New Nudge Agent",
     agentNudge: "Nudge Agent",
@@ -596,6 +598,7 @@ const translations = {
     agentDataModelDesc: "تصميم مخطط نجمي وإنشاء سكريبتات DDL",
     previewFile: "معاينة الملف",
     useCases: "حالات الاستخدام",
+    sharingEligibility: "المشاركة",
     nudgeAgent: "وكيل التحفيز",
     newChatNudge: "وكيل تحفيز جديد",
     agentNudge: "وكيل التحفيز",
@@ -2553,6 +2556,15 @@ export default function ChatPage() {
           >
             <LayoutGrid className="w-3.5 h-3.5" />
             {t.useCases}
+          </Link>
+          <Link
+            href="/sharing-eligibility"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
+            style={{ color: "#6B7280" }}
+            data-testid="link-sharing-eligibility"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            {t.sharingEligibility}
           </Link>
           <Link
             href="/user-guide"

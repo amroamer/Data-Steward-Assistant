@@ -2011,4 +2011,102 @@ Return this exact structure:
       return res.status(500).json({ ok: false, error: "server_error" });
     }
   });
+
+  app.post("/api/sharing-eligibility", async (req: Request, res: Response) => {
+    try {
+      const { fields, sampleRows } = req.body as {
+        fields?: string[];
+        sampleRows?: Record<string, unknown>[];
+      };
+
+      if (!fields || !Array.isArray(fields) || fields.length === 0) {
+        return res.status(400).json({ ok: false, error: "fields_required" });
+      }
+
+      const sampleStr = (sampleRows || []).slice(0, 5).map((r: Record<string, unknown>) =>
+        fields.map(f => `${f}: ${r[f] ?? ""}`).join(" | ")
+      ).join("\n");
+
+      const sharingPrompt = `You are a ZATCA data governance consultant. Analyze the uploaded dataset fields and return a sharing eligibility assessment per NDMO National Data Governance Interim Regulations (June 2020).
+
+CLASSIFICATION LEVELS (Section 4.3):
+- TOP SECRET (TS) — High Impact: exceptional harm to national interest, military, intelligence, national infrastructure
+- SECRET (S) — Medium Impact: considerable harm to national interest, financial/organizational damage, significant injury to individuals
+- CONFIDENTIAL (C) — Low Impact: contained harm to gov operations, limited financial loss, negative effect on individuals. Includes ALL PII (NID, name, address, phone, account numbers, biometrics, salary, medical, tax declarations, VAT filings, TINs, CR numbers). Sub-levels: Confidential-A (sector/economic scale), Confidential-B (multiple entities/group of individuals), Confidential-C (single entity/specific individual)
+- PUBLIC (P) — No Impact: published statistics, press releases, public service info
+
+SHARING ELIGIBILITY RULES (Section 6):
+PUBLIC: all recipients CAN SHARE
+CONFIDENTIAL: Public → CANNOT SHARE | Private Sector → CONDITIONAL (DSA + anonymization of PII) | Gov Entities → CONDITIONAL (DSA + BDE approval)
+SECRET: Public → CANNOT SHARE | Private → CANNOT SHARE | Gov → CONDITIONAL (NDMO coordination + security clearance)
+TOP SECRET: all recipients → CANNOT SHARE
+
+Fields to analyze: ${fields.join(", ")}
+Sample data:
+${sampleStr}
+
+Respond with ONLY valid JSON matching this exact schema:
+{
+  "field_assessments": [
+    {
+      "field_name": "string",
+      "sample_values": ["string"],
+      "classification_level": "Top Secret|Secret|Confidential|Public",
+      "classification_code": "TS|S|C|P",
+      "confidential_sub_level": "A|B|C|N/A",
+      "impact_level": "High|Medium|Low|None",
+      "justification": "string",
+      "is_pii": true,
+      "sharing_eligibility": {
+        "general_public":      { "verdict": "CAN SHARE|CANNOT SHARE|CONDITIONAL", "condition": "string" },
+        "private_sector":      { "verdict": "CAN SHARE|CANNOT SHARE|CONDITIONAL", "condition": "string" },
+        "government_entities": { "verdict": "CAN SHARE|CANNOT SHARE|CONDITIONAL", "condition": "string" }
+      }
+    }
+  ],
+  "dataset_summary": {
+    "overall_classification": "Top Secret|Secret|Confidential|Public",
+    "overall_code": "TS|S|C|P",
+    "governing_field": "string",
+    "overall_sharing_eligibility": {
+      "general_public":      { "verdict": "CAN SHARE|CANNOT SHARE|CONDITIONAL", "conditions_required": ["string"] },
+      "private_sector":      { "verdict": "CAN SHARE|CANNOT SHARE|CONDITIONAL", "conditions_required": ["string"] },
+      "government_entities": { "verdict": "CAN SHARE|CANNOT SHARE|CONDITIONAL", "conditions_required": ["string"] }
+    },
+    "recommended_actions": ["string"],
+    "can_be_shared_after_anonymization": true,
+    "fields_to_remove_or_mask": ["string"]
+  }
+}`;
+
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 4000,
+        temperature: 0,
+        system: buildSystemPrompt("You are a ZATCA data governance consultant specializing in NDMO data classification and sharing eligibility assessments."),
+        messages: [{ role: "user" as const, content: sharingPrompt }],
+      });
+
+      const rawText = response.content
+        .filter((b) => b.type === "text")
+        .map((b) => (b as { type: "text"; text: string }).text)
+        .join("");
+
+      const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
+
+      let parsed: object;
+      try {
+        const start = cleaned.indexOf("{");
+        const end = cleaned.lastIndexOf("}");
+        parsed = JSON.parse(cleaned.slice(start, end + 1));
+      } catch {
+        return res.json({ ok: false, error: "invalid_json", raw: cleaned.substring(0, 500) });
+      }
+
+      return res.json({ ok: true, data: parsed });
+    } catch (error) {
+      console.error("Error in /api/sharing-eligibility:", error);
+      return res.status(500).json({ ok: false, error: "server_error" });
+    }
+  });
 }
