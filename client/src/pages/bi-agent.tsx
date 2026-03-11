@@ -1,7 +1,3 @@
-// BI AGENT PAGE
-// Features: Sharing Eligibility | Dashboard Designer | Report Tester | Test Case Generator | Dashboard Tester
-// Excel output: bi_agent_report.xlsx (cumulative, never overwrites result.xlsx)
-// All Claude calls: temperature 0, AbortController, XML-wrapped prompts
 import { useState, useRef, useCallback, Fragment } from "react";
 import * as XLSX from "xlsx";
 import { useLocation } from "wouter";
