@@ -1,0 +1,592 @@
+Now I have everything I need. Building the full artifact:
+jsximport { useState, useRef, useCallback } from "react";
+import * as XLSX from "xlsx";
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+const CLASSIFICATION_META = {
+  "Top Secret": { code: "TS", impact: "High",   bg: "#1A1A2E", fg: "#FFFFFF", accent: "#C0392B" },
+  "Secret":     { code: "S",  impact: "Medium", bg: "#C0392B", fg: "#FFFFFF", accent: "#E74C3C" },
+  "Confidential":{ code: "C", impact: "Low",    bg: "#E65100", fg: "#FFFFFF", accent: "#FF6D00" },
+  "Public":     { code: "P",  impact: "None",   bg: "#1B5E20", fg: "#FFFFFF", accent: "#2E7D32" },
+};
+
+const VERDICT_META = {
+  "CANNOT SHARE": { icon: "✕", color: "#B71C1C", bg: "#FFEBEE", border: "#EF9A9A", label: "Cannot Be Shared" },
+  "CONDITIONAL":  { icon: "◐", color: "#E65100", bg: "#FFF3E0", border: "#FFCC80", label: "Conditional Sharing" },
+  "CAN SHARE":    { icon: "✓", color: "#1B5E20", bg: "#E8F5E9", border: "#A5D6A7", label: "Safe to Share" },
+};
+
+const RECIPIENTS = [
+  { key: "general_public",      label: "General Public",      icon: "🌐" },
+  { key: "private_sector",      label: "Private Sector",      icon: "🏢" },
+  { key: "government_entities", label: "Gov. Entities",       icon: "🏛️" },
+];
+
+function getWorstVerdict(eligibility) {
+  const v = Object.values(eligibility).map(x => x.verdict);
+  if (v.includes("CANNOT SHARE")) return "CANNOT SHARE";
+  if (v.includes("CONDITIONAL"))  return "CONDITIONAL";
+  return "CAN SHARE";
+}
+
+function parseExcelFile(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+        res(rows);
+      } catch (err) { rej(err); }
+    };
+    reader.onerror = rej;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function buildPrompt(fields, sampleRows) {
+  const sampleStr = sampleRows.slice(0, 5).map(r =>
+    fields.map(f => `${f}: ${r[f] ?? ""}`).join(" | ")
+  ).join("\n");
+
+  return `You are a ZATCA data governance consultant. Analyze the uploaded dataset fields and return a sharing eligibility assessment per NDMO National Data Governance Interim Regulations (June 2020).
+
+CLASSIFICATION LEVELS (Section 4.3):
+- TOP SECRET (TS) — High Impact: exceptional harm to national interest, military, intelligence, national infrastructure
+- SECRET (S) — Medium Impact: considerable harm to national interest, financial/organizational damage, significant injury to individuals
+- CONFIDENTIAL (C) — Low Impact: contained harm to gov operations, limited financial loss, negative effect on individuals. Includes ALL PII (NID, name, address, phone, account numbers, biometrics, salary, medical, tax declarations, VAT filings, TINs, CR numbers)
+- PUBLIC (P) — No Impact: published statistics, press releases, public service info
+
+SHARING ELIGIBILITY RULES (Section 6):
+PUBLIC: all recipients CAN SHARE
+CONFIDENTIAL: Public → CANNOT SHARE | Private Sector → CONDITIONAL (DSA + anonymization of PII) | Gov Entities → CONDITIONAL (DSA + BDE approval)
+SECRET: Public → CANNOT SHARE | Private → CANNOT SHARE | Gov → CONDITIONAL (NDMO coordination + security clearance)
+TOP SECRET: all recipients → CANNOT SHARE
+
+Fields to analyze: ${fields.join(", ")}
+Sample data:
+${sampleStr}
+
+Respond with ONLY valid JSON matching this exact schema:
+{
+  "field_assessments": [
+    {
+      "field_name": "string",
+      "sample_values": ["string"],
+      "classification_level": "Top Secret|Secret|Confidential|Public",
+      "classification_code": "TS|S|C|P",
+      "confidential_sub_level": "A|B|C|N/A",
+      "impact_level": "High|Medium|Low|None",
+      "justification": "string",
+      "is_pii": true,
+      "sharing_eligibility": {
+        "general_public":      { "verdict": "CAN SHARE|CANNOT SHARE|CONDITIONAL", "condition": "string" },
+        "private_sector":      { "verdict": "CAN SHARE|CANNOT SHARE|CONDITIONAL", "condition": "string" },
+        "government_entities": { "verdict": "CAN SHARE|CANNOT SHARE|CONDITIONAL", "condition": "string" }
+      }
+    }
+  ],
+  "dataset_summary": {
+    "overall_classification": "Top Secret|Secret|Confidential|Public",
+    "overall_code": "TS|S|C|P",
+    "governing_field": "string",
+    "overall_sharing_eligibility": {
+      "general_public":      { "verdict": "CAN SHARE|CANNOT SHARE|CONDITIONAL", "conditions_required": ["string"] },
+      "private_sector":      { "verdict": "CAN SHARE|CANNOT SHARE|CONDITIONAL", "conditions_required": ["string"] },
+      "government_entities": { "verdict": "CAN SHARE|CANNOT SHARE|CONDITIONAL", "conditions_required": ["string"] }
+    },
+    "recommended_actions": ["string"],
+    "can_be_shared_after_anonymization": true,
+    "fields_to_remove_or_mask": ["string"]
+  }
+}`;
+}
+
+async function callClaude(prompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 4000,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  const data = await res.json();
+  const raw = data.content?.map(b => b.text || "").join("") || "";
+  const clean = raw.replace(/```json|```/g, "").trim();
+  const start = clean.indexOf("{");
+  const end   = clean.lastIndexOf("}");
+  return JSON.parse(clean.slice(start, end + 1));
+}
+
+function downloadExcel(result, fileName) {
+  const wb = XLSX.utils.book_new();
+
+  // ── Summary sheet ──
+  const summaryData = [
+    ["NDMO DATA SHARING ELIGIBILITY REPORT"],
+    ["Generated", new Date().toLocaleString()],
+    ["Source File", fileName],
+    [],
+    ["OVERALL DATASET CLASSIFICATION", result.dataset_summary.overall_classification, `(${result.dataset_summary.overall_code})`],
+    ["Governing Field", result.dataset_summary.governing_field],
+    [],
+    ["RECIPIENT", "VERDICT", "CONDITIONS"],
+    ...RECIPIENTS.map(r => {
+      const e = result.dataset_summary.overall_sharing_eligibility[r.key];
+      return [r.label, e.verdict, (e.conditions_required || []).join("; ")];
+    }),
+    [],
+    ["RECOMMENDED ACTIONS"],
+    ...(result.dataset_summary.recommended_actions || []).map(a => [a]),
+    [],
+    ["Can be shared after anonymization?", result.dataset_summary.can_be_shared_after_anonymization ? "YES" : "NO"],
+    ["Fields to mask/remove", (result.dataset_summary.fields_to_remove_or_mask || []).join(", ")],
+  ];
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+  XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
+
+  // ── Field detail sheet ──
+  const headers = ["Field Name","Classification","Code","Sub-Level","Impact","Is PII","Justification","Public Verdict","Public Condition","Private Verdict","Private Condition","Gov Verdict","Gov Condition"];
+  const rows = result.field_assessments.map(f => [
+    f.field_name,
+    f.classification_level,
+    f.classification_code,
+    f.confidential_sub_level || "N/A",
+    f.impact_level,
+    f.is_pii ? "YES" : "NO",
+    f.justification,
+    f.sharing_eligibility.general_public.verdict,
+    f.sharing_eligibility.general_public.condition || "",
+    f.sharing_eligibility.private_sector.verdict,
+    f.sharing_eligibility.private_sector.condition || "",
+    f.sharing_eligibility.government_entities.verdict,
+    f.sharing_eligibility.government_entities.condition || "",
+  ]);
+  const wsDetail = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  wsDetail["!cols"] = headers.map((_, i) => ({ wch: i === 6 ? 40 : i >= 8 ? 30 : 18 }));
+  XLSX.utils.book_append_sheet(wb, wsDetail, "Field Assessment");
+
+  XLSX.writeFile(wb, `sharing_eligibility_${Date.now()}.xlsx`);
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+function VerdictBadge({ verdict, small }) {
+  const m = VERDICT_META[verdict] || VERDICT_META["CANNOT SHARE"];
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      padding: small ? "2px 8px" : "4px 12px",
+      borderRadius: 20, fontSize: small ? 11 : 13, fontWeight: 700,
+      background: m.bg, color: m.color, border: `1px solid ${m.border}`,
+      fontFamily: "monospace",
+    }}>
+      <span>{m.icon}</span> {verdict}
+    </span>
+  );
+}
+
+function ClassificationBadge({ level, code }) {
+  const m = CLASSIFICATION_META[level] || CLASSIFICATION_META["Confidential"];
+  return (
+    <span style={{
+      display: "inline-block", padding: "3px 10px", borderRadius: 4,
+      fontSize: 12, fontWeight: 800, letterSpacing: 1,
+      background: m.bg, color: m.fg, fontFamily: "monospace",
+    }}>
+      {code}
+    </span>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+export default function SharingEligibilityApp() {
+  const [file, setFile]           = useState(null);
+  const [rows, setRows]           = useState([]);
+  const [fields, setFields]       = useState([]);
+  const [loading, setLoading]     = useState(false);
+  const [result, setResult]       = useState(null);
+  const [error, setError]         = useState(null);
+  const [dragOver, setDragOver]   = useState(false);
+  const [expandedField, setExpandedField] = useState(null);
+  const abortRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const handleFile = useCallback(async (f) => {
+    if (!f) return;
+    setError(null); setResult(null);
+    try {
+      const parsed = await parseExcelFile(f);
+      if (!parsed.length) throw new Error("File appears empty.");
+      setFile(f); setRows(parsed); setFields(Object.keys(parsed[0]));
+    } catch (e) { setError("Could not read file: " + e.message); }
+  }, []);
+
+  const handleDrop = useCallback(e => {
+    e.preventDefault(); setDragOver(false);
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  }, [handleFile]);
+
+  const analyse = async () => {
+    setLoading(true); setError(null); setResult(null);
+    try {
+      const prompt = buildPrompt(fields, rows);
+      const data   = await callClaude(prompt);
+      setResult(data);
+    } catch (e) {
+      setError("Analysis failed: " + e.message);
+    } finally { setLoading(false); }
+  };
+
+  const overallVerdict = result
+    ? getWorstVerdict(result.dataset_summary.overall_sharing_eligibility)
+    : null;
+  const vm = overallVerdict ? VERDICT_META[overallVerdict] : null;
+  const cm = result ? (CLASSIFICATION_META[result.dataset_summary.overall_classification] || CLASSIFICATION_META["Confidential"]) : null;
+
+  return (
+    <div style={{
+      minHeight: "100vh", background: "#0A1628",
+      fontFamily: "'Segoe UI', system-ui, sans-serif", color: "#E8EDF5",
+    }}>
+      {/* Header */}
+      <div style={{
+        background: "linear-gradient(135deg, #0D2E5C 0%, #1A4B8C 100%)",
+        borderBottom: "1px solid #1E4080", padding: "20px 32px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 10,
+            background: "linear-gradient(135deg, #1A4B8C, #2E7D32)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 22, boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+          }}>🛡️</div>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: 0.5 }}>
+              Data Sharing Eligibility
+            </div>
+            <div style={{ fontSize: 11, color: "#90B4D4", letterSpacing: 1, textTransform: "uppercase" }}>
+              NDMO Classification Framework · ZATCA
+            </div>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: "#5A8AB8", textAlign: "right" }}>
+          <div>National Data Governance</div>
+          <div>Interim Regulations v1 · June 2020</div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px" }}>
+
+        {/* Upload zone */}
+        {!result && (
+          <div
+            onDrop={handleDrop}
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onClick={() => !file && inputRef.current?.click()}
+            style={{
+              border: `2px dashed ${dragOver ? "#2E7D32" : file ? "#1A4B8C" : "#2A4A6E"}`,
+              borderRadius: 16, padding: "48px 32px", textAlign: "center",
+              background: dragOver ? "rgba(46,125,50,0.08)" : file ? "rgba(26,75,140,0.08)" : "rgba(255,255,255,0.02)",
+              cursor: file ? "default" : "pointer",
+              transition: "all 0.2s", marginBottom: 24,
+            }}
+          >
+            <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
+              onChange={e => handleFile(e.target.files[0])} />
+
+            {!file ? (
+              <>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>📂</div>
+                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+                  Drop your Excel or CSV file here
+                </div>
+                <div style={{ color: "#5A8AB8", fontSize: 13 }}>
+                  Supports .xlsx · .xls · .csv
+                </div>
+              </>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: 32, marginBottom: 4 }}>📊</div>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{file.name}</div>
+                  <div style={{ color: "#5A8AB8", fontSize: 12, marginTop: 4 }}>
+                    {rows.length} rows · {fields.length} fields detected
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={e => { e.stopPropagation(); setFile(null); setRows([]); setFields([]); setResult(null); }}
+                    style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #2A4A6E", background: "transparent", color: "#90B4D4", cursor: "pointer", fontSize: 13 }}>
+                    Change file
+                  </button>
+                  <button onClick={e => { e.stopPropagation(); analyse(); }}
+                    disabled={loading}
+                    style={{
+                      padding: "8px 20px", borderRadius: 8, border: "none",
+                      background: loading ? "#1A4B8C88" : "linear-gradient(135deg, #1A4B8C, #2E7D32)",
+                      color: "#fff", cursor: loading ? "not-allowed" : "pointer",
+                      fontWeight: 700, fontSize: 13,
+                    }}>
+                    {loading ? "Analysing…" : "🔍 Run Eligibility Check"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Fields preview */}
+        {file && !result && !loading && (
+          <div style={{
+            background: "rgba(255,255,255,0.03)", border: "1px solid #1E4080",
+            borderRadius: 12, padding: "16px 20px", marginBottom: 24,
+          }}>
+            <div style={{ fontSize: 12, color: "#5A8AB8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>
+              Detected Fields
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {fields.map(f => (
+                <span key={f} style={{
+                  padding: "4px 12px", borderRadius: 20, fontSize: 12,
+                  background: "rgba(26,75,140,0.3)", border: "1px solid #2A4A6E", color: "#90B4D4",
+                }}>
+                  {f}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Loading */}
+        {loading && (
+          <div style={{
+            textAlign: "center", padding: "64px 0",
+            background: "rgba(255,255,255,0.02)", borderRadius: 16,
+            border: "1px solid #1E4080",
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16, animation: "spin 2s linear infinite" }}>⚙️</div>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Classifying fields…</div>
+            <div style={{ color: "#5A8AB8", fontSize: 13 }}>
+              Applying NDMO Section 4.3 classification &amp; Section 6 sharing rules
+            </div>
+            <style>{`@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div style={{
+            background: "#2D1014", border: "1px solid #B71C1C", borderRadius: 12,
+            padding: "16px 20px", color: "#EF9A9A", marginBottom: 24,
+          }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        {/* Results */}
+        {result && (() => {
+          const summary = result.dataset_summary;
+
+          return (
+            <>
+              {/* ── Overall verdict banner ── */}
+              <div style={{
+                background: `linear-gradient(135deg, ${cm.bg}22, ${cm.bg}44)`,
+                border: `2px solid ${vm.color}55`,
+                borderLeft: `6px solid ${vm.color}`,
+                borderRadius: 16, padding: "28px 32px", marginBottom: 24,
+                display: "flex", alignItems: "center", gap: 28, flexWrap: "wrap",
+              }}>
+                <div style={{
+                  width: 72, height: 72, borderRadius: "50%",
+                  background: vm.bg, border: `3px solid ${vm.color}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 32, color: vm.color, fontWeight: 900, flexShrink: 0,
+                }}>
+                  {vm.icon}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: vm.color }}>
+                    {vm.label}
+                  </div>
+                  <div style={{ color: "#90B4D4", marginTop: 4, fontSize: 14 }}>
+                    Overall dataset classification:{" "}
+                    <strong style={{ color: "#E8EDF5" }}>{summary.overall_classification}</strong>
+                    {" "}· governed by field:{" "}
+                    <em style={{ color: "#FFD580" }}>{summary.governing_field}</em>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    onClick={() => { setResult(null); setFile(null); setRows([]); setFields([]); }}
+                    style={{ padding: "10px 18px", borderRadius: 8, border: "1px solid #2A4A6E", background: "transparent", color: "#90B4D4", cursor: "pointer", fontSize: 13 }}>
+                    ← New File
+                  </button>
+                  <button
+                    onClick={() => downloadExcel(result, file.name)}
+                    style={{
+                      padding: "10px 20px", borderRadius: 8, border: "none",
+                      background: "linear-gradient(135deg, #1B5E20, #2E7D32)",
+                      color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 13,
+                    }}>
+                    ⬇ Download Excel
+                  </button>
+                </div>
+              </div>
+
+              {/* ── 3 recipient cards ── */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 24 }}>
+                {RECIPIENTS.map(r => {
+                  const e = summary.overall_sharing_eligibility[r.key];
+                  const v = VERDICT_META[e.verdict] || VERDICT_META["CANNOT SHARE"];
+                  return (
+                    <div key={r.key} style={{
+                      background: "rgba(255,255,255,0.03)",
+                      border: `1px solid ${v.color}55`,
+                      borderTop: `4px solid ${v.color}`,
+                      borderRadius: 12, padding: "20px 18px",
+                    }}>
+                      <div style={{ fontSize: 22, marginBottom: 6 }}>{r.icon}</div>
+                      <div style={{ fontSize: 13, color: "#90B4D4", marginBottom: 8 }}>{r.label}</div>
+                      <VerdictBadge verdict={e.verdict} />
+                      {(e.conditions_required || []).length > 0 && (
+                        <ul style={{ marginTop: 12, paddingLeft: 16, fontSize: 11, color: "#7A9EC0", lineHeight: 1.7 }}>
+                          {e.conditions_required.map((c, i) => <li key={i}>{c}</li>)}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* ── Anonymization tip ── */}
+              {summary.can_be_shared_after_anonymization && (
+                <div style={{
+                  background: "rgba(27,94,32,0.12)", border: "1px solid #2E7D3255",
+                  borderRadius: 12, padding: "16px 20px", marginBottom: 24,
+                  display: "flex", gap: 16, alignItems: "flex-start",
+                }}>
+                  <span style={{ fontSize: 22 }}>💡</span>
+                  <div>
+                    <div style={{ fontWeight: 700, color: "#81C784", marginBottom: 4 }}>
+                      Shareable after anonymization
+                    </div>
+                    <div style={{ fontSize: 13, color: "#90B4D4" }}>
+                      Remove or mask the following fields:{" "}
+                      <strong style={{ color: "#FFD580" }}>
+                        {(summary.fields_to_remove_or_mask || []).join(", ")}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Recommended actions ── */}
+              <div style={{
+                background: "rgba(26,75,140,0.12)", border: "1px solid #1A4B8C55",
+                borderRadius: 12, padding: "20px 24px", marginBottom: 28,
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#90B4D4", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>
+                  📋 Recommended Actions
+                </div>
+                <ol style={{ paddingLeft: 20, margin: 0, fontSize: 13, color: "#C8D8EA", lineHeight: 2 }}>
+                  {(summary.recommended_actions || []).map((a, i) => <li key={i}>{a}</li>)}
+                </ol>
+              </div>
+
+              {/* ── Field-by-field table ── */}
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#5A8AB8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>
+                Field-by-Field Assessment
+              </div>
+              <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid #1E4080" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: "#0D2E5C" }}>
+                      {["Field", "Classification", "PII", "General Public", "Private Sector", "Gov. Entities", "Justification"].map(h => (
+                        <th key={h} style={{ padding: "12px 14px", textAlign: "left", fontSize: 11, color: "#5A8AB8", fontWeight: 700, letterSpacing: 0.5, borderBottom: "1px solid #1E4080" }}>
+                          {h.toUpperCase()}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.field_assessments.map((f, idx) => {
+                      const expanded = expandedField === f.field_name;
+                      return (
+                        <>
+                          <tr key={f.field_name}
+                            onClick={() => setExpandedField(expanded ? null : f.field_name)}
+                            style={{
+                              background: idx % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent",
+                              cursor: "pointer", transition: "background 0.15s",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = "rgba(26,75,140,0.15)"}
+                            onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent"}
+                          >
+                            <td style={{ padding: "12px 14px", fontWeight: 600, color: "#E8EDF5", borderBottom: "1px solid #1E408033" }}>
+                              {f.field_name}
+                            </td>
+                            <td style={{ padding: "12px 14px", borderBottom: "1px solid #1E408033" }}>
+                              <ClassificationBadge level={f.classification_level} code={f.classification_code} />
+                            </td>
+                            <td style={{ padding: "12px 14px", borderBottom: "1px solid #1E408033" }}>
+                              {f.is_pii
+                                ? <span style={{ color: "#FF8A65", fontWeight: 700, fontSize: 12 }}>⚠ PII</span>
+                                : <span style={{ color: "#5A8AB8", fontSize: 12 }}>—</span>}
+                            </td>
+                            {["general_public", "private_sector", "government_entities"].map(rk => (
+                              <td key={rk} style={{ padding: "12px 14px", borderBottom: "1px solid #1E408033" }}>
+                                <VerdictBadge verdict={f.sharing_eligibility[rk].verdict} small />
+                              </td>
+                            ))}
+                            <td style={{ padding: "12px 14px", borderBottom: "1px solid #1E408033", color: "#7A9EC0", fontSize: 12, maxWidth: 240 }}>
+                              {expanded ? f.justification : f.justification?.substring(0, 60) + (f.justification?.length > 60 ? "…" : "")}
+                            </td>
+                          </tr>
+                          {expanded && (
+                            <tr key={f.field_name + "_exp"}>
+                              <td colSpan={7} style={{ background: "rgba(26,75,140,0.08)", padding: "12px 24px", borderBottom: "1px solid #1E4080" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                                  {["general_public", "private_sector", "government_entities"].map(rk => {
+                                    const e = f.sharing_eligibility[rk];
+                                    const rec = RECIPIENTS.find(r => r.key === rk);
+                                    return (
+                                      <div key={rk} style={{ fontSize: 12, color: "#90B4D4" }}>
+                                        <div style={{ fontWeight: 700, marginBottom: 4 }}>{rec.icon} {rec.label}</div>
+                                        <VerdictBadge verdict={e.verdict} small />
+                                        {e.condition && <div style={{ marginTop: 6, color: "#7A9EC0" }}>{e.condition}</div>}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Footer note */}
+              <div style={{ marginTop: 20, textAlign: "center", color: "#2A4A6E", fontSize: 11 }}>
+                Assessment based on NDMO National Data Governance Interim Regulations v1 · June 2020 · Sections 4.3 and 6
+              </div>
+            </>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+The app does the following end to end:
+Upload — drag and drop or click to upload any .xlsx, .xls, or .csv. It reads the file client-side with SheetJS, extracts all field names and up to 5 sample rows.
+Analysis — sends field names + sample data to Claude with the full NDMO Section 4.3 classification rules and Section 6 sharing eligibility rules baked into the prompt. Claude returns structured JSON only.
+On-screen output — four sections: (1) overall verdict banner with the worst-case classification and governing field, (2) three recipient cards (General Public / Private Sector / Gov. Entities) each with verdict + conditions, (3) anonymization tip if the report can be rescued by masking specific fields, (4) full field-by-field table where clicking any row expands the per-recipient conditions.
+Excel download — two sheets: Summary with the overall verdict and recommended actions, and Field Assessment with all 13 columns per field.
