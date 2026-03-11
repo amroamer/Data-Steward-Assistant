@@ -219,8 +219,8 @@ export default function BiAgentPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: 8, background: "linear-gradient(135deg, #1A4B8C, #2E7D32)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🧠</div>
             <div>
-              <div style={{ fontWeight: 800, fontSize: 15 }}>BI Agent</div>
-              <div style={{ fontSize: 10, color: "#5A8AB8", textTransform: "uppercase", letterSpacing: 1 }}>ZATCA Intelligence</div>
+              <div style={{ fontWeight: 800, fontSize: 15 }}>{isRtl ? "وكيل BI" : "BI Agent"}</div>
+              <div style={{ fontSize: 10, color: "#5A8AB8", textTransform: "uppercase", letterSpacing: 1 }}>{isRtl ? "ذكاء هيئة الزكاة" : "ZATCA Intelligence"}</div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -378,10 +378,18 @@ export default function BiAgentPage() {
                     <div style={{ marginBottom: 14 }}>
                       <label style={{ fontSize: 11, color: "#5A8AB8", display: "block", marginBottom: 6 }}>{isRtl ? "فئات الاختبار" : "Test categories"}</label>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        {["Data completeness", "Data accuracy", "Business rules", "Edge cases", "Security & governance", "Performance thresholds", "Formatting & presentation"].map(cat => (
+                        {([
+                          ["Data completeness", "اكتمال البيانات"],
+                          ["Data accuracy", "دقة البيانات"],
+                          ["Business rules", "قواعد العمل"],
+                          ["Edge cases", "حالات حدية"],
+                          ["Security & governance", "الأمن والحوكمة"],
+                          ["Performance thresholds", "حدود الأداء"],
+                          ["Formatting & presentation", "التنسيق والعرض"],
+                        ] as [string, string][]).map(([cat, catAr]) => (
                           <label key={cat} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: testCategories.includes(cat) ? "#E8EDF5" : "#5A8AB8", cursor: "pointer" }}>
                             <input type="checkbox" checked={testCategories.includes(cat)} onChange={() => toggleCategory(cat)} style={{ accentColor: "#2E7D32" }} />
-                            {cat}
+                            {isRtl ? catAr : cat}
                           </label>
                         ))}
                       </div>
