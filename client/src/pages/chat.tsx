@@ -2569,15 +2569,6 @@ export default function ChatPage() {
             {t.sharingEligibility}
           </Link>
           <Link
-            href="/bi-agent"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
-            style={{ color: "#6B7280" }}
-            data-testid="link-bi-agent"
-          >
-            <Brain className="w-3.5 h-3.5" />
-            {t.biAgent}
-          </Link>
-          <Link
             href="/user-guide"
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
             style={{ color: "#6B7280" }}
@@ -2638,6 +2629,15 @@ export default function ChatPage() {
                 <span>{t[tab.labelKey] as string}</span>
               </button>
             ))}
+            <a
+              href="/bi-agent"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{ color: "#6B7280" }}
+              data-testid="tab-agent-bi"
+            >
+              <Brain className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>{t.biAgent as string}</span>
+            </a>
           </div>
         )}
 
