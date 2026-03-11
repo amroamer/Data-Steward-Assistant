@@ -72,6 +72,10 @@ import {
   Zap,
   TrendingUp,
   Share2,
+  LayoutDashboard,
+  FileSearch,
+  ListChecks,
+  Monitor,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -534,6 +538,64 @@ const translations = {
     generationStopped: "Generation Stopped",
     stoppedMessage: "The analysis was stopped before it completed. No results were saved.",
     clearInput: "Clear",
+    newChatBi: "New BI Agent",
+    biHeroTitle: "BI Agent — Business Intelligence",
+    biHeroDesc: "Upload an Excel or CSV file, then use the BI tools below to analyse sharing eligibility, design dashboards, test reports, and generate test cases.",
+    biUploadPrompt: "Upload an Excel or CSV file to start",
+    biInfoCard1: "Sharing Eligibility",
+    biInfoCard1Desc: "Check if your dataset can be shared per NDMO rules",
+    biInfoCard2: "Dashboard Designer",
+    biInfoCard2Desc: "Generate Power BI dashboard blueprints with KPIs",
+    biInfoCard3: "Report Tester",
+    biInfoCard3Desc: "Audit BI reports for governance, quality & logic issues",
+    biInfoCard4: "Test Cases",
+    biInfoCard4Desc: "Auto-generate UAT test cases for your report",
+    biInfoCard5: "Dashboard Tester",
+    biInfoCard5Desc: "Generate dashboard-specific test cases with visual checks",
+    biCardSharing: "Sharing Eligibility",
+    biCardSharingDesc: "Analyse dataset sharing eligibility per NDMO",
+    biCardDashboard: "Dashboard Designer",
+    biCardDashboardDesc: "Design Power BI dashboards with KPI cards & visuals",
+    biCardReport: "Report Tester",
+    biCardReportDesc: "Audit BI reports for data quality & governance",
+    biCardTestCases: "Test Case Generator",
+    biCardTestCasesDesc: "Generate UAT test cases for BI reports",
+    biCardDashTest: "Dashboard Tester",
+    biCardDashTestDesc: "Dashboard-specific test cases with visual checks",
+    biRunBtn: "Run",
+    biStopBtn: "Stop",
+    biDownloadReport: "Download bi_agent_report.xlsx",
+    biAnalysisComplete: "BI analysis complete",
+    biDownloadXlsx: "Download .xlsx",
+    biClassification: "Classification:",
+    biGoverning: "Governing:",
+    biApprovalChecklist: "Approval Checklist",
+    biField: "Field",
+    biClass: "Class",
+    biVerdict: "Verdict",
+    biDetail: "Detail:",
+    biGovernance: "Governance",
+    biDataQuality: "Data Quality",
+    biBusinessLogic: "Business Logic",
+    biPresentation: "Presentation",
+    biPreSendChecklist: "Pre-Send Checklist",
+    biTotal: "Total",
+    biCritical: "Critical",
+    biProgress: "Progress:",
+    biAll: "All",
+    biExportTestRun: "Export Test Run",
+    biObjective: "Objective:",
+    biSteps: "Steps:",
+    biExpected: "Expected:",
+    biPass: "Pass",
+    biFail: "Fail",
+    biGovRisk: "Gov Risk",
+    biGrade: "Grade",
+    biMoreTestCases: "more test cases",
+    biGeneralPublic: "General Public",
+    biPrivateSector: "Private Sector",
+    biGovEntities: "Gov. Entities",
+    biSidebarDownload: "Download BI Report",
   },
   ar: {
     newChat: "وكيل مالك بيانات جديد",
@@ -747,6 +809,64 @@ const translations = {
     generationStopped: "تم إيقاف المعالجة",
     stoppedMessage: "تم إيقاف التحليل قبل اكتماله. لم يتم حفظ أي نتائج.",
     clearInput: "مسح",
+    newChatBi: "وكيل BI جديد",
+    biHeroTitle: "وكيل BI — ذكاء الأعمال",
+    biHeroDesc: "حمّل ملف Excel أو CSV واستخدم أدوات BI لتحليل أهلية المشاركة وتصميم لوحات المعلومات وفحص التقارير وإنشاء حالات الاختبار.",
+    biUploadPrompt: "حمّل ملف Excel أو CSV للبدء",
+    biInfoCard1: "أهلية المشاركة",
+    biInfoCard1Desc: "تحقق مما إذا كان يمكن مشاركة بياناتك وفقًا لقواعد NDMO",
+    biInfoCard2: "مصمم لوحات المعلومات",
+    biInfoCard2Desc: "إنشاء مخططات لوحات Power BI مع مؤشرات الأداء",
+    biInfoCard3: "فاحص التقارير",
+    biInfoCard3Desc: "فحص تقارير BI للحوكمة والجودة والمنطق",
+    biInfoCard4: "حالات الاختبار",
+    biInfoCard4Desc: "إنشاء حالات اختبار UAT تلقائيًا لتقريرك",
+    biInfoCard5: "فاحص لوحات المعلومات",
+    biInfoCard5Desc: "حالات اختبار خاصة بلوحات المعلومات مع فحص المرئيات",
+    biCardSharing: "أهلية المشاركة",
+    biCardSharingDesc: "تحليل أهلية مشاركة البيانات وفقًا لـ NDMO",
+    biCardDashboard: "مصمم لوحات المعلومات",
+    biCardDashboardDesc: "تصميم لوحات Power BI مع بطاقات KPI والمرئيات",
+    biCardReport: "فاحص التقارير",
+    biCardReportDesc: "فحص تقارير BI لجودة البيانات والحوكمة",
+    biCardTestCases: "مولد حالات الاختبار",
+    biCardTestCasesDesc: "إنشاء حالات اختبار UAT لتقارير BI",
+    biCardDashTest: "فاحص لوحات المعلومات",
+    biCardDashTestDesc: "حالات اختبار خاصة بلوحات المعلومات مع فحص المرئيات",
+    biRunBtn: "تشغيل",
+    biStopBtn: "إيقاف",
+    biDownloadReport: "تنزيل bi_agent_report.xlsx",
+    biAnalysisComplete: "اكتمل تحليل BI",
+    biDownloadXlsx: "تنزيل .xlsx",
+    biClassification: "التصنيف:",
+    biGoverning: "الحقل المهيمن:",
+    biApprovalChecklist: "قائمة الموافقات",
+    biField: "الحقل",
+    biClass: "التصنيف",
+    biVerdict: "الحكم",
+    biDetail: "التفاصيل:",
+    biGovernance: "الحوكمة",
+    biDataQuality: "جودة البيانات",
+    biBusinessLogic: "منطق الأعمال",
+    biPresentation: "العرض",
+    biPreSendChecklist: "قائمة ما قبل الإرسال",
+    biTotal: "المجموع",
+    biCritical: "حرجة",
+    biProgress: "التقدم:",
+    biAll: "الكل",
+    biExportTestRun: "تصدير نتائج الاختبار",
+    biObjective: "الهدف:",
+    biSteps: "الخطوات:",
+    biExpected: "المتوقع:",
+    biPass: "✓ نجح",
+    biFail: "✕ فشل",
+    biGovRisk: "مخاطر الحوكمة",
+    biGrade: "الدرجة",
+    biMoreTestCases: "حالات اختبار إضافية",
+    biGeneralPublic: "عام",
+    biPrivateSector: "قطاع خاص",
+    biGovEntities: "جهات حكومية",
+    biSidebarDownload: "تنزيل تقرير BI",
   },
 } as const;
 
@@ -877,6 +997,56 @@ const FEATURE_CARDS = [
     bg: "bg-[#7C3AED]/5",
     iconBg: "bg-[#7C3AED]/10",
     agentMode: "nudge" as const,
+  },
+  {
+    icon: Share2,
+    title: "Sharing Eligibility",
+    description: "Analyse dataset sharing eligibility per NDMO",
+    prompt: "",
+    color: "text-[#1A4B8C]",
+    bg: "bg-[#1A4B8C]/5",
+    iconBg: "bg-[#1A4B8C]/10",
+    agentMode: "bi" as const,
+  },
+  {
+    icon: LayoutDashboard,
+    title: "Dashboard Designer",
+    description: "Design Power BI dashboards with KPI cards & visuals",
+    prompt: "",
+    color: "text-[#1A4B8C]",
+    bg: "bg-[#1A4B8C]/5",
+    iconBg: "bg-[#1A4B8C]/10",
+    agentMode: "bi" as const,
+  },
+  {
+    icon: FileSearch,
+    title: "Report Tester",
+    description: "Audit BI reports for data quality & governance",
+    prompt: "",
+    color: "text-[#1A4B8C]",
+    bg: "bg-[#1A4B8C]/5",
+    iconBg: "bg-[#1A4B8C]/10",
+    agentMode: "bi" as const,
+  },
+  {
+    icon: ListChecks,
+    title: "Test Case Generator",
+    description: "Generate UAT test cases for BI reports",
+    prompt: "",
+    color: "text-[#1A4B8C]",
+    bg: "bg-[#1A4B8C]/5",
+    iconBg: "bg-[#1A4B8C]/10",
+    agentMode: "bi" as const,
+  },
+  {
+    icon: Monitor,
+    title: "Dashboard Tester",
+    description: "Dashboard-specific test cases with visual checks",
+    prompt: "",
+    color: "text-[#1A4B8C]",
+    bg: "bg-[#1A4B8C]/5",
+    iconBg: "bg-[#1A4B8C]/10",
+    agentMode: "bi" as const,
   },
 ];
 
@@ -1425,7 +1595,7 @@ function SidebarContent({
           data-testid="button-new-chat"
         >
           <Plus className="w-4 h-4" />
-          {agentMode === "data-model" ? t.newChatDataModel : agentMode === "insights" ? t.newChatInsights : t.newChatDataManagement}
+          {agentMode === "data-model" ? t.newChatDataModel : agentMode === "insights" ? t.newChatInsights : agentMode === "nudge" ? t.newChatNudge : agentMode === "bi" ? t.newChatBi : t.newChatDataManagement}
         </Button>
       </div>
     </div>
@@ -2816,7 +2986,7 @@ export default function ChatPage() {
               { id: "data-model", icon: Layers, labelKey: "agentDataModel", descKey: "agentDataModelDesc", color: "#774896", href: null as string | null },
               { id: "insights", icon: Brain, labelKey: "agentInsights", descKey: "agentInsightsDesc", color: "#067647", href: null as string | null },
               { id: "nudge", icon: Target, labelKey: "agentNudge", descKey: "agentDataMgmtDesc", color: "#7C3AED", href: null as string | null },
-              { id: "bi", icon: Brain, labelKey: "biAgent", descKey: "agentDataMgmtDesc", color: "#1A4B8C", href: null as string | null },
+              { id: "bi", icon: BarChart3, labelKey: "biAgent", descKey: "agentDataMgmtDesc", color: "#1A4B8C", href: null as string | null },
             ]).map((tab) => (
               <button
                 key={tab.id}
@@ -2866,10 +3036,10 @@ export default function ChatPage() {
               {!activeConversationId && messages.length === 0 && !isStreaming ? (
                 <div className="flex flex-col items-center justify-center pt-8">
                   <h2 className="text-2xl font-bold mb-2 tracking-tight font-main" style={{ color: agentMode === "nudge" ? "#7C3AED" : agentMode === "bi" ? "#1A4B8C" : "#2563EB" }} data-testid="text-hero-title">
-                    {agentMode === "nudge" ? t.nudgeHeroTitle as string : agentMode === "bi" ? (lang === "ar" ? "وكيل BI — ذكاء الأعمال" : "BI Agent — Business Intelligence") : t.whatToDo}
+                    {agentMode === "nudge" ? t.nudgeHeroTitle as string : agentMode === "bi" ? t.biHeroTitle as string : t.whatToDo}
                   </h2>
                   <p className="text-center mb-8 max-w-md text-sm leading-relaxed" style={{ color: "#6B7280" }}>
-                    {agentMode === "nudge" ? t.nudgeHeroDesc as string : agentMode === "bi" ? (lang === "ar" ? "حمّل ملف Excel أو CSV واستخدم أدوات BI لتحليل أهلية المشاركة وتصميم لوحات المعلومات وفحص التقارير وإنشاء حالات الاختبار." : "Upload an Excel or CSV file, then use the BI tools below to analyse sharing eligibility, design dashboards, test reports, and generate test cases.") : agentMode === "insights" ? t.agentInsightsDesc : agentMode === "data-model" ? t.agentDataModelDesc : t.heroDescription}
+                    {agentMode === "nudge" ? t.nudgeHeroDesc as string : agentMode === "bi" ? t.biHeroDesc as string : agentMode === "insights" ? t.agentInsightsDesc : agentMode === "data-model" ? t.agentDataModelDesc : t.heroDescription}
                   </p>
                   {agentMode === "nudge" && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-3xl mb-8">
@@ -2913,7 +3083,7 @@ export default function ChatPage() {
                         >
                           <input ref={biFileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleBiFile(e.target.files?.[0] ?? null)} data-testid="bi-input-file" />
                           <div className="text-5xl mb-4">📂</div>
-                          <div className="text-lg font-bold text-gray-800 mb-2">{lang === "ar" ? "أسقط ملف Excel أو CSV هنا" : "Drop your Excel or CSV file here"}</div>
+                          <div className="text-lg font-bold text-gray-800 mb-2">{t.biUploadPrompt as string}</div>
                           <div className="text-sm text-gray-500">.xlsx · .xls · .csv</div>
                         </div>
                       ) : (
@@ -2928,16 +3098,18 @@ export default function ChatPage() {
                           </div>
                         </div>
                       )}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                         {([
-                          { icon: "🔍", title: lang === "ar" ? "أهلية المشاركة" : "Sharing Eligibility", desc: lang === "ar" ? "تقييم أهلية البيانات للمشاركة" : "Assess data sharing eligibility per NDMO rules", color: "#1A4B8C" },
-                          { icon: "📐", title: lang === "ar" ? "مصمم لوحة المعلومات" : "Dashboard Designer", desc: lang === "ar" ? "تصميم لوحات Power BI تلقائيًا" : "Auto-design Power BI dashboards with DAX", color: "#2E7D32" },
-                          { icon: "🔬", title: lang === "ar" ? "فاحص التقارير" : "Report Tester", desc: lang === "ar" ? "فحص جودة وحوكمة التقارير" : "Test report quality, governance & presentation", color: "#E65100" },
-                        ]).map(({ icon, title, desc, color }, i) => (
+                          { icon: "🔍", titleKey: "biInfoCard1" as const, descKey: "biInfoCard1Desc" as const, color: "#1A4B8C" },
+                          { icon: "📐", titleKey: "biInfoCard2" as const, descKey: "biInfoCard2Desc" as const, color: "#2E7D32" },
+                          { icon: "🔬", titleKey: "biInfoCard3" as const, descKey: "biInfoCard3Desc" as const, color: "#E65100" },
+                          { icon: "📋", titleKey: "biInfoCard4" as const, descKey: "biInfoCard4Desc" as const, color: "#774896" },
+                          { icon: "🖥️", titleKey: "biInfoCard5" as const, descKey: "biInfoCard5Desc" as const, color: "#0D2E5C" },
+                        ]).map(({ icon, titleKey, descKey, color }, i) => (
                           <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                             <div className="text-2xl mb-3">{icon}</div>
-                            <h3 className="font-bold text-sm mb-1" style={{ color }}>{title}</h3>
-                            <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
+                            <h3 className="font-bold text-sm mb-1" style={{ color }}>{t[titleKey] as string}</h3>
+                            <p className="text-xs text-gray-500 leading-relaxed">{t[descKey] as string}</p>
                           </div>
                         ))}
                       </div>
@@ -3101,7 +3273,7 @@ export default function ChatPage() {
                     >
                       <input ref={biFileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleBiFile(e.target.files?.[0] ?? null)} />
                       <Upload className="w-4 h-4" style={{ color: "rgba(255,255,255,0.5)" }} />
-                      <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.6)" }}>{lang === "ar" ? "حمّل ملف Excel أو CSV للبدء" : "Upload an Excel or CSV file to start"}</span>
+                      <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.6)" }}>{t.biUploadPrompt as string}</span>
                     </div>
                   ) : (
                     <>
@@ -3141,14 +3313,14 @@ export default function ChatPage() {
                           </button>
                         ) : (
                           <Button onClick={biRunAnalysis} className="h-9 px-4 flex-shrink-0 rounded-lg gap-1.5 text-xs font-medium text-white ripple-button" style={{ backgroundColor: "#2E7D32" }} disabled={!biFields.length || biLoading} data-testid="bi-run-btn">
-                            {lang === "ar" ? "تشغيل" : "Run"} <Play className="w-3.5 h-3.5" />
+                            {t.biRunBtn as string} <Play className="w-3.5 h-3.5" />
                           </Button>
                         )}
                       </div>
                       {hasBiSheets() && (
                         <div className="mt-2 flex justify-end">
                           <button onClick={() => downloadBiReport()} className="text-[10px] font-semibold px-3 py-1 rounded-lg" style={{ background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff" }} data-testid="bi-download-report">
-                            ⬇ {lang === "ar" ? "تحميل bi_agent_report.xlsx" : "Download bi_agent_report.xlsx"}
+                            ⬇ {t.biDownloadReport as string}
                           </button>
                         </div>
                       )}
@@ -3456,6 +3628,25 @@ function OutputsPanel({
                         </div>
                       </div>
                     ))}
+                    {hasBiSheets() && (
+                      <div
+                        className="rounded-lg border p-3 cursor-pointer hover:shadow-sm transition-shadow bg-white"
+                        style={{ borderColor: "#E5E7EB" }}
+                        onClick={() => downloadBiReport()}
+                        data-testid="output-card-bi-report"
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileSpreadsheet className="w-5 h-5" style={{ color: "#1A4B8C" }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold" style={{ color: "#1A1A2E" }}>bi_agent_report.xlsx</p>
+                            <p className="text-[10px]" style={{ color: "#6B7280" }}>{t.biSidebarDownload}</p>
+                          </div>
+                          <Button size="sm" className="h-7 px-2 text-[10px] text-white" style={{ backgroundColor: "#1A4B8C" }} onClick={(e) => { e.stopPropagation(); downloadBiReport(); }} data-testid="button-sidebar-bi-download">
+                            <Download className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-[10px] py-3 text-center" style={{ color: "#9CA3AF" }}>{t.noOutputsYet}</p>
@@ -4163,27 +4354,28 @@ function NudgeResultCard({ report, t }: { report: NudgeReport; t: Translation })
 
 function BiResultCard({ biReport, isRtl, lang }: { biReport: BiReport; isRtl: boolean; lang: Lang }) {
   const { tab, data } = biReport;
+  const t = translations[lang];
   const [biTcStatus, setBiTcStatus] = useState<Record<string, "pass" | "fail" | null>>({});
   return (
     <div className="space-y-3 mt-2" data-testid="bi-result-card">
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#1A4B8C", color: "#ffffff" }}>BI {BI_TABS.find(t => t.key === tab)?.label || tab}</span>
+        <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#1A4B8C", color: "#ffffff" }}>BI {BI_TABS.find(tb => tb.key === tab)?.label || tab}</span>
         {hasBiSheets() && (
           <button onClick={() => downloadBiReport()} className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#2E7D32", color: "#fff" }} data-testid="bi-result-download">
-            ⬇ {isRtl ? "تحميل" : "Download"} .xlsx
+            ⬇ {t.biDownloadXlsx as string}
           </button>
         )}
       </div>
-      {tab === "sharing" && <BiSharingResult data={data} isRtl={isRtl} />}
-      {tab === "dashboard" && <BiDashboardResult data={data} isRtl={isRtl} />}
-      {tab === "report" && <BiReportResult data={data} isRtl={isRtl} />}
-      {tab === "testcases" && <BiTestCaseResult data={data} isRtl={isRtl} testStatus={biTcStatus} setTestStatus={setBiTcStatus} />}
-      {tab === "dashtest" && <BiDashboardTestResult data={data} isRtl={isRtl} testStatus={biTcStatus} setTestStatus={setBiTcStatus} />}
+      {tab === "sharing" && <BiSharingResult data={data} t={t} />}
+      {tab === "dashboard" && <BiDashboardResult data={data} t={t} />}
+      {tab === "report" && <BiReportResult data={data} t={t} />}
+      {tab === "testcases" && <BiTestCaseResult data={data} t={t} testStatus={biTcStatus} setTestStatus={setBiTcStatus} />}
+      {tab === "dashtest" && <BiDashboardTestResult data={data} t={t} testStatus={biTcStatus} setTestStatus={setBiTcStatus} />}
     </div>
   );
 }
 
-function BiSharingResult({ data, isRtl }: { data: Record<string, unknown>; isRtl: boolean }) {
+function BiSharingResult({ data, t }: { data: Record<string, unknown>; t: Translation }) {
   const [expandedField, setExpandedField] = useState<string | null>(null);
   const verdict = String(data.overall_verdict || "BLOCKED");
   const vc = BI_VERDICT_COLORS[verdict] || BI_VERDICT_COLORS.BLOCKED;
@@ -4197,16 +4389,16 @@ function BiSharingResult({ data, isRtl }: { data: Record<string, unknown>; isRtl
         <div className="text-lg font-extrabold mb-1" style={{ color: vc.fg }}>{verdict}</div>
         <div className="text-xs mb-2" style={{ color: "#6B7280" }}>{String(data.verdict_rationale || "")}</div>
         <div className="flex gap-4 flex-wrap text-xs">
-          <span style={{ color: "#6B7280" }}>{isRtl ? "التصنيف:" : "Classification:"} <strong style={{ color: "#1A1A2E" }}>{String(data.overall_classification || "")}</strong></span>
-          <span style={{ color: "#6B7280" }}>{isRtl ? "الحقل المهيمن:" : "Governing:"} <strong style={{ color: "#E65100" }}>{String(data.governing_field || "")}</strong></span>
+          <span style={{ color: "#6B7280" }}>{t.biClassification as string} <strong style={{ color: "#1A1A2E" }}>{String(data.overall_classification || "")}</strong></span>
+          <span style={{ color: "#6B7280" }}>{t.biGoverning as string} <strong style={{ color: "#E65100" }}>{String(data.governing_field || "")}</strong></span>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2 mb-3">
         {[
-          { label: isRtl ? "عام" : "General Public", tier: "PUBLIC" },
-          { label: isRtl ? "قطاع خاص" : "Private Sector", tier: "PRIVATE_SECTOR" },
-          { label: isRtl ? "جهات حكومية" : "Gov. Entities", tier: "INTERNAL_GOV" },
+          { label: t.biGeneralPublic as string, tier: "PUBLIC" },
+          { label: t.biPrivateSector as string, tier: "PRIVATE_SECTOR" },
+          { label: t.biGovEntities as string, tier: "INTERNAL_GOV" },
         ].map(rec => {
           const tierAssess = assessments.map(f => {
             const cls = String(f.classification_code || "P");
@@ -4232,7 +4424,7 @@ function BiSharingResult({ data, isRtl }: { data: Record<string, unknown>; isRtl
 
       {checklist.length > 0 && (
         <div className="rounded-lg p-3 mb-3 border" style={{ borderColor: "#E6510044", backgroundColor: "#FFF3E0" }} data-testid="approval-checklist">
-          <div className="text-xs font-bold mb-2" style={{ color: "#E65100" }}>📋 {isRtl ? "قائمة الموافقات" : "Approval Checklist"}</div>
+          <div className="text-xs font-bold mb-2" style={{ color: "#E65100" }}>📋 {t.biApprovalChecklist as string}</div>
           {checklist.map((item, i) => (
             <label key={i} className="flex items-start gap-2 py-1 text-[11px] cursor-pointer" style={{ color: "#374151" }}>
               <input type="checkbox" checked={checkedItems.has(i)} onChange={() => setCheckedItems(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; })} style={{ accentColor: "#2E7D32", marginTop: 2 }} />
@@ -4247,7 +4439,7 @@ function BiSharingResult({ data, isRtl }: { data: Record<string, unknown>; isRtl
           <table className="w-full text-[10px]">
             <thead>
               <tr style={{ backgroundColor: "#F3F4F6" }}>
-                {[isRtl ? "الحقل" : "Field", isRtl ? "التصنيف" : "Class", "PII", isRtl ? "الحكم" : "Verdict"].map(h => (
+                {[t.biField as string, t.biClass as string, "PII", t.biVerdict as string].map(h => (
                   <th key={h} className="px-2 py-1.5 text-left font-semibold" style={{ color: "#6B7280", borderBottom: "1px solid #E5E7EB" }}>{h}</th>
                 ))}
               </tr>
@@ -4267,7 +4459,7 @@ function BiSharingResult({ data, isRtl }: { data: Record<string, unknown>; isRtl
                   </tr>
                   {expandedField === String(f.field_name) && (
                     <tr><td colSpan={4} className="px-3 py-2 text-[10px]" style={{ backgroundColor: "#F0F9FF", color: "#374151" }}>
-                      <div><strong>{isRtl ? "التفاصيل:" : "Detail:"}</strong> {String(f.remediation_detail || "—")}</div>
+                      <div><strong>{t.biDetail as string}</strong> {String(f.remediation_detail || "—")}</div>
                     </td></tr>
                   )}
                 </Fragment>
@@ -4281,7 +4473,7 @@ function BiSharingResult({ data, isRtl }: { data: Record<string, unknown>; isRtl
   );
 }
 
-function BiDashboardResult({ data, isRtl }: { data: Record<string, unknown>; isRtl: boolean }) {
+function BiDashboardResult({ data, t }: { data: Record<string, unknown>; t: Translation }) {
   const [activePage, setActivePage] = useState(0);
   const pages = (data.pages || []) as Record<string, unknown>[];
   const kpis = (data.kpis || []) as Record<string, unknown>[];
@@ -4339,7 +4531,7 @@ function BiDashboardResult({ data, isRtl }: { data: Record<string, unknown>; isR
   );
 }
 
-function BiReportResult({ data, isRtl }: { data: Record<string, unknown>; isRtl: boolean }) {
+function BiReportResult({ data, t }: { data: Record<string, unknown>; t: Translation }) {
   const [expandedSection, setExpandedSection] = useState<string | null>("governance");
   const verdict = String(data.governance_verdict || "BLOCKED");
   const sendRec = String(data.send_recommendation || "DO NOT SEND");
@@ -4358,10 +4550,10 @@ function BiReportResult({ data, isRtl }: { data: Record<string, unknown>; isRtl:
   const scoreColor = (v: number) => v >= 80 ? "#2E7D32" : v >= 60 ? "#F59E0B" : "#B71C1C";
 
   const sections = [
-    { key: "governance", label: isRtl ? "الحوكمة" : "Governance", issues: govIssues },
-    { key: "quality", label: isRtl ? "جودة البيانات" : "Data Quality", issues: dqIssues },
-    { key: "logic", label: isRtl ? "منطق الأعمال" : "Business Logic", issues: blIssues },
-    { key: "presentation", label: isRtl ? "العرض" : "Presentation", issues: prIssues },
+    { key: "governance", label: t.biGovernance as string, issues: govIssues },
+    { key: "quality", label: t.biDataQuality as string, issues: dqIssues },
+    { key: "logic", label: t.biBusinessLogic as string, issues: blIssues },
+    { key: "presentation", label: t.biPresentation as string, issues: prIssues },
   ];
 
   return (
@@ -4372,7 +4564,7 @@ function BiReportResult({ data, isRtl }: { data: Record<string, unknown>; isRtl:
         </div>
         <div>
           <div className="text-base font-extrabold" style={{ color: sendColor }}>{sendRec}</div>
-          <div className="text-[11px]" style={{ color: "#6B7280" }}>{isRtl ? "الحكم:" : "Governance:"} <strong style={{ color: vc.fg }}>{verdict}</strong> · {isRtl ? "الدرجة:" : "Grade:"} <strong>{grade}</strong></div>
+          <div className="text-[11px]" style={{ color: "#6B7280" }}>{t.biGovernance as string}: <strong style={{ color: vc.fg }}>{verdict}</strong> · {t.biGrade as string}: <strong>{grade}</strong></div>
         </div>
       </div>
 
@@ -4416,7 +4608,7 @@ function BiReportResult({ data, isRtl }: { data: Record<string, unknown>; isRtl:
 
       {checklist.length > 0 && (
         <div className="rounded-lg p-3 mt-2 border" style={{ borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }} data-testid="pre-send-checklist">
-          <div className="text-xs font-bold mb-2" style={{ color: "#1A4B8C" }}>✅ {isRtl ? "قائمة ما قبل الإرسال" : "Pre-Send Checklist"}</div>
+          <div className="text-xs font-bold mb-2" style={{ color: "#1A4B8C" }}>✅ {t.biPreSendChecklist as string}</div>
           {checklist.map((item, i) => (
             <label key={i} className="flex items-center gap-2 py-0.5 text-[11px] cursor-pointer" style={{ color: "#374151" }}>
               <input type="checkbox" checked={checkedItems.has(i)} onChange={() => setCheckedItems(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; })} style={{ accentColor: "#2E7D32" }} />
@@ -4429,7 +4621,7 @@ function BiReportResult({ data, isRtl }: { data: Record<string, unknown>; isRtl:
   );
 }
 
-function BiTestCaseResult({ data, isRtl, testStatus, setTestStatus }: { data: Record<string, unknown>; isRtl: boolean; testStatus: Record<string, "pass" | "fail" | null>; setTestStatus: (fn: (prev: Record<string, "pass" | "fail" | null>) => Record<string, "pass" | "fail" | null>) => void }) {
+function BiTestCaseResult({ data, t, testStatus, setTestStatus }: { data: Record<string, unknown>; t: Translation; testStatus: Record<string, "pass" | "fail" | null>; setTestStatus: (fn: (prev: Record<string, "pass" | "fail" | null>) => Record<string, "pass" | "fail" | null>) => void }) {
   const cases = (data.test_cases || []) as Record<string, unknown>[];
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [expandedCase, setExpandedCase] = useState<string | null>(null);
@@ -4446,16 +4638,16 @@ function BiTestCaseResult({ data, isRtl, testStatus, setTestStatus }: { data: Re
       <div className="flex gap-3 mb-3 flex-wrap">
         <div className="rounded-lg p-3 text-center border" style={{ borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }}>
           <div className="text-lg font-extrabold" style={{ color: "#1A1A2E" }}>{totalCases}</div>
-          <div className="text-[10px]" style={{ color: "#6B7280" }}>{isRtl ? "المجموع" : "Total"}</div>
+          <div className="text-[10px]" style={{ color: "#6B7280" }}>{t.biTotal as string}</div>
         </div>
         <div className="rounded-lg p-3 text-center border" style={{ borderColor: "#FECACA", backgroundColor: "#FEF2F2" }}>
           <div className="text-lg font-extrabold" style={{ color: "#DC2626" }}>{Number(data.critical_test_count || 0)}</div>
-          <div className="text-[10px]" style={{ color: "#6B7280" }}>{isRtl ? "حرجة" : "Critical"}</div>
+          <div className="text-[10px]" style={{ color: "#6B7280" }}>{t.biCritical as string}</div>
         </div>
       </div>
 
       <div className="rounded-lg p-2.5 mb-3 flex items-center gap-3 border" style={{ borderColor: "#E5E7EB" }} data-testid="test-progress">
-        <div className="text-[10px]" style={{ color: "#6B7280" }}>{isRtl ? "التقدم:" : "Progress:"}</div>
+        <div className="text-[10px]" style={{ color: "#6B7280" }}>{t.biProgress as string}</div>
         <div className="flex-1 rounded-full h-2.5 overflow-hidden flex" style={{ backgroundColor: "#E5E7EB" }}>
           {passed > 0 && <div style={{ width: `${(passed / totalCases) * 100}%`, backgroundColor: "#2E7D32", height: "100%" }} />}
           {failed > 0 && <div style={{ width: `${(failed / totalCases) * 100}%`, backgroundColor: "#DC2626", height: "100%" }} />}
@@ -4466,7 +4658,7 @@ function BiTestCaseResult({ data, isRtl, testStatus, setTestStatus }: { data: Re
       </div>
 
       <div className="flex gap-1 mb-3 flex-wrap">
-        <button onClick={() => setActiveCategory(null)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === null ? "#EFF6FF" : "transparent", color: activeCategory === null ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === null ? "#BFDBFE" : "#E5E7EB"}` }}>{isRtl ? "الكل" : "All"}</button>
+        <button onClick={() => setActiveCategory(null)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === null ? "#EFF6FF" : "transparent", color: activeCategory === null ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === null ? "#BFDBFE" : "#E5E7EB"}` }}>{t.biAll as string}</button>
         {categories.map(cat => (
           <button key={cat} onClick={() => setActiveCategory(cat)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === cat ? "#EFF6FF" : "transparent", color: activeCategory === cat ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === cat ? "#BFDBFE" : "#E5E7EB"}` }} data-testid={`cat-filter-${cat}`}>{cat}</button>
         ))}
@@ -4474,7 +4666,7 @@ function BiTestCaseResult({ data, isRtl, testStatus, setTestStatus }: { data: Re
 
       <div className="flex justify-end mb-2">
         <button onClick={() => { exportTestRunSheet(cases, testStatus); downloadBiReport(); }} className="text-[10px] font-semibold px-3 py-1 rounded-lg" style={{ background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff" }} data-testid="button-export-test-run">
-          ⬇ {isRtl ? "تصدير نتائج الاختبار" : "Export Test Run"}
+          ⬇ {t.biExportTestRun as string}
         </button>
       </div>
 
@@ -4494,27 +4686,27 @@ function BiTestCaseResult({ data, isRtl, testStatus, setTestStatus }: { data: Re
             </div>
             {expanded && (
               <div className="px-3 py-2 space-y-1.5 text-[11px]" style={{ backgroundColor: "#fff", color: "#374151" }}>
-                <div><strong>{isRtl ? "الهدف:" : "Objective:"}</strong> {String(tc.objective || "")}</div>
-                <div><strong>{isRtl ? "الخطوات:" : "Steps:"}</strong></div>
+                <div><strong>{t.biObjective as string}</strong> {String(tc.objective || "")}</div>
+                <div><strong>{t.biSteps as string}</strong></div>
                 <ol className="pl-4 list-decimal space-y-0.5">
                   {((tc.test_steps || []) as string[]).map((s, j) => <li key={j}>{s}</li>)}
                 </ol>
-                <div style={{ color: "#2E7D32" }}><strong>{isRtl ? "المتوقع:" : "Expected:"}</strong> {String(tc.expected_result || "")}</div>
+                <div style={{ color: "#2E7D32" }}><strong>{t.biExpected as string}</strong> {String(tc.expected_result || "")}</div>
                 <div className="flex gap-2 mt-2">
-                  <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "pass" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "pass" ? "#2E7D32" : "#D1D5DB"}`, backgroundColor: status === "pass" ? "#F0FDF4" : "transparent", color: status === "pass" ? "#2E7D32" : "#6B7280" }} data-testid={`btn-pass-${tcId}`}>{isRtl ? "✓ نجح" : "✓ Pass"}</button>
-                  <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "fail" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "fail" ? "#DC2626" : "#D1D5DB"}`, backgroundColor: status === "fail" ? "#FEF2F2" : "transparent", color: status === "fail" ? "#DC2626" : "#6B7280" }} data-testid={`btn-fail-${tcId}`}>{isRtl ? "✕ فشل" : "✕ Fail"}</button>
+                  <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "pass" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "pass" ? "#2E7D32" : "#D1D5DB"}`, backgroundColor: status === "pass" ? "#F0FDF4" : "transparent", color: status === "pass" ? "#2E7D32" : "#6B7280" }} data-testid={`btn-pass-${tcId}`}>{t.biPass as string}</button>
+                  <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "fail" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "fail" ? "#DC2626" : "#D1D5DB"}`, backgroundColor: status === "fail" ? "#FEF2F2" : "transparent", color: status === "fail" ? "#DC2626" : "#6B7280" }} data-testid={`btn-fail-${tcId}`}>{t.biFail as string}</button>
                 </div>
               </div>
             )}
           </div>
         );
       })}
-      {filtered.length > 20 && <div className="text-[10px] text-center py-1" style={{ color: "#9CA3AF" }}>+ {filtered.length - 20} more test cases</div>}
+      {filtered.length > 20 && <div className="text-[10px] text-center py-1" style={{ color: "#9CA3AF" }}>+ {filtered.length - 20} {t.biMoreTestCases as string}</div>}
     </>
   );
 }
 
-function BiDashboardTestResult({ data, isRtl, testStatus, setTestStatus }: { data: Record<string, unknown>; isRtl: boolean; testStatus: Record<string, "pass" | "fail" | null>; setTestStatus: (fn: (prev: Record<string, "pass" | "fail" | null>) => Record<string, "pass" | "fail" | null>) => void }) {
+function BiDashboardTestResult({ data, t, testStatus, setTestStatus }: { data: Record<string, unknown>; t: Translation; testStatus: Record<string, "pass" | "fail" | null>; setTestStatus: (fn: (prev: Record<string, "pass" | "fail" | null>) => Record<string, "pass" | "fail" | null>) => void }) {
   const cases = (data.test_cases || []) as Record<string, unknown>[];
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [expandedCase, setExpandedCase] = useState<string | null>(null);
@@ -4533,19 +4725,19 @@ function BiDashboardTestResult({ data, isRtl, testStatus, setTestStatus }: { dat
       <div className="flex gap-3 mb-3 flex-wrap items-center">
         <div className="rounded-lg p-3 text-center border" style={{ borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }}>
           <div className="text-lg font-extrabold" style={{ color: "#1A1A2E" }}>{totalCases}</div>
-          <div className="text-[10px]" style={{ color: "#6B7280" }}>{isRtl ? "المجموع" : "Total"}</div>
+          <div className="text-[10px]" style={{ color: "#6B7280" }}>{t.biTotal as string}</div>
         </div>
         <div className="rounded-lg p-3 text-center border" style={{ borderColor: "#FECACA", backgroundColor: "#FEF2F2" }}>
           <div className="text-lg font-extrabold" style={{ color: "#DC2626" }}>{Number(data.critical_test_count || 0)}</div>
-          <div className="text-[10px]" style={{ color: "#6B7280" }}>{isRtl ? "حرجة" : "Critical"}</div>
+          <div className="text-[10px]" style={{ color: "#6B7280" }}>{t.biCritical as string}</div>
         </div>
         <div className="rounded-lg p-2.5 border" style={{ borderColor: `${govRiskColor}44`, backgroundColor: `${govRiskColor}08` }}>
-          <div className="text-[11px] font-bold" style={{ color: govRiskColor }}>{isRtl ? "مخاطر الحوكمة" : "Gov Risk"}: {govRisk}</div>
+          <div className="text-[11px] font-bold" style={{ color: govRiskColor }}>{t.biGovRisk as string}: {govRisk}</div>
         </div>
       </div>
 
       <div className="rounded-lg p-2.5 mb-3 flex items-center gap-3 border" style={{ borderColor: "#E5E7EB" }} data-testid="dashtest-progress">
-        <div className="text-[10px]" style={{ color: "#6B7280" }}>{isRtl ? "التقدم:" : "Progress:"}</div>
+        <div className="text-[10px]" style={{ color: "#6B7280" }}>{t.biProgress as string}</div>
         <div className="flex-1 rounded-full h-2.5 overflow-hidden flex" style={{ backgroundColor: "#E5E7EB" }}>
           {passed > 0 && <div style={{ width: `${(passed / totalCases) * 100}%`, backgroundColor: "#2E7D32", height: "100%" }} />}
           {failed > 0 && <div style={{ width: `${(failed / totalCases) * 100}%`, backgroundColor: "#DC2626", height: "100%" }} />}
@@ -4556,7 +4748,7 @@ function BiDashboardTestResult({ data, isRtl, testStatus, setTestStatus }: { dat
       </div>
 
       <div className="flex gap-1 mb-3 flex-wrap">
-        <button onClick={() => setActiveCategory(null)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === null ? "#EFF6FF" : "transparent", color: activeCategory === null ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === null ? "#BFDBFE" : "#E5E7EB"}` }}>{isRtl ? "الكل" : "All"}</button>
+        <button onClick={() => setActiveCategory(null)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === null ? "#EFF6FF" : "transparent", color: activeCategory === null ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === null ? "#BFDBFE" : "#E5E7EB"}` }}>{t.biAll as string}</button>
         {DASHBOARD_CATEGORIES_EN.map(cat => (
           <button key={cat} onClick={() => setActiveCategory(cat)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === cat ? "#EFF6FF" : "transparent", color: activeCategory === cat ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === cat ? "#BFDBFE" : "#E5E7EB"}` }} data-testid={`dashcat-filter-${cat}`}>{cat}</button>
         ))}
@@ -4564,7 +4756,7 @@ function BiDashboardTestResult({ data, isRtl, testStatus, setTestStatus }: { dat
 
       <div className="flex justify-end mb-2">
         <button onClick={() => { exportDashboardTestRunSheet(cases, testStatus); downloadBiReport(); }} className="text-[10px] font-semibold px-3 py-1 rounded-lg" style={{ background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff" }} data-testid="button-export-dashtest-run">
-          ⬇ {isRtl ? "تصدير نتائج الاختبار" : "Export Test Run"}
+          ⬇ {t.biExportTestRun as string}
         </button>
       </div>
 
@@ -4585,23 +4777,23 @@ function BiDashboardTestResult({ data, isRtl, testStatus, setTestStatus }: { dat
             </div>
             {expanded && (
               <div className="px-3 py-2 space-y-1.5 text-[11px]" style={{ backgroundColor: "#fff", color: "#374151" }}>
-                <div><strong>{isRtl ? "الهدف:" : "Objective:"}</strong> {String(tc.objective || "")}</div>
-                <div><strong>{isRtl ? "الخطوات:" : "Steps:"}</strong></div>
+                <div><strong>{t.biObjective as string}</strong> {String(tc.objective || "")}</div>
+                <div><strong>{t.biSteps as string}</strong></div>
                 <ol className="pl-4 list-decimal space-y-0.5">
                   {((tc.test_steps || []) as string[]).map((s, j) => <li key={j}>{s}</li>)}
                 </ol>
-                <div style={{ color: "#2E7D32" }}><strong>{isRtl ? "المتوقع:" : "Expected:"}</strong> {String(tc.expected_result || "")}</div>
+                <div style={{ color: "#2E7D32" }}><strong>{t.biExpected as string}</strong> {String(tc.expected_result || "")}</div>
                 {tc.power_bi_specific_note && <div className="p-2 rounded-lg text-[10px]" style={{ backgroundColor: "#EFF6FF", color: "#1A4B8C" }}>💡 {String(tc.power_bi_specific_note)}</div>}
                 <div className="flex gap-2 mt-2">
-                  <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "pass" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "pass" ? "#2E7D32" : "#D1D5DB"}`, backgroundColor: status === "pass" ? "#F0FDF4" : "transparent", color: status === "pass" ? "#2E7D32" : "#6B7280" }} data-testid={`btn-pass-${tcId}`}>{isRtl ? "✓ نجح" : "✓ Pass"}</button>
-                  <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "fail" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "fail" ? "#DC2626" : "#D1D5DB"}`, backgroundColor: status === "fail" ? "#FEF2F2" : "transparent", color: status === "fail" ? "#DC2626" : "#6B7280" }} data-testid={`btn-fail-${tcId}`}>{isRtl ? "✕ فشل" : "✕ Fail"}</button>
+                  <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "pass" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "pass" ? "#2E7D32" : "#D1D5DB"}`, backgroundColor: status === "pass" ? "#F0FDF4" : "transparent", color: status === "pass" ? "#2E7D32" : "#6B7280" }} data-testid={`btn-pass-${tcId}`}>{t.biPass as string}</button>
+                  <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "fail" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "fail" ? "#DC2626" : "#D1D5DB"}`, backgroundColor: status === "fail" ? "#FEF2F2" : "transparent", color: status === "fail" ? "#DC2626" : "#6B7280" }} data-testid={`btn-fail-${tcId}`}>{t.biFail as string}</button>
                 </div>
               </div>
             )}
           </div>
         );
       })}
-      {filtered.length > 20 && <div className="text-[10px] text-center py-1" style={{ color: "#9CA3AF" }}>+ {filtered.length - 20} more test cases</div>}
+      {filtered.length > 20 && <div className="text-[10px] text-center py-1" style={{ color: "#9CA3AF" }}>+ {filtered.length - 20} {t.biMoreTestCases as string}</div>}
     </>
   );
 }

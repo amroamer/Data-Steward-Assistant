@@ -55,15 +55,16 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 ### BI Agent Integration (5th Mode)
 - ✅ `agentMode` type extended to include `"bi"` in `chat.tsx`
 - ✅ BI Agent tab changed from `<Link href="/bi-agent">` to mode-switching `<button>` (ZATCA blue #1A4B8C)
-- ✅ Empty-state hero for BI mode: upload zone + 4 info cards (Sharing, Dashboard, Report, Test Cases) (EN + AR)
-- ✅ BI input panel in command console: file upload → 5 sub-tabs → form inputs → Run/Stop/Download buttons
+- ✅ Empty-state hero for BI mode: upload zone + 5 info cards (Sharing, Dashboard, Report, Test Cases, Dashboard Tester) using `t.*` bilingual keys
+- ✅ BI input panel in command console: file upload → 5 sub-tabs → form inputs → Run/Stop/Download buttons (all strings via `t.*` keys)
 - ✅ `biRunAnalysis` function: POST to `/api/bi/*` endpoints, animated loading, optimistic thread insertion
 - ✅ `biReports` state (`Record<number, BiReport>`) persists parsed results keyed by assistant message ID
-- ✅ 5 result components inline in `chat.tsx`: `BiSharingResult`, `BiDashboardResult`, `BiReportResult`, `BiTestCaseResult`, `BiDashboardTestResult`
+- ✅ 5 result components inline in `chat.tsx`: `BiSharingResult`, `BiDashboardResult`, `BiReportResult`, `BiTestCaseResult`, `BiDashboardTestResult` (all strings via `t.*` keys)
 - ✅ `BiResultCard` wrapper renders inside `ThreadCard` with download button
 - ✅ Excel export: `bi_agent_report.xlsx` via `bi-store.ts` (8 sheets, ZATCA styling)
+- ✅ Sidebar "Download BI Report" button appears when `hasBiSheets()` is true
 - ✅ Session persistence: BI conversations saved to DB with `agentMode: "bi"`, listed in sidebar
-- ✅ `/bi-agent` route redirects to `/` via wouter `<Redirect>`; standalone BI page deleted
+- ✅ `/bi-agent` route fully removed from App.tsx; standalone BI page deleted
 - ✅ 5 backend endpoints: `/api/bi/sharing-eligibility`, `/api/bi/dashboard-designer`, `/api/bi/report-tester`, `/api/bi/test-case-generator`, `/api/bi/dashboard-tester`
 
 ### Session Management

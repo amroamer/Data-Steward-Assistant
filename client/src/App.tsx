@@ -16,7 +16,7 @@ function Router() {
       <Route path="/nudge"><Redirect to="/" /></Route>
       <Route path="/user-guide" component={UserGuidePage} />
       <Route path="/sharing-eligibility" component={SharingEligibilityPage} />
-      <Route path="/bi-agent"><Redirect to="/" /></Route>
+
     </Switch>
   );
 }
