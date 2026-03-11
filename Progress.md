@@ -29,9 +29,9 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 - ✅ Mobile-responsive layout (sidebar and outputs become slide-in drawers)
 - ✅ RTL layout flip for Arabic language
 
-### 4-Agent Navigation
-- ✅ Agent mode tabs below header: Data Management / Analytical Model / Insights Agent / **Nudge Agent**
-- ✅ Active tab highlighted (navy bg, white text); Nudge Agent tab uses purple accent (#7C3AED)
+### 5-Agent Navigation
+- ✅ Agent mode tabs below header: Data Management / Analytical Model / Insights Agent / Nudge Agent / **BI Agent**
+- ✅ Active tab highlighted (navy bg, white text); Nudge Agent tab uses purple accent (#7C3AED); BI Agent tab uses ZATCA blue (#1A4B8C)
 - ✅ Feature cards and quick-action pills filtered by active agent mode
 - ✅ Switching agent mode clears active conversation and resets result state
 - ✅ Dynamic "New Session" button label per agent mode:
@@ -39,6 +39,7 @@ Track all feature development, fixes, and backlog items. Updated as work progres
   - Analytical Model → "New Analytical Data Model Agent"
   - Insights Agent → "New Insight Report Agent"
   - Nudge Agent → "New Nudge Agent"
+  - BI Agent → "New BI Agent"
 
 ### Nudge Agent Integration (4th Mode)
 - ✅ `agentMode` type extended to include `"nudge"` in `chat.tsx`
@@ -50,6 +51,20 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 - ✅ Excel export per thread: "Download Nudge Report" → `nudge_report_[timestamp].xlsx` (5 sheets)
 - ✅ Session persistence: nudge conversations saved to DB with `agentMode: "nudge"`, listed in sidebar
 - ✅ `/nudge` route redirects to `/` via wouter `<Redirect>`; standalone nudge page removed from routing
+
+### BI Agent Integration (5th Mode)
+- ✅ `agentMode` type extended to include `"bi"` in `chat.tsx`
+- ✅ BI Agent tab changed from `<Link href="/bi-agent">` to mode-switching `<button>` (ZATCA blue #1A4B8C)
+- ✅ Empty-state hero for BI mode: upload zone + 4 info cards (Sharing, Dashboard, Report, Test Cases) (EN + AR)
+- ✅ BI input panel in command console: file upload → 5 sub-tabs → form inputs → Run/Stop/Download buttons
+- ✅ `biRunAnalysis` function: POST to `/api/bi/*` endpoints, animated loading, optimistic thread insertion
+- ✅ `biReports` state (`Record<number, BiReport>`) persists parsed results keyed by assistant message ID
+- ✅ 5 result components inline in `chat.tsx`: `BiSharingResult`, `BiDashboardResult`, `BiReportResult`, `BiTestCaseResult`, `BiDashboardTestResult`
+- ✅ `BiResultCard` wrapper renders inside `ThreadCard` with download button
+- ✅ Excel export: `bi_agent_report.xlsx` via `bi-store.ts` (8 sheets, ZATCA styling)
+- ✅ Session persistence: BI conversations saved to DB with `agentMode: "bi"`, listed in sidebar
+- ✅ `/bi-agent` route redirects to `/` via wouter `<Redirect>`; standalone BI page deleted
+- ✅ 5 backend endpoints: `/api/bi/sharing-eligibility`, `/api/bi/dashboard-designer`, `/api/bi/report-tester`, `/api/bi/test-case-generator`, `/api/bi/dashboard-tester`
 
 ### Session Management
 - ✅ Per-agent-mode isolated session lists (DB-backed `agent_mode` column)
@@ -209,5 +224,5 @@ Track all feature development, fixes, and backlog items. Updated as work progres
 | 2026-03-06 | **Insights Agent expanded** — 3-level analysis (Descriptive / Diagnostic / Analytical) from a single Claude call; inline `InsightsReportCard` with collapsible sections and executive summary banner (navy, gold border); 6-sheet Excel export (executive_summary, descriptive_field_profiles, completeness_scorecard, diagnostic_correlations, diagnostic_findings, analytical_insights); invalid JSON shows red error card; never writes to result.xlsx; `insights-store.ts` fully rewritten with new types + detection + Excel builder |
 | 2026-03-06 | **User Guide docs updated** — added Informatica Output section (EN + AR, 3 entries each); added `insights_report_[timestamp].xlsx` entry to Exporting Results (EN + AR); `Code2` icon added to imports; README User Guide section count corrected (8 → 9, Informatica Output added to section list) |
 | 2026-03-11 | **Data Sharing Eligibility Tool** — new standalone `/sharing-eligibility` page; `POST /api/sharing-eligibility` backend endpoint calls Claude with NDMO Section 4.3 classification + Section 6 sharing rules; drag-and-drop Excel/CSV upload; field detection preview; AI analysis returns field-by-field assessments + dataset summary; overall verdict banner (CAN SHARE/CONDITIONAL/CANNOT SHARE); 3 recipient cards (General Public, Private Sector, Gov. Entities); anonymization tip; recommended actions; expandable field-by-field table with per-recipient drill-down; Excel download (Summary + Field Assessment sheets); "Sharing" nav link added to sidebar header (EN+AR); route registered in App.tsx |
-| 2026-03-11 | **Business Intelligence Agent Page** — new `/bi-agent` page with 3-panel layout (left sidebar: session list + file chip + download + nav; center panel: tab bar + input forms + thread history list; right panel: 420px result detail output); 5 feature tabs: Sharing Eligibility, Dashboard Designer, Report Tester, Test Case Generator, Dashboard Tester; 5 backend endpoints (`POST /api/bi/sharing-eligibility`, `/api/bi/dashboard-designer`, `/api/bi/report-tester`, `/api/bi/test-case-generator`, `/api/bi/dashboard-tester`) all using `buildSystemPrompt()` wrapper; `bi-store.ts` Excel library generates cumulative `bi_agent_report.xlsx` (fixed filename, no timestamp) with 8 sheets, ZATCA blue #1A4B8C header styling, severity/verdict color coding, yellow #FFFDE7 actual_result fill, auto-sized columns, freeze panes; shared file upload across tabs; AbortController stop generation; recharts donut charts for coverage; pass/fail tracking on test cases; in-memory session threads; EN+AR bilingual; ZATCA brand colors; BI Agent tab in agent-mode-tabs (next to Nudge); route registered in App.tsx |
+| 2026-03-11 | **BI Agent — inline integration into chat.tsx** — BI Agent fully integrated as inline `agentMode="bi"` within the main chat page (same pattern as Nudge Agent); `bi-agent.tsx` standalone page deleted; `/bi-agent` route redirects to `/`; BI tab in agent-mode-tabs toggles `agentMode` instead of navigating; BI hero screen with upload zone + 4 info cards; BI input panel replaces the normal command console when `agentMode === "bi"` (file upload → 5 sub-tabs: sharing/dashboard/report/testcases/dashtest → form inputs → Run/Stop buttons → download button); `biRunAnalysis` function posts to `/api/bi/*` endpoints with `__BI_REPORT_ID_` marker pattern; `biReports` state map (`Record<number, BiReport>`) keyed by assistant message ID; 5 inline result components: `BiSharingResult` (verdict banner + recipient cards + approval checklist + field table), `BiDashboardResult` (KPIs + page tabs + visual cards), `BiReportResult` (score circle + dimension bars + expandable issue sections + pre-send checklist), `BiTestCaseResult` (progress bar + category filters + expandable test cards with pass/fail buttons + export), `BiDashboardTestResult` (gov risk badge + dashboard-specific categories + visual-tested tags + Power BI notes); `BiResultCard` wrapper renders inside `ThreadCard`; `__BI_REPORT_ID_` marker handled in activity timeline rebuild; all 5 backend endpoints unchanged (`/api/bi/*`); `bi-store.ts` Excel library unchanged |
 | 2026-03-06 | **Reference Documents system** — multi-file PDF/TXT upload in sidebar; all docs injected as context into every Data Management Claude call; individual ✕ remove per doc; session-persistent; duplicate detection; inline error with 4s auto-clear; status pill shows count; EN+AR translations; rule 6 added to ZATCA_SYSTEM_PROMPT; user guide updated (EN+AR); README updated |

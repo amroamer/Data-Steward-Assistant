@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -116,6 +116,17 @@ import {
   PanelGroup,
   PanelResizeHandle,
 } from "react-resizable-panels";
+import {
+  addSharingEligibilitySheet,
+  addDashboardDesignSheets,
+  addReportTestSheet,
+  addTestCaseSheets,
+  addDashboardTestSheet,
+  exportTestRunSheet,
+  exportDashboardTestRunSheet,
+  downloadBiReport,
+  hasSheets as hasBiSheets,
+} from "@/lib/bi-store";
 
 type Lang = "en" | "ar";
 
@@ -177,6 +188,63 @@ function nudgePriorityColor(p: string): { bg: string; text: string } {
   if (p === "High") return { bg: "#FEE2E2", text: "#991B1B" };
   if (p === "Medium") return { bg: "#FFEDD5", text: "#C2410C" };
   return { bg: "#DCFCE7", text: "#166534" };
+}
+
+type BiTabKey = "sharing" | "dashboard" | "report" | "testcases" | "dashtest";
+
+interface BiTabDef {
+  key: BiTabKey;
+  label: string;
+  labelAr: string;
+  icon: string;
+  endpoint: string;
+  steps: string[];
+  stepsAr: string[];
+}
+
+const BI_TABS: BiTabDef[] = [
+  { key: "sharing", label: "Sharing Eligibility", labelAr: "أهلية المشاركة", icon: "🔍", endpoint: "/api/bi/sharing-eligibility", steps: ["Parsing fields", "Classifying data", "Applying NDMO rules", "Generating verdict"], stepsAr: ["تحليل الحقول", "تصنيف البيانات", "تطبيق قواعد NDMO", "إصدار الحكم"] },
+  { key: "dashboard", label: "Dashboard Designer", labelAr: "مصمم لوحة المعلومات", icon: "📐", endpoint: "/api/bi/dashboard-designer", steps: ["Analysing dataset", "Designing visuals", "Writing DAX measures", "Building layout"], stepsAr: ["تحليل البيانات", "تصميم المرئيات", "كتابة مقاييس DAX", "بناء التخطيط"] },
+  { key: "report", label: "Report Tester", labelAr: "فاحص التقارير", icon: "🔬", endpoint: "/api/bi/report-tester", steps: ["Checking governance", "Scanning data quality", "Reviewing business logic", "Checking presentation"], stepsAr: ["فحص الحوكمة", "فحص جودة البيانات", "مراجعة منطق الأعمال", "فحص العرض"] },
+  { key: "testcases", label: "Test Cases", labelAr: "حالات الاختبار", icon: "📋", endpoint: "/api/bi/test-case-generator", steps: ["Analysing fields", "Writing completeness tests", "Writing accuracy tests", "Writing governance tests", "Finalising test suite"], stepsAr: ["تحليل الحقول", "كتابة اختبارات الاكتمال", "كتابة اختبارات الدقة", "كتابة اختبارات الحوكمة", "إنهاء مجموعة الاختبارات"] },
+  { key: "dashtest", label: "Dashboard Tester", labelAr: "فاحص لوحة المعلومات", icon: "🖥", endpoint: "/api/bi/dashboard-tester", steps: ["Analysing dashboard", "Writing visual tests", "Writing DAX tests", "Writing governance tests", "Finalising test suite"], stepsAr: ["تحليل لوحة المعلومات", "كتابة اختبارات المرئيات", "كتابة اختبارات DAX", "كتابة اختبارات الحوكمة", "إنهاء مجموعة الاختبارات"] },
+];
+
+const BI_VERDICT_COLORS: Record<string, { bg: string; fg: string; border: string }> = {
+  CLEARED: { bg: "#E8F5E9", fg: "#1B5E20", border: "#2E7D32" },
+  "CLEARED WITH CONDITIONS": { bg: "#FFF3E0", fg: "#E65100", border: "#E65100" },
+  "CLEARED AFTER REMEDIATION": { bg: "#FFFDE7", fg: "#F59E0B", border: "#F59E0B" },
+  BLOCKED: { bg: "#FFEBEE", fg: "#B71C1C", border: "#B71C1C" },
+};
+
+const BI_SEVERITY_COLORS: Record<string, { bg: string; fg: string }> = {
+  Critical: { bg: "#B71C1C", fg: "#fff" },
+  High: { bg: "#E65100", fg: "#fff" },
+  Medium: { bg: "#F59E0B", fg: "#000" },
+  Low: { bg: "#2E7D32", fg: "#fff" },
+};
+
+const BI_DONUT_COLORS = ["#1A4B8C", "#2E7D32", "#E65100", "#F59E0B", "#B71C1C", "#0D2E5C", "#6366F1", "#EC4899"];
+
+function parseBiExcelFile(file: File): Promise<Record<string, unknown>[]> {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target?.result, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: "" }) as Record<string, unknown>[];
+        res(rows);
+      } catch (err) { rej(err); }
+    };
+    reader.onerror = rej;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+interface BiReport {
+  tab: BiTabKey;
+  data: Record<string, unknown>;
 }
 
 function generateNudgeExcel(report: NudgeReport): void {
@@ -1089,7 +1157,7 @@ function SidebarContent({
   editTitle: string;
   setEditTitle: (t: string) => void;
   handleSaveRename: (id: number) => void;
-  agentMode: "data-management" | "data-model" | "insights" | "nudge";
+  agentMode: "data-management" | "data-model" | "insights" | "nudge" | "bi";
   referenceDocuments: Array<{ id: string; filename: string; fileType: "pdf" | "text"; sizeKb: number }>;
   refDocError: string | null;
   onAddDocument: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -1419,7 +1487,7 @@ export default function ChatPage() {
   const [editingConvId, setEditingConvId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [outputsPanelCollapsed, setOutputsPanelCollapsed] = useState(false);
-  const [agentMode, setAgentMode] = useState<"insights" | "data-management" | "data-model" | "nudge">("data-management");
+  const [agentMode, setAgentMode] = useState<"insights" | "data-management" | "data-model" | "nudge" | "bi">("data-management");
   const [referenceDocuments, setReferenceDocuments] = useState<Array<{
     id: string;
     filename: string;
@@ -1432,6 +1500,27 @@ export default function ChatPage() {
   const refDocInputRef = useRef<HTMLInputElement>(null);
   const refDocErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [nudgeReports, setNudgeReports] = useState<Record<number, NudgeReport>>({});
+  const [biReports, setBiReports] = useState<Record<number, BiReport>>({});
+  const [biActiveTab, setBiActiveTab] = useState<BiTabKey>("sharing");
+  const [biFile, setBiFile] = useState<File | null>(null);
+  const [biRows, setBiRows] = useState<Record<string, unknown>[]>([]);
+  const [biFields, setBiFields] = useState<string[]>([]);
+  const [biStakeholder, setBiStakeholder] = useState("");
+  const [biBusinessQuestion, setBiBusinessQuestion] = useState("");
+  const [biAudience, setBiAudience] = useState("Internal ZATCA Team");
+  const [biDashboardType, setBiDashboardType] = useState("Analytical");
+  const [biReportPurpose, setBiReportPurpose] = useState("");
+  const [biReportFormat, setBiReportFormat] = useState("Mixed");
+  const [biTestDepth, setBiTestDepth] = useState("Standard");
+  const [biTestCategories, setBiTestCategories] = useState<string[]>(["Data completeness", "Data accuracy", "Business rules", "Edge cases", "Security & governance", "Performance thresholds", "Formatting & presentation"]);
+  const [biVisualsList, setBiVisualsList] = useState("");
+  const [biDashDesc, setBiDashDesc] = useState("");
+  const [biTestCaseStatus, setBiTestCaseStatus] = useState<Record<string, "pass" | "fail" | null>>({});
+  const [biLoading, setBiLoading] = useState(false);
+  const [biLoadingStep, setBiLoadingStep] = useState(0);
+  const [biError, setBiError] = useState<string | null>(null);
+  const biFileInputRef = useRef<HTMLInputElement>(null);
+  const biAbortRef = useRef<AbortController | null>(null);
   const [textInputMode, setTextInputMode] = useState(false);
   const [pastedText, setPastedText] = useState("");
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -1452,9 +1541,9 @@ export default function ChatPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const promptParam = params.get("prompt");
-    const modeParam = params.get("mode") as "data-management" | "data-model" | "insights" | "nudge" | null;
+    const modeParam = params.get("mode") as "data-management" | "data-model" | "insights" | "nudge" | "bi" | null;
     if (promptParam) setInputValue(promptParam);
-    if (modeParam && ["data-management", "data-model", "insights", "nudge"].includes(modeParam)) setAgentMode(modeParam);
+    if (modeParam && ["data-management", "data-model", "insights", "nudge", "bi"].includes(modeParam)) setAgentMode(modeParam);
     if (promptParam || modeParam) history.replaceState({}, "", window.location.pathname);
   }, []);
 
@@ -1645,6 +1734,10 @@ export default function ChatPage() {
           rebuiltLog.push({ icon: "🎯", text: lang === "ar" ? "اكتمل تحليل التحفيز" : "Nudge analysis complete", timestamp: ts });
           continue;
         }
+        if (msg.content.includes("__BI_REPORT_ID_")) {
+          rebuiltLog.push({ icon: "📊", text: lang === "ar" ? "اكتمل تحليل BI" : "BI analysis complete", timestamp: ts });
+          continue;
+        }
         if (detectInsightsJSON(msg.content) || looksLikeInsightsJSON(msg.content)) {
           rebuiltLog.push({ icon: "📊", text: t.tagInsights, timestamp: ts });
         }
@@ -1826,6 +1919,121 @@ export default function ChatPage() {
       title: t.toastUpdated,
       description: toastParts.join(" | "),
     });
+  };
+
+  const handleBiFile = useCallback(async (f: File | null | undefined) => {
+    if (!f) return;
+    setBiError(null);
+    try {
+      const parsed = await parseBiExcelFile(f);
+      if (!parsed.length) throw new Error("File appears empty.");
+      setBiFile(f);
+      setBiRows(parsed);
+      setBiFields(Object.keys(parsed[0]));
+    } catch (e: unknown) {
+      setBiError("Could not read file: " + (e instanceof Error ? e.message : String(e)));
+    }
+  }, []);
+
+  const biRunAnalysis = async () => {
+    if (!biFields.length) return;
+    setBiLoading(true);
+    setBiError(null);
+    setBiLoadingStep(0);
+    setAgentStatus("thinking");
+
+    const tabDef = BI_TABS.find(t => t.key === biActiveTab)!;
+
+    const controller = new AbortController();
+    biAbortRef.current = controller;
+
+    const stepInterval = setInterval(() => {
+      setBiLoadingStep(prev => Math.min(prev + 1, tabDef.steps.length - 1));
+    }, 2500);
+
+    let conversationId = activeConversationId;
+    if (!conversationId) {
+      const inputLabel = biActiveTab === "sharing" ? biStakeholder : biActiveTab === "dashboard" ? biBusinessQuestion : biActiveTab === "report" ? biReportPurpose : biActiveTab === "testcases" ? biReportPurpose : biDashDesc;
+      const title = `[BI] ${tabDef.label}: ${(inputLabel || "Analysis").substring(0, 40)}`;
+      const newConv = await createConversation.mutateAsync(title);
+      conversationId = newConv.id;
+    }
+
+    const userMsgId = Date.now();
+    const assistantMsgId = userMsgId + 1;
+    const inputLabel = biActiveTab === "sharing" ? biStakeholder : biActiveTab === "dashboard" ? biBusinessQuestion : biActiveTab === "report" ? biReportPurpose : biActiveTab === "testcases" ? biReportPurpose : biDashDesc;
+    const userContent = `${tabDef.icon} ${tabDef.label}: ${inputLabel || "Analysis"} (${biFile?.name || "file"})`;
+
+    queryClient.setQueryData(
+      ["/api/conversations", conversationId],
+      (old: any) => {
+        const userMsg = { id: userMsgId, conversationId, role: "user", content: userContent, createdAt: new Date().toISOString() };
+        return old
+          ? { ...old, messages: [...(old.messages || []), userMsg] }
+          : { id: conversationId, title: userContent.substring(0, 50), messages: [userMsg] };
+      }
+    );
+
+    setIsStreaming(true);
+
+    const biStepsArr = lang === "ar" ? tabDef.stepsAr : tabDef.steps;
+    setThinkingSteps(biStepsArr.map((label, i) => ({
+      label,
+      status: i === 0 ? "active" as const : "pending" as const,
+      startedAt: i === 0 ? Date.now() : undefined,
+    })));
+
+    try {
+      let body: Record<string, unknown> = { fields: biFields, sampleRows: biRows.slice(0, 10) };
+      if (biActiveTab === "sharing") body.stakeholder = biStakeholder;
+      if (biActiveTab === "dashboard") { body.businessQuestion = biBusinessQuestion; body.audience = biAudience; body.dashboardType = biDashboardType; }
+      if (biActiveTab === "report") { body.stakeholder = biStakeholder; body.reportPurpose = biReportPurpose; body.reportFormat = biReportFormat; }
+      if (biActiveTab === "testcases") { body.reportPurpose = biReportPurpose; body.testDepth = biTestDepth; body.testCategories = biTestCategories; }
+      if (biActiveTab === "dashtest") { body.dashboardDescription = biDashDesc; body.visualsList = biVisualsList; body.audience = biAudience; body.testDepth = biTestDepth; }
+
+      const resp = await fetch(tabDef.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      clearInterval(stepInterval);
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || "Analysis failed");
+
+      const result = data.data as Record<string, unknown>;
+
+      if (biActiveTab === "sharing") addSharingEligibilitySheet(result);
+      if (biActiveTab === "dashboard") addDashboardDesignSheets(result);
+      if (biActiveTab === "report") addReportTestSheet(result);
+      if (biActiveTab === "testcases") addTestCaseSheets(result);
+      if (biActiveTab === "dashtest") addDashboardTestSheet(result);
+
+      const summaryText = `__BI_REPORT_ID_${assistantMsgId}__`;
+      queryClient.setQueryData(
+        ["/api/conversations", conversationId],
+        (old: any) => {
+          const assistantMsg = { id: assistantMsgId, conversationId, role: "assistant", content: summaryText, createdAt: new Date().toISOString() };
+          return old ? { ...old, messages: [...(old.messages || []), assistantMsg] } : old;
+        }
+      );
+
+      setBiReports(prev => ({ ...prev, [assistantMsgId]: { tab: biActiveTab, data: result } }));
+      addActivityEntry(tabDef.icon, `${tabDef.label} complete`);
+      setAgentStatus("done");
+      setThinkingSteps(prev => prev.map(s => ({ ...s, status: "done" as const })));
+    } catch (e: unknown) {
+      clearInterval(stepInterval);
+      if ((e as Error).name !== "AbortError") {
+        setBiError("Analysis failed: " + (e instanceof Error ? e.message : String(e)));
+      }
+      setAgentStatus("idle");
+    } finally {
+      setBiLoading(false);
+      setIsStreaming(false);
+      setStreamingContent("");
+      biAbortRef.current = null;
+    }
   };
 
   const sendMessage = async (content: string, file?: File | null, extraText?: string) => {
@@ -2608,7 +2816,7 @@ export default function ChatPage() {
               { id: "data-model", icon: Layers, labelKey: "agentDataModel", descKey: "agentDataModelDesc", color: "#774896", href: null as string | null },
               { id: "insights", icon: Brain, labelKey: "agentInsights", descKey: "agentInsightsDesc", color: "#067647", href: null as string | null },
               { id: "nudge", icon: Target, labelKey: "agentNudge", descKey: "agentDataMgmtDesc", color: "#7C3AED", href: null as string | null },
-              { id: "bi", icon: Brain, labelKey: "biAgent", descKey: "agentDataMgmtDesc", color: "#1A4B8C", href: "/bi-agent" as string | null },
+              { id: "bi", icon: Brain, labelKey: "biAgent", descKey: "agentDataMgmtDesc", color: "#1A4B8C", href: null as string | null },
             ]).map((tab) => (
               <button
                 key={tab.id}
@@ -2657,11 +2865,11 @@ export default function ChatPage() {
             <div className="max-w-4xl mx-auto w-full px-4 py-6">
               {!activeConversationId && messages.length === 0 && !isStreaming ? (
                 <div className="flex flex-col items-center justify-center pt-8">
-                  <h2 className="text-2xl font-bold mb-2 tracking-tight font-main" style={{ color: agentMode === "nudge" ? "#7C3AED" : "#2563EB" }} data-testid="text-hero-title">
-                    {agentMode === "nudge" ? t.nudgeHeroTitle as string : t.whatToDo}
+                  <h2 className="text-2xl font-bold mb-2 tracking-tight font-main" style={{ color: agentMode === "nudge" ? "#7C3AED" : agentMode === "bi" ? "#1A4B8C" : "#2563EB" }} data-testid="text-hero-title">
+                    {agentMode === "nudge" ? t.nudgeHeroTitle as string : agentMode === "bi" ? (lang === "ar" ? "وكيل BI — ذكاء الأعمال" : "BI Agent — Business Intelligence") : t.whatToDo}
                   </h2>
                   <p className="text-center mb-8 max-w-md text-sm leading-relaxed" style={{ color: "#6B7280" }}>
-                    {agentMode === "nudge" ? t.nudgeHeroDesc as string : agentMode === "insights" ? t.agentInsightsDesc : agentMode === "data-model" ? t.agentDataModelDesc : t.heroDescription}
+                    {agentMode === "nudge" ? t.nudgeHeroDesc as string : agentMode === "bi" ? (lang === "ar" ? "حمّل ملف Excel أو CSV واستخدم أدوات BI لتحليل أهلية المشاركة وتصميم لوحات المعلومات وفحص التقارير وإنشاء حالات الاختبار." : "Upload an Excel or CSV file, then use the BI tools below to analyse sharing eligibility, design dashboards, test reports, and generate test cases.") : agentMode === "insights" ? t.agentInsightsDesc : agentMode === "data-model" ? t.agentDataModelDesc : t.heroDescription}
                   </p>
                   {agentMode === "nudge" && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-3xl mb-8">
@@ -2691,6 +2899,53 @@ export default function ChatPage() {
                           </li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+                  {agentMode === "bi" && (
+                    <div className="w-full max-w-3xl mb-8 space-y-6">
+                      {!biFile ? (
+                        <div
+                          onClick={() => biFileInputRef.current?.click()}
+                          onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleBiFile(f); }}
+                          onDragOver={(e) => e.preventDefault()}
+                          className="bg-white rounded-xl border-2 border-dashed border-gray-300 hover:border-blue-400 p-12 text-center cursor-pointer transition-all"
+                          data-testid="bi-upload-zone"
+                        >
+                          <input ref={biFileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleBiFile(e.target.files?.[0] ?? null)} data-testid="bi-input-file" />
+                          <div className="text-5xl mb-4">📂</div>
+                          <div className="text-lg font-bold text-gray-800 mb-2">{lang === "ar" ? "أسقط ملف Excel أو CSV هنا" : "Drop your Excel or CSV file here"}</div>
+                          <div className="text-sm text-gray-500">.xlsx · .xls · .csv</div>
+                        </div>
+                      ) : (
+                        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                          <div className="flex items-center gap-3">
+                            <span className="text-xl">📊</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold text-gray-800 truncate">{biFile.name}</div>
+                              <div className="text-xs text-gray-500">{biRows.length} rows · {biFields.length} fields</div>
+                            </div>
+                            <button onClick={() => { setBiFile(null); setBiRows([]); setBiFields([]); }} className="text-gray-400 hover:text-gray-600 text-sm" data-testid="button-bi-clear-file">✕</button>
+                          </div>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {([
+                          { icon: "🔍", title: lang === "ar" ? "أهلية المشاركة" : "Sharing Eligibility", desc: lang === "ar" ? "تقييم أهلية البيانات للمشاركة" : "Assess data sharing eligibility per NDMO rules", color: "#1A4B8C" },
+                          { icon: "📐", title: lang === "ar" ? "مصمم لوحة المعلومات" : "Dashboard Designer", desc: lang === "ar" ? "تصميم لوحات Power BI تلقائيًا" : "Auto-design Power BI dashboards with DAX", color: "#2E7D32" },
+                          { icon: "🔬", title: lang === "ar" ? "فاحص التقارير" : "Report Tester", desc: lang === "ar" ? "فحص جودة وحوكمة التقارير" : "Test report quality, governance & presentation", color: "#E65100" },
+                        ]).map(({ icon, title, desc, color }, i) => (
+                          <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <div className="text-2xl mb-3">{icon}</div>
+                            <h3 className="font-bold text-sm mb-1" style={{ color }}>{title}</h3>
+                            <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {biError && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700" data-testid="bi-error">
+                          ⚠️ {biError}
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className={`grid grid-cols-2 ${isMobile ? "" : "lg:grid-cols-3"} gap-4 w-full max-w-4xl`}>
@@ -2760,6 +3015,7 @@ export default function ChatPage() {
                         profiledColumns={profiledColumns}
                         uploadedFileName={uploadedFileName}
                         nudgeReport={thread.assistantMsg ? (nudgeReports[thread.assistantMsg.id] || undefined) : undefined}
+                        biReport={thread.assistantMsg ? (biReports[thread.assistantMsg.id] || undefined) : undefined}
                       />
                     );
                   })}
@@ -2835,6 +3091,72 @@ export default function ChatPage() {
           )}
           <div className="p-3 flex-shrink-0" style={{ backgroundColor: "#0D2E5C" }}>
             <div className="max-w-4xl mx-auto">
+              {agentMode === "bi" ? (
+                <div data-testid="bi-input-panel">
+                  {!biFile ? (
+                    <div className="flex items-center gap-3 rounded-lg px-4 py-3 cursor-pointer border border-dashed transition-all"
+                      style={{ borderColor: "rgba(255,255,255,0.3)", backgroundColor: "rgba(255,255,255,0.05)" }}
+                      onClick={() => biFileInputRef.current?.click()}
+                      data-testid="bi-bottom-upload"
+                    >
+                      <input ref={biFileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleBiFile(e.target.files?.[0] ?? null)} />
+                      <Upload className="w-4 h-4" style={{ color: "rgba(255,255,255,0.5)" }} />
+                      <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.6)" }}>{lang === "ar" ? "حمّل ملف Excel أو CSV للبدء" : "Upload an Excel or CSV file to start"}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 mb-2 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
+                        <span>📊</span>
+                        <span className="font-medium" style={{ color: "rgba(255,255,255,0.8)" }}>{biFile.name}</span>
+                        <span>· {biRows.length} rows · {biFields.length} fields</span>
+                        <button onClick={() => { setBiFile(null); setBiRows([]); setBiFields([]); }} className="ml-auto text-white/40 hover:text-white/70 text-sm" data-testid="bi-clear-file-btn">✕</button>
+                      </div>
+                      <div className="flex items-center gap-1 mb-2">
+                        {BI_TABS.map(tb => (
+                          <button key={tb.key} onClick={() => setBiActiveTab(tb.key)}
+                            className="px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all"
+                            style={{ backgroundColor: biActiveTab === tb.key ? "rgba(26,75,140,0.5)" : "transparent", color: biActiveTab === tb.key ? "#E8EDF5" : "rgba(255,255,255,0.5)", border: `1px solid ${biActiveTab === tb.key ? "#1A4B8C" : "transparent"}` }}
+                            data-testid={`bi-tab-${tb.key}`}
+                          >{tb.icon} {lang === "ar" ? tb.labelAr : tb.label}</button>
+                        ))}
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1 flex gap-2 flex-wrap">
+                          {(biActiveTab === "sharing" || biActiveTab === "report") && (
+                            <input value={biStakeholder} onChange={e => setBiStakeholder(e.target.value)} placeholder={lang === "ar" ? "الجهة المستلمة..." : "Stakeholder..."} className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg text-xs border-0" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#fff" }} data-testid="bi-input-stakeholder" />
+                          )}
+                          {biActiveTab === "dashboard" && (
+                            <input value={biBusinessQuestion} onChange={e => setBiBusinessQuestion(e.target.value)} placeholder={lang === "ar" ? "سؤال الأعمال..." : "Business question..."} className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg text-xs border-0" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#fff" }} data-testid="bi-input-bq" />
+                          )}
+                          {(biActiveTab === "report" || biActiveTab === "testcases") && (
+                            <input value={biReportPurpose} onChange={e => setBiReportPurpose(e.target.value)} placeholder={lang === "ar" ? "غرض التقرير..." : "Report purpose..."} className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg text-xs border-0" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#fff" }} data-testid="bi-input-purpose" />
+                          )}
+                          {biActiveTab === "dashtest" && (
+                            <input value={biDashDesc} onChange={e => setBiDashDesc(e.target.value)} placeholder={lang === "ar" ? "وصف لوحة المعلومات..." : "Dashboard description..."} className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg text-xs border-0" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#fff" }} data-testid="bi-input-dashdesc" />
+                          )}
+                        </div>
+                        {biLoading ? (
+                          <button type="button" onClick={() => { biAbortRef.current?.abort(); setBiLoading(false); }} className="h-9 px-4 flex-shrink-0 rounded-lg text-xs font-bold text-white flex items-center gap-1.5" style={{ backgroundColor: "#C62828" }} data-testid="bi-stop-btn">
+                            {t.stopButton}
+                          </button>
+                        ) : (
+                          <Button onClick={biRunAnalysis} className="h-9 px-4 flex-shrink-0 rounded-lg gap-1.5 text-xs font-medium text-white ripple-button" style={{ backgroundColor: "#2E7D32" }} disabled={!biFields.length || biLoading} data-testid="bi-run-btn">
+                            {lang === "ar" ? "تشغيل" : "Run"} <Play className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                      {hasBiSheets() && (
+                        <div className="mt-2 flex justify-end">
+                          <button onClick={() => downloadBiReport()} className="text-[10px] font-semibold px-3 py-1 rounded-lg" style={{ background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff" }} data-testid="bi-download-report">
+                            ⬇ {lang === "ar" ? "تحميل bi_agent_report.xlsx" : "Download bi_agent_report.xlsx"}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : (
+              <>
               {selectedFile && (
                 <div className="flex items-center gap-2 mb-2 rounded-lg px-3 py-1.5" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}>
                   {selectedFile.type.startsWith("image/") ? (
@@ -3002,6 +3324,8 @@ export default function ChatPage() {
                   </Button>
                 )}
               </form>
+              </>
+              )}
             </div>
           </div>
         </div>
@@ -3837,11 +4161,456 @@ function NudgeResultCard({ report, t }: { report: NudgeReport; t: Translation })
   );
 }
 
+function BiResultCard({ biReport, isRtl, lang }: { biReport: BiReport; isRtl: boolean; lang: Lang }) {
+  const { tab, data } = biReport;
+  const [biTcStatus, setBiTcStatus] = useState<Record<string, "pass" | "fail" | null>>({});
+  return (
+    <div className="space-y-3 mt-2" data-testid="bi-result-card">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#1A4B8C", color: "#ffffff" }}>BI {BI_TABS.find(t => t.key === tab)?.label || tab}</span>
+        {hasBiSheets() && (
+          <button onClick={() => downloadBiReport()} className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#2E7D32", color: "#fff" }} data-testid="bi-result-download">
+            ⬇ {isRtl ? "تحميل" : "Download"} .xlsx
+          </button>
+        )}
+      </div>
+      {tab === "sharing" && <BiSharingResult data={data} isRtl={isRtl} />}
+      {tab === "dashboard" && <BiDashboardResult data={data} isRtl={isRtl} />}
+      {tab === "report" && <BiReportResult data={data} isRtl={isRtl} />}
+      {tab === "testcases" && <BiTestCaseResult data={data} isRtl={isRtl} testStatus={biTcStatus} setTestStatus={setBiTcStatus} />}
+      {tab === "dashtest" && <BiDashboardTestResult data={data} isRtl={isRtl} testStatus={biTcStatus} setTestStatus={setBiTcStatus} />}
+    </div>
+  );
+}
+
+function BiSharingResult({ data, isRtl }: { data: Record<string, unknown>; isRtl: boolean }) {
+  const [expandedField, setExpandedField] = useState<string | null>(null);
+  const verdict = String(data.overall_verdict || "BLOCKED");
+  const vc = BI_VERDICT_COLORS[verdict] || BI_VERDICT_COLORS.BLOCKED;
+  const assessments = (data.field_assessments || []) as Record<string, unknown>[];
+  const checklist = (data.approval_checklist || []) as Record<string, unknown>[];
+  const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
+
+  return (
+    <>
+      <div className="rounded-xl p-4 mb-3" style={{ backgroundColor: `${vc.bg}`, border: `2px solid ${vc.border}55`, borderLeft: `6px solid ${vc.border}` }} data-testid="bi-verdict-banner">
+        <div className="text-lg font-extrabold mb-1" style={{ color: vc.fg }}>{verdict}</div>
+        <div className="text-xs mb-2" style={{ color: "#6B7280" }}>{String(data.verdict_rationale || "")}</div>
+        <div className="flex gap-4 flex-wrap text-xs">
+          <span style={{ color: "#6B7280" }}>{isRtl ? "التصنيف:" : "Classification:"} <strong style={{ color: "#1A1A2E" }}>{String(data.overall_classification || "")}</strong></span>
+          <span style={{ color: "#6B7280" }}>{isRtl ? "الحقل المهيمن:" : "Governing:"} <strong style={{ color: "#E65100" }}>{String(data.governing_field || "")}</strong></span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        {[
+          { label: isRtl ? "عام" : "General Public", tier: "PUBLIC" },
+          { label: isRtl ? "قطاع خاص" : "Private Sector", tier: "PRIVATE_SECTOR" },
+          { label: isRtl ? "جهات حكومية" : "Gov. Entities", tier: "INTERNAL_GOV" },
+        ].map(rec => {
+          const tierAssess = assessments.map(f => {
+            const cls = String(f.classification_code || "P");
+            if (cls === "P") return { field: String(f.field_name), verdict: "SEND" };
+            if (cls === "TS") return { field: String(f.field_name), verdict: "BLOCK" };
+            if (cls === "S") return { field: String(f.field_name), verdict: rec.tier === "INTERNAL_GOV" ? "CONDITIONAL" : "BLOCK" };
+            if (rec.tier === "PUBLIC") return { field: String(f.field_name), verdict: "BLOCK" };
+            if (rec.tier === "PRIVATE_SECTOR") return { field: String(f.field_name), verdict: "CONDITIONAL" };
+            return { field: String(f.field_name), verdict: "CONDITIONAL" };
+          });
+          const blocked = tierAssess.filter(a => a.verdict === "BLOCK");
+          const cond = tierAssess.filter(a => a.verdict === "CONDITIONAL");
+          const recVerdict = blocked.length > 0 ? "BLOCK" : cond.length > 0 ? "CONDITIONAL" : "SEND";
+          const recColor = recVerdict === "SEND" ? "#2E7D32" : recVerdict === "BLOCK" ? "#B71C1C" : "#E65100";
+          return (
+            <div key={rec.tier} className="rounded-lg p-3 border" style={{ borderColor: `${recColor}44`, borderTop: `3px solid ${recColor}` }} data-testid={`recipient-${rec.tier}`}>
+              <div className="text-xs font-bold mb-1" style={{ color: recColor }}>{rec.label}</div>
+              <div className="text-[10px] font-bold uppercase" style={{ color: recColor }}>{recVerdict}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {checklist.length > 0 && (
+        <div className="rounded-lg p-3 mb-3 border" style={{ borderColor: "#E6510044", backgroundColor: "#FFF3E0" }} data-testid="approval-checklist">
+          <div className="text-xs font-bold mb-2" style={{ color: "#E65100" }}>📋 {isRtl ? "قائمة الموافقات" : "Approval Checklist"}</div>
+          {checklist.map((item, i) => (
+            <label key={i} className="flex items-start gap-2 py-1 text-[11px] cursor-pointer" style={{ color: "#374151" }}>
+              <input type="checkbox" checked={checkedItems.has(i)} onChange={() => setCheckedItems(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; })} style={{ accentColor: "#2E7D32", marginTop: 2 }} />
+              <span>{String(item.item || "")}</span>
+            </label>
+          ))}
+        </div>
+      )}
+
+      {assessments.length > 0 && (
+        <div className="rounded-lg overflow-hidden border" style={{ borderColor: "#E5E7EB" }} data-testid="bi-field-table">
+          <table className="w-full text-[10px]">
+            <thead>
+              <tr style={{ backgroundColor: "#F3F4F6" }}>
+                {[isRtl ? "الحقل" : "Field", isRtl ? "التصنيف" : "Class", "PII", isRtl ? "الحكم" : "Verdict"].map(h => (
+                  <th key={h} className="px-2 py-1.5 text-left font-semibold" style={{ color: "#6B7280", borderBottom: "1px solid #E5E7EB" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {assessments.slice(0, 10).map((f, idx) => (
+                <Fragment key={String(f.field_name)}>
+                  <tr onClick={() => setExpandedField(expandedField === String(f.field_name) ? null : String(f.field_name))} className="cursor-pointer hover:bg-gray-50" style={{ backgroundColor: idx % 2 === 0 ? "#fff" : "#F9FAFB" }} data-testid={`row-bi-field-${f.field_name}`}>
+                    <td className="px-2 py-1.5 font-medium" style={{ color: "#1A1A2E" }}>{String(f.field_name)}</td>
+                    <td className="px-2 py-1.5">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold text-white" style={{ backgroundColor: f.classification_code === "TS" ? "#1A1A2E" : f.classification_code === "S" ? "#C0392B" : f.classification_code === "C" ? "#E65100" : "#1B5E20" }}>{String(f.classification_code)}</span>
+                    </td>
+                    <td className="px-2 py-1.5">{f.is_pii ? <span className="font-bold" style={{ color: "#DC2626" }}>YES</span> : <span style={{ color: "#9CA3AF" }}>NO</span>}</td>
+                    <td className="px-2 py-1.5">
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ color: f.stakeholder_verdict === "SEND" ? "#2E7D32" : f.stakeholder_verdict === "BLOCK" ? "#B71C1C" : "#E65100", backgroundColor: f.stakeholder_verdict === "SEND" ? "#DCFCE7" : f.stakeholder_verdict === "BLOCK" ? "#FEE2E2" : "#FEF3C7" }}>{String(f.stakeholder_verdict)}</span>
+                    </td>
+                  </tr>
+                  {expandedField === String(f.field_name) && (
+                    <tr><td colSpan={4} className="px-3 py-2 text-[10px]" style={{ backgroundColor: "#F0F9FF", color: "#374151" }}>
+                      <div><strong>{isRtl ? "التفاصيل:" : "Detail:"}</strong> {String(f.remediation_detail || "—")}</div>
+                    </td></tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+          {assessments.length > 10 && <div className="text-[10px] text-center py-1.5" style={{ color: "#9CA3AF" }}>+ {assessments.length - 10} more fields</div>}
+        </div>
+      )}
+    </>
+  );
+}
+
+function BiDashboardResult({ data, isRtl }: { data: Record<string, unknown>; isRtl: boolean }) {
+  const [activePage, setActivePage] = useState(0);
+  const pages = (data.pages || []) as Record<string, unknown>[];
+  const kpis = (data.kpis || []) as Record<string, unknown>[];
+  const VISUAL_COLORS: Record<string, string> = { "KPI Card": "#1A4B8C", "Bar Chart": "#2E7D32", "Line Chart": "#2E7D32", "Donut Chart": "#E65100", "Slicer": "#6B7280", "Table": "#0D2E5C", "Matrix": "#0D2E5C" };
+
+  return (
+    <>
+      <div className="mb-3">
+        <div className="text-base font-extrabold mb-1" style={{ color: "#1A1A2E" }}>{String(data.dashboard_title || "")}</div>
+        <div className="flex gap-2 text-[11px]">
+          <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: "#EFF6FF", color: "#1A4B8C", border: "1px solid #BFDBFE" }}>{String(data.dashboard_type || "")}</span>
+          <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: "#F0FDF4", color: "#2E7D32", border: "1px solid #BBF7D0" }}>{String(data.audience || "")}</span>
+        </div>
+      </div>
+
+      {kpis.length > 0 && (
+        <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: `repeat(${Math.min(kpis.length, 4)}, 1fr)` }}>
+          {kpis.map((k, i) => (
+            <div key={i} className="rounded-lg p-3 border" style={{ borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }} data-testid={`kpi-card-${i}`}>
+              <div className="text-[11px] font-bold mb-1" style={{ color: "#1A4B8C" }}>{String(k.kpi_name || "")}</div>
+              <div className="text-[9px] font-mono" style={{ color: "#6B7280" }}>{String(k.dax_formula || "").substring(0, 50)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {pages.length > 1 && (
+        <div className="flex gap-1 mb-3">
+          {pages.map((p, i) => (
+            <button key={i} onClick={() => setActivePage(i)} className="px-3 py-1 rounded-lg text-[11px]" style={{ backgroundColor: i === activePage ? "#EFF6FF" : "transparent", color: i === activePage ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${i === activePage ? "#BFDBFE" : "#E5E7EB"}`, fontWeight: i === activePage ? 700 : 400 }} data-testid={`page-tab-${i}`}>
+              {String(p.page_title || `Page ${i + 1}`)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {pages[activePage] && (
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {((pages[activePage].visuals || []) as Record<string, unknown>[]).slice(0, 8).map((v, i) => {
+            const vType = String(v.visual_type || "");
+            const bc = VISUAL_COLORS[vType] || "#1A4B8C";
+            return (
+              <div key={i} className="rounded-lg p-3 border" style={{ borderColor: `${bc}33`, borderTop: `3px solid ${bc}`, backgroundColor: "#FAFAFA" }} data-testid={`visual-card-${v.visual_id}`}>
+                <div className="flex items-center gap-1 mb-1">
+                  <span className="text-[9px] font-bold px-1.5 rounded" style={{ backgroundColor: `${bc}15`, color: bc }}>{vType}</span>
+                </div>
+                <div className="text-[11px] font-bold mb-1" style={{ color: "#1A1A2E" }}>{String(v.title || "")}</div>
+                <div className="text-[9px]" style={{ color: "#6B7280" }}>{String(v.insight_purpose || "")}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+function BiReportResult({ data, isRtl }: { data: Record<string, unknown>; isRtl: boolean }) {
+  const [expandedSection, setExpandedSection] = useState<string | null>("governance");
+  const verdict = String(data.governance_verdict || "BLOCKED");
+  const sendRec = String(data.send_recommendation || "DO NOT SEND");
+  const score = Number(data.overall_quality_score || 0);
+  const grade = String(data.quality_grade || "F");
+  const dims = (data.dimension_scores || {}) as Record<string, number>;
+  const govIssues = (data.governance_issues || []) as Record<string, unknown>[];
+  const dqIssues = (data.data_quality_issues || []) as Record<string, unknown>[];
+  const blIssues = (data.business_logic_issues || []) as Record<string, unknown>[];
+  const prIssues = (data.presentation_issues || []) as Record<string, unknown>[];
+  const checklist = (data.pre_send_checklist || []) as string[];
+  const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
+
+  const sendColor = sendRec === "SEND NOW" ? "#2E7D32" : sendRec === "SEND AFTER FIXES" ? "#E65100" : "#B71C1C";
+  const vc = BI_VERDICT_COLORS[verdict] || BI_VERDICT_COLORS.BLOCKED;
+  const scoreColor = (v: number) => v >= 80 ? "#2E7D32" : v >= 60 ? "#F59E0B" : "#B71C1C";
+
+  const sections = [
+    { key: "governance", label: isRtl ? "الحوكمة" : "Governance", issues: govIssues },
+    { key: "quality", label: isRtl ? "جودة البيانات" : "Data Quality", issues: dqIssues },
+    { key: "logic", label: isRtl ? "منطق الأعمال" : "Business Logic", issues: blIssues },
+    { key: "presentation", label: isRtl ? "العرض" : "Presentation", issues: prIssues },
+  ];
+
+  return (
+    <>
+      <div className="flex items-center gap-4 rounded-xl p-4 mb-3" style={{ backgroundColor: `${vc.bg}`, border: `2px solid ${vc.border}55` }} data-testid="report-verdict-banner">
+        <div className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${sendColor}18`, border: `3px solid ${sendColor}` }}>
+          <span className="text-xl font-black" style={{ color: sendColor }}>{score}</span>
+        </div>
+        <div>
+          <div className="text-base font-extrabold" style={{ color: sendColor }}>{sendRec}</div>
+          <div className="text-[11px]" style={{ color: "#6B7280" }}>{isRtl ? "الحكم:" : "Governance:"} <strong style={{ color: vc.fg }}>{verdict}</strong> · {isRtl ? "الدرجة:" : "Grade:"} <strong>{grade}</strong></div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-2 mb-3">
+        {Object.entries(dims).map(([k, v]) => (
+          <div key={k} className="rounded-lg p-2 border" style={{ borderColor: "#E5E7EB" }} data-testid={`dim-${k}`}>
+            <div className="text-[10px] mb-1" style={{ color: "#6B7280" }}>{k.replace(/_/g, " ")}</div>
+            <div className="rounded-full h-1.5 overflow-hidden" style={{ backgroundColor: "#E5E7EB" }}>
+              <div style={{ width: `${v}%`, height: "100%", backgroundColor: scoreColor(v), borderRadius: 6 }} />
+            </div>
+            <div className="text-[10px] font-bold mt-0.5" style={{ color: scoreColor(v) }}>{v}/100</div>
+          </div>
+        ))}
+      </div>
+
+      {sections.map(sec => (
+        <div key={sec.key} className="mb-2">
+          <div onClick={() => setExpandedSection(expandedSection === sec.key ? null : sec.key)} className="px-3 py-2 rounded-lg cursor-pointer flex justify-between items-center" style={{ backgroundColor: "#F3F4F6", border: "1px solid #E5E7EB" }} data-testid={`section-${sec.key}`}>
+            <span className="text-xs font-semibold" style={{ color: "#374151" }}>{sec.label} ({sec.issues.length})</span>
+            <span className="text-[10px]" style={{ color: "#9CA3AF" }}>{expandedSection === sec.key ? "▲" : "▼"}</span>
+          </div>
+          {expandedSection === sec.key && sec.issues.length > 0 && (
+            <div className="border border-t-0 rounded-b-lg overflow-hidden" style={{ borderColor: "#E5E7EB" }}>
+              {sec.issues.map((issue, i) => {
+                const sev = String((issue as Record<string, unknown>).severity || "Medium");
+                const sc = BI_SEVERITY_COLORS[sev] || BI_SEVERITY_COLORS.Medium;
+                return (
+                  <div key={i} className="px-3 py-2 text-[11px]" style={{ borderBottom: "1px solid #F3F4F6", borderLeft: sev === "Critical" ? "3px solid #B71C1C" : "3px solid transparent", backgroundColor: i % 2 === 0 ? "#fff" : "#F9FAFB" }}>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: sc.bg, color: sc.fg }}>{sev}</span>
+                      <span className="font-semibold" style={{ color: "#374151" }}>{String((issue as Record<string, unknown>).issue_id || (issue as Record<string, unknown>).field_name || "")}</span>
+                    </div>
+                    <div style={{ color: "#6B7280" }}>{String((issue as Record<string, unknown>).description || (issue as Record<string, unknown>).remediation || "")}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {checklist.length > 0 && (
+        <div className="rounded-lg p-3 mt-2 border" style={{ borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }} data-testid="pre-send-checklist">
+          <div className="text-xs font-bold mb-2" style={{ color: "#1A4B8C" }}>✅ {isRtl ? "قائمة ما قبل الإرسال" : "Pre-Send Checklist"}</div>
+          {checklist.map((item, i) => (
+            <label key={i} className="flex items-center gap-2 py-0.5 text-[11px] cursor-pointer" style={{ color: "#374151" }}>
+              <input type="checkbox" checked={checkedItems.has(i)} onChange={() => setCheckedItems(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; })} style={{ accentColor: "#2E7D32" }} />
+              {item}
+            </label>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function BiTestCaseResult({ data, isRtl, testStatus, setTestStatus }: { data: Record<string, unknown>; isRtl: boolean; testStatus: Record<string, "pass" | "fail" | null>; setTestStatus: (fn: (prev: Record<string, "pass" | "fail" | null>) => Record<string, "pass" | "fail" | null>) => void }) {
+  const cases = (data.test_cases || []) as Record<string, unknown>[];
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [expandedCase, setExpandedCase] = useState<string | null>(null);
+  const totalCases = cases.length;
+  const passed = cases.filter(tc => testStatus[String(tc.tc_id)] === "pass").length;
+  const failed = cases.filter(tc => testStatus[String(tc.tc_id)] === "fail").length;
+  const notRun = totalCases - passed - failed;
+
+  const categories = [...new Set(cases.map(tc => String(tc.category || "")))];
+  const filtered = activeCategory ? cases.filter(tc => String(tc.category) === activeCategory) : cases;
+
+  return (
+    <>
+      <div className="flex gap-3 mb-3 flex-wrap">
+        <div className="rounded-lg p-3 text-center border" style={{ borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }}>
+          <div className="text-lg font-extrabold" style={{ color: "#1A1A2E" }}>{totalCases}</div>
+          <div className="text-[10px]" style={{ color: "#6B7280" }}>{isRtl ? "المجموع" : "Total"}</div>
+        </div>
+        <div className="rounded-lg p-3 text-center border" style={{ borderColor: "#FECACA", backgroundColor: "#FEF2F2" }}>
+          <div className="text-lg font-extrabold" style={{ color: "#DC2626" }}>{Number(data.critical_test_count || 0)}</div>
+          <div className="text-[10px]" style={{ color: "#6B7280" }}>{isRtl ? "حرجة" : "Critical"}</div>
+        </div>
+      </div>
+
+      <div className="rounded-lg p-2.5 mb-3 flex items-center gap-3 border" style={{ borderColor: "#E5E7EB" }} data-testid="test-progress">
+        <div className="text-[10px]" style={{ color: "#6B7280" }}>{isRtl ? "التقدم:" : "Progress:"}</div>
+        <div className="flex-1 rounded-full h-2.5 overflow-hidden flex" style={{ backgroundColor: "#E5E7EB" }}>
+          {passed > 0 && <div style={{ width: `${(passed / totalCases) * 100}%`, backgroundColor: "#2E7D32", height: "100%" }} />}
+          {failed > 0 && <div style={{ width: `${(failed / totalCases) * 100}%`, backgroundColor: "#DC2626", height: "100%" }} />}
+        </div>
+        <div className="text-[10px] whitespace-nowrap" style={{ color: "#6B7280" }}>
+          <span style={{ color: "#2E7D32" }}>{passed}✓</span> / <span style={{ color: "#DC2626" }}>{failed}✕</span> / {notRun}○
+        </div>
+      </div>
+
+      <div className="flex gap-1 mb-3 flex-wrap">
+        <button onClick={() => setActiveCategory(null)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === null ? "#EFF6FF" : "transparent", color: activeCategory === null ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === null ? "#BFDBFE" : "#E5E7EB"}` }}>{isRtl ? "الكل" : "All"}</button>
+        {categories.map(cat => (
+          <button key={cat} onClick={() => setActiveCategory(cat)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === cat ? "#EFF6FF" : "transparent", color: activeCategory === cat ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === cat ? "#BFDBFE" : "#E5E7EB"}` }} data-testid={`cat-filter-${cat}`}>{cat}</button>
+        ))}
+      </div>
+
+      <div className="flex justify-end mb-2">
+        <button onClick={() => { exportTestRunSheet(cases, testStatus); downloadBiReport(); }} className="text-[10px] font-semibold px-3 py-1 rounded-lg" style={{ background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff" }} data-testid="button-export-test-run">
+          ⬇ {isRtl ? "تصدير نتائج الاختبار" : "Export Test Run"}
+        </button>
+      </div>
+
+      {filtered.slice(0, 20).map((tc, i) => {
+        const tcId = String(tc.tc_id || "");
+        const sev = String(tc.severity || "Medium");
+        const sc = BI_SEVERITY_COLORS[sev] || BI_SEVERITY_COLORS.Medium;
+        const expanded = expandedCase === tcId;
+        const status = testStatus[tcId];
+        return (
+          <div key={i} className="mb-2 rounded-lg overflow-hidden border" style={{ borderColor: "#E5E7EB", borderLeft: sev === "Critical" ? "3px solid #B71C1C" : "3px solid transparent" }} data-testid={`tc-${tcId}`}>
+            <div onClick={() => setExpandedCase(expanded ? null : tcId)} className="px-3 py-2 flex items-center gap-2 cursor-pointer" style={{ backgroundColor: "#F9FAFB" }}>
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: "#1A4B8C", color: "#fff" }}>{tcId}</span>
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: sc.bg, color: sc.fg }}>{sev}</span>
+              <span className="flex-1 text-[11px] font-semibold" style={{ color: "#1A1A2E" }}>{String(tc.test_name || "")}</span>
+              <span className="text-[10px]" style={{ color: "#9CA3AF" }}>{expanded ? "▲" : "▼"}</span>
+            </div>
+            {expanded && (
+              <div className="px-3 py-2 space-y-1.5 text-[11px]" style={{ backgroundColor: "#fff", color: "#374151" }}>
+                <div><strong>{isRtl ? "الهدف:" : "Objective:"}</strong> {String(tc.objective || "")}</div>
+                <div><strong>{isRtl ? "الخطوات:" : "Steps:"}</strong></div>
+                <ol className="pl-4 list-decimal space-y-0.5">
+                  {((tc.test_steps || []) as string[]).map((s, j) => <li key={j}>{s}</li>)}
+                </ol>
+                <div style={{ color: "#2E7D32" }}><strong>{isRtl ? "المتوقع:" : "Expected:"}</strong> {String(tc.expected_result || "")}</div>
+                <div className="flex gap-2 mt-2">
+                  <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "pass" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "pass" ? "#2E7D32" : "#D1D5DB"}`, backgroundColor: status === "pass" ? "#F0FDF4" : "transparent", color: status === "pass" ? "#2E7D32" : "#6B7280" }} data-testid={`btn-pass-${tcId}`}>{isRtl ? "✓ نجح" : "✓ Pass"}</button>
+                  <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "fail" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "fail" ? "#DC2626" : "#D1D5DB"}`, backgroundColor: status === "fail" ? "#FEF2F2" : "transparent", color: status === "fail" ? "#DC2626" : "#6B7280" }} data-testid={`btn-fail-${tcId}`}>{isRtl ? "✕ فشل" : "✕ Fail"}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {filtered.length > 20 && <div className="text-[10px] text-center py-1" style={{ color: "#9CA3AF" }}>+ {filtered.length - 20} more test cases</div>}
+    </>
+  );
+}
+
+function BiDashboardTestResult({ data, isRtl, testStatus, setTestStatus }: { data: Record<string, unknown>; isRtl: boolean; testStatus: Record<string, "pass" | "fail" | null>; setTestStatus: (fn: (prev: Record<string, "pass" | "fail" | null>) => Record<string, "pass" | "fail" | null>) => void }) {
+  const cases = (data.test_cases || []) as Record<string, unknown>[];
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [expandedCase, setExpandedCase] = useState<string | null>(null);
+  const totalCases = cases.length;
+  const passed = cases.filter(tc => testStatus[String(tc.tc_id)] === "pass").length;
+  const failed = cases.filter(tc => testStatus[String(tc.tc_id)] === "fail").length;
+  const notRun = totalCases - passed - failed;
+
+  const govRisk = String(data.governance_risk_level || "Low");
+  const govRiskColor = govRisk === "Critical" ? "#B71C1C" : govRisk === "High" ? "#E65100" : govRisk === "Medium" ? "#F59E0B" : "#2E7D32";
+  const DASHBOARD_CATEGORIES_EN = ["Visual Accuracy", "DAX Validation", "Slicer & Filter", "Drill-Through", "Governance", "Performance", "Formatting", "Refresh"];
+  const filtered = activeCategory ? cases.filter(tc => String(tc.category) === activeCategory) : cases;
+
+  return (
+    <>
+      <div className="flex gap-3 mb-3 flex-wrap items-center">
+        <div className="rounded-lg p-3 text-center border" style={{ borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }}>
+          <div className="text-lg font-extrabold" style={{ color: "#1A1A2E" }}>{totalCases}</div>
+          <div className="text-[10px]" style={{ color: "#6B7280" }}>{isRtl ? "المجموع" : "Total"}</div>
+        </div>
+        <div className="rounded-lg p-3 text-center border" style={{ borderColor: "#FECACA", backgroundColor: "#FEF2F2" }}>
+          <div className="text-lg font-extrabold" style={{ color: "#DC2626" }}>{Number(data.critical_test_count || 0)}</div>
+          <div className="text-[10px]" style={{ color: "#6B7280" }}>{isRtl ? "حرجة" : "Critical"}</div>
+        </div>
+        <div className="rounded-lg p-2.5 border" style={{ borderColor: `${govRiskColor}44`, backgroundColor: `${govRiskColor}08` }}>
+          <div className="text-[11px] font-bold" style={{ color: govRiskColor }}>{isRtl ? "مخاطر الحوكمة" : "Gov Risk"}: {govRisk}</div>
+        </div>
+      </div>
+
+      <div className="rounded-lg p-2.5 mb-3 flex items-center gap-3 border" style={{ borderColor: "#E5E7EB" }} data-testid="dashtest-progress">
+        <div className="text-[10px]" style={{ color: "#6B7280" }}>{isRtl ? "التقدم:" : "Progress:"}</div>
+        <div className="flex-1 rounded-full h-2.5 overflow-hidden flex" style={{ backgroundColor: "#E5E7EB" }}>
+          {passed > 0 && <div style={{ width: `${(passed / totalCases) * 100}%`, backgroundColor: "#2E7D32", height: "100%" }} />}
+          {failed > 0 && <div style={{ width: `${(failed / totalCases) * 100}%`, backgroundColor: "#DC2626", height: "100%" }} />}
+        </div>
+        <div className="text-[10px] whitespace-nowrap" style={{ color: "#6B7280" }}>
+          <span style={{ color: "#2E7D32" }}>{passed}✓</span> / <span style={{ color: "#DC2626" }}>{failed}✕</span> / {notRun}○
+        </div>
+      </div>
+
+      <div className="flex gap-1 mb-3 flex-wrap">
+        <button onClick={() => setActiveCategory(null)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === null ? "#EFF6FF" : "transparent", color: activeCategory === null ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === null ? "#BFDBFE" : "#E5E7EB"}` }}>{isRtl ? "الكل" : "All"}</button>
+        {DASHBOARD_CATEGORIES_EN.map(cat => (
+          <button key={cat} onClick={() => setActiveCategory(cat)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === cat ? "#EFF6FF" : "transparent", color: activeCategory === cat ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === cat ? "#BFDBFE" : "#E5E7EB"}` }} data-testid={`dashcat-filter-${cat}`}>{cat}</button>
+        ))}
+      </div>
+
+      <div className="flex justify-end mb-2">
+        <button onClick={() => { exportDashboardTestRunSheet(cases, testStatus); downloadBiReport(); }} className="text-[10px] font-semibold px-3 py-1 rounded-lg" style={{ background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff" }} data-testid="button-export-dashtest-run">
+          ⬇ {isRtl ? "تصدير نتائج الاختبار" : "Export Test Run"}
+        </button>
+      </div>
+
+      {filtered.slice(0, 20).map((tc, i) => {
+        const tcId = String(tc.tc_id || "");
+        const sev = String(tc.severity || "Medium");
+        const sc = BI_SEVERITY_COLORS[sev] || BI_SEVERITY_COLORS.Medium;
+        const expanded = expandedCase === tcId;
+        const status = testStatus[tcId];
+        return (
+          <div key={i} className="mb-2 rounded-lg overflow-hidden border" style={{ borderColor: "#E5E7EB", borderLeft: sev === "Critical" ? "3px solid #B71C1C" : "3px solid transparent" }} data-testid={`dbt-${tcId}`}>
+            <div onClick={() => setExpandedCase(expanded ? null : tcId)} className="px-3 py-2 flex items-center gap-2 cursor-pointer" style={{ backgroundColor: "#F9FAFB" }}>
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: "#0D2E5C", color: "#fff" }}>{tcId}</span>
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: sc.bg, color: sc.fg }}>{sev}</span>
+              {tc.visual_tested && <span className="px-1.5 py-0.5 rounded text-[8px]" style={{ backgroundColor: "#EFF6FF", color: "#1A4B8C", border: "1px solid #BFDBFE" }}>{String(tc.visual_tested)}</span>}
+              <span className="flex-1 text-[11px] font-semibold" style={{ color: "#1A1A2E" }}>{String(tc.test_name || "")}</span>
+              <span className="text-[10px]" style={{ color: "#9CA3AF" }}>{expanded ? "▲" : "▼"}</span>
+            </div>
+            {expanded && (
+              <div className="px-3 py-2 space-y-1.5 text-[11px]" style={{ backgroundColor: "#fff", color: "#374151" }}>
+                <div><strong>{isRtl ? "الهدف:" : "Objective:"}</strong> {String(tc.objective || "")}</div>
+                <div><strong>{isRtl ? "الخطوات:" : "Steps:"}</strong></div>
+                <ol className="pl-4 list-decimal space-y-0.5">
+                  {((tc.test_steps || []) as string[]).map((s, j) => <li key={j}>{s}</li>)}
+                </ol>
+                <div style={{ color: "#2E7D32" }}><strong>{isRtl ? "المتوقع:" : "Expected:"}</strong> {String(tc.expected_result || "")}</div>
+                {tc.power_bi_specific_note && <div className="p-2 rounded-lg text-[10px]" style={{ backgroundColor: "#EFF6FF", color: "#1A4B8C" }}>💡 {String(tc.power_bi_specific_note)}</div>}
+                <div className="flex gap-2 mt-2">
+                  <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "pass" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "pass" ? "#2E7D32" : "#D1D5DB"}`, backgroundColor: status === "pass" ? "#F0FDF4" : "transparent", color: status === "pass" ? "#2E7D32" : "#6B7280" }} data-testid={`btn-pass-${tcId}`}>{isRtl ? "✓ نجح" : "✓ Pass"}</button>
+                  <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "fail" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "fail" ? "#DC2626" : "#D1D5DB"}`, backgroundColor: status === "fail" ? "#FEF2F2" : "transparent", color: status === "fail" ? "#DC2626" : "#6B7280" }} data-testid={`btn-fail-${tcId}`}>{isRtl ? "✕ فشل" : "✕ Fail"}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {filtered.length > 20 && <div className="text-[10px] text-center py-1" style={{ color: "#9CA3AF" }}>+ {filtered.length - 20} more test cases</div>}
+    </>
+  );
+}
+
 function ThreadCard({
   thread, idx, isCollapsed, onToggle, tag, isRtl, t, lang,
   isActiveStreaming, liveSteps, completedSteps, streamingContent, timeTick,
   summaryOverride, onDownloadResult, dataModel, dqAnalysis, informaticaOutput, insightsReport,
-  allInsightsReports, profiledColumns = [], uploadedFileName, nudgeReport,
+  allInsightsReports, profiledColumns = [], uploadedFileName, nudgeReport, biReport,
 }: {
   thread: ThreadPair; idx: number; isCollapsed: boolean; onToggle: () => void;
   tag: string | null; isRtl: boolean; t: Translation; lang: Lang;
@@ -3852,6 +4621,7 @@ function ThreadCard({
   allInsightsReports?: { report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[];
   profiledColumns?: BackendColumnProfile[]; uploadedFileName?: string | null;
   nudgeReport?: NudgeReport | null;
+  biReport?: BiReport | null;
 }) {
   const { userMsg, assistantMsg } = thread;
   const { displayText, fileName: attachedFile } = stripExcelContent(userMsg.content);
@@ -3865,6 +4635,7 @@ function ThreadCard({
   const hasInsights = insightsReport != null;
   const hasSummary = !!summaryOverride;
   const hasNudge = nudgeReport != null;
+  const hasBi = biReport != null;
 
   const isDone = !!assistantMsg && !isActiveStreaming;
   const stepsToShow = isActiveStreaming
@@ -4155,7 +4926,11 @@ function ThreadCard({
                 <NudgeResultCard report={nudgeReport} t={t} />
               )}
 
-              {!hasSummary && !hasDataModel && !hasDqAnalysis && !hasInsights && !hasNudge && (() => {
+              {hasBi && biReport && (
+                <BiResultCard biReport={biReport} isRtl={isRtl} lang={lang} />
+              )}
+
+              {!hasSummary && !hasDataModel && !hasDqAnalysis && !hasInsights && !hasNudge && !hasBi && (() => {
                 const isFailedInsights = looksLikeInsightsJSON(assistantMsg.content);
                 if (isFailedInsights) {
                   return (
