@@ -117,6 +117,13 @@ export interface ResultRow {
   data_type?: string;
   example?: string;
   classification_level?: string;
+  classification_code?: string;
+  confidential_sub_level?: string;
+  impact_level?: string;
+  impact_category?: string;
+  justification?: string;
+  is_pii_under_pdpl?: string;
+  recommended_controls?: string;
   classification_rationale?: string;
   data_owner?: string;
   sensitivity_category?: string;
@@ -133,8 +140,8 @@ const ANALYSIS_COLUMNS: Record<AnalysisType, { keys: string[]; headers: string[]
     headers: ["Business Term (EN)", "Business Definition (EN)", "Business Term (AR)", "Business Definition (AR)", "Data Type", "Example"],
   },
   data_classification: {
-    keys: ["classification_level", "classification_rationale", "data_owner", "sensitivity_category"],
-    headers: ["Classification Level", "Classification Rationale", "Data Owner", "Sensitivity Category"],
+    keys: ["classification_level", "classification_code", "confidential_sub_level", "impact_level", "impact_category", "justification", "is_pii_under_pdpl", "recommended_controls"],
+    headers: ["Classification Level", "Classification Code", "Confidential Sub-Level", "Impact Level", "Impact Category", "Justification", "PII Under PDPL", "Recommended Controls"],
   },
   data_quality: {
     keys: ["dq_dimension", "dq_rule", "dq_threshold", "dq_priority"],
@@ -212,7 +219,13 @@ const HEADER_MAPPINGS: Record<AnalysisType, Record<string, string[]>> = {
   },
   data_classification: {
     classification_level: ["classification_level", "classification", "level", "class"],
-    classification_rationale: ["classification_rationale", "rationale", "justification", "reason"],
+    classification_code: ["classification_code", "code"],
+    confidential_sub_level: ["confidential_sub_level", "sub_level", "sublevel", "confidential_sub"],
+    impact_level: ["impact_level", "impact"],
+    impact_category: ["impact_category"],
+    justification: ["justification", "classification_rationale", "rationale", "reason"],
+    is_pii_under_pdpl: ["is_pii_under_pdpl", "pii_under_pdpl", "pii", "pdpl"],
+    recommended_controls: ["recommended_controls", "controls", "handling_rules"],
     data_owner: ["data_owner", "owner"],
     sensitivity_category: ["sensitivity_category", "sensitivity", "category"],
   },
@@ -775,6 +788,30 @@ export function buildResultWorkbook(rows: ResultRow[], includedAnalyses: Analysi
     });
     ws["!cols"] = colWidths;
 
+    if (analysis === "data_classification") {
+      const levelColIdx = 1;
+      const classColors: Record<string, { bg: string; font: string }> = {
+        "Top Secret": { bg: "1A1A2E", font: "FFFFFF" },
+        "Secret": { bg: "C0392B", font: "FFFFFF" },
+        "Confidential": { bg: "E67E22", font: "FFFFFF" },
+        "Public": { bg: "27AE60", font: "FFFFFF" },
+      };
+      for (let r = 1; r < wsData.length; r++) {
+        const cellRef = XLSX.utils.encode_cell({ r, c: levelColIdx });
+        const cell = ws[cellRef];
+        if (cell) {
+          const val = (cell.v || "").toString().trim();
+          const color = classColors[val];
+          if (color) {
+            cell.s = {
+              fill: { fgColor: { rgb: color.bg } },
+              font: { color: { rgb: color.font }, bold: true },
+            };
+          }
+        }
+      }
+    }
+
     XLSX.utils.book_append_sheet(wb, ws, ANALYSIS_SHEET_NAMES[analysis]);
   }
 
@@ -933,15 +970,26 @@ export function generateAnalysisSummary(
     if (result.analysisType === "business_definitions") {
       lines.push(`✅ Business definitions generated for ${fieldCount} fields. Results saved to result.xlsx — Sheet: ${sheetName}`);
     } else if (result.analysisType === "data_classification") {
-      const levels: Record<string, number> = {};
+      const levelEmoji: Record<string, string> = { "TS": "🔴", "S": "🟠", "C": "🟡", "P": "🟢" };
+      const levelName: Record<string, string> = { "TS": "Top Secret", "S": "Secret", "C": "Confidential", "P": "Public" };
+      const levelPriority: Record<string, number> = { "TS": 4, "S": 3, "C": 2, "P": 1 };
+      const codes: Record<string, number> = {};
       for (const columns of Object.values(result.fieldData)) {
-        const level = columns.classification_level || "Unknown";
-        levels[level] = (levels[level] || 0) + 1;
+        const code = columns.classification_code || (columns.classification_level ? columns.classification_level.charAt(0).toUpperCase() === "T" ? "TS" : columns.classification_level.charAt(0).toUpperCase() : "C");
+        codes[code] = (codes[code] || 0) + 1;
       }
-      const breakdown = Object.entries(levels)
-        .map(([level, count]) => `${count} ${level}`)
-        .join(", ");
-      lines.push(`✅ Data classification completed for ${fieldCount} fields. ${breakdown}. Sheet: ${sheetName} added to result.xlsx`);
+      const breakdownParts: string[] = [];
+      for (const c of ["TS", "S", "C", "P"]) {
+        if (codes[c]) {
+          breakdownParts.push(`${levelEmoji[c] || ""} ${levelName[c] || c} (${c}): ${codes[c]}`);
+        }
+      }
+      let highestCode = "P";
+      for (const c of Object.keys(codes)) {
+        if ((levelPriority[c] || 0) > (levelPriority[highestCode] || 0)) highestCode = c;
+      }
+      const breakdown = breakdownParts.join(" | ");
+      lines.push(`✅ Data classification completed for ${fieldCount} fields. ${breakdown}\n📋 Overall Dataset: ${levelName[highestCode] || highestCode} (${highestCode}). Sheet: ${sheetName} added to result.xlsx`);
     } else if (result.analysisType === "data_quality") {
       const ruleCount = result.dqMultiRows?.length || fieldCount;
       lines.push(`✅ Data quality rules defined — ${ruleCount} rules across ${fieldCount} fields. Sheet: ${sheetName} added to result.xlsx`);
