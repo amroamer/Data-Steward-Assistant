@@ -2257,14 +2257,29 @@ Overall verdict: CLEARED / CLEARED WITH CONDITIONS / CLEARED AFTER REMEDIATION /
 <fields>${fieldsWithTypes}</fields>
 <sample_data>${sampleStr}</sample_data>
 <instructions>
-Design a complete Power BI dashboard with:
-1. RECOMMENDED VISUALS: visual_id (VIS-001…), visual_type, title, fields_used, x_axis/y_axis/legend/tooltip, dax_measure, insight_purpose, placement (Top-Left/Top-Center/Top-Right/Mid-Left/Mid-Center/Mid-Right/Bottom-Full).
-2. SLICERS AND FILTERS: field_name, slicer_type (Dropdown/Between/Relative Date/Search), controls_visuals.
-3. DAX MEASURES: measure_name, formula, description.
-4. DATA MODEL HINTS: calculated columns, relationships, Power Query transformations.
-5. LAYOUT PLAN: pages, visual placement grid.
-6. COLOR THEME: Power BI theme JSON using ZATCA brand colors (#1A4B8C, #2E7D32, #E65100, #0D2E5C, #F59E0B).
-7. KPIs: top 5 KPIs with field, DAX formula, target logic, green/amber/red thresholds.
+Design a complete Power BI dashboard with the following:
+
+1. RECOMMENDED VISUALS: For each visual specify:
+   - visual_id (VIS-001, VIS-002…)
+   - visual_type: Bar Chart / Line Chart / Donut Chart / KPI Card / Matrix / Scatter Plot / Map / Treemap / Waterfall / Gauge / Slicer / Table
+   - title
+   - fields_used (from uploaded dataset)
+   - x_axis / y_axis / legend / tooltip fields where applicable
+   - dax_measure: the exact DAX formula if a calculated measure is needed
+   - insight_purpose: what business question this visual answers
+   - placement: Top-Left / Top-Center / Top-Right / Mid-Left / Mid-Center / Mid-Right / Bottom-Full
+
+2. SLICERS AND FILTERS: List all recommended slicers with field name, slicer type (Dropdown / Between / Relative Date / Search), and which visuals it controls.
+
+3. DAX MEASURES: Full list of all recommended DAX measures with measure name, formula, and description.
+
+4. DATA MODEL HINTS: Any calculated columns, relationships, or transformations needed in Power Query before building the dashboard.
+
+5. LAYOUT PLAN: Describe the dashboard layout — number of pages, what goes on each page, visual placement grid.
+
+6. COLOR THEME: Recommend a Power BI theme JSON configuration using ZATCA brand colors (#1A4B8C primary, #2E7D32 green, #E65100 orange, #0D2E5C dark navy, #F59E0B amber).
+
+7. KPIs: List the top 5 KPIs to surface, with field used, DAX formula, target value logic, and color thresholds (green/amber/red).
 </instructions>
 <json_schema>
 {
@@ -2351,30 +2366,64 @@ Design a complete Power BI dashboard with:
       if (!fields || !Array.isArray(fields) || fields.length === 0) {
         return res.status(400).json({ ok: false, error: "fields_required" });
       }
-      const sampleStr = (sampleRows || []).slice(0, 10).map((r: Record<string, unknown>) =>
+      const samples = (sampleRows || []).slice(0, 10);
+      const sampleStr = samples.map((r: Record<string, unknown>) =>
         fields.map(f => `${f}: ${r[f] ?? ""}`).join(" | ")
       ).join("\n");
+
+      const inferType = (f: string): string => {
+        for (const row of samples) {
+          const v = row[f];
+          if (v === null || v === undefined || v === "") continue;
+          if (typeof v === "number") return "numeric";
+          if (typeof v === "boolean") return "boolean";
+          const s = String(v);
+          if (!isNaN(Number(s)) && s.trim() !== "") return "numeric";
+          if (/^\d{4}-\d{2}-\d{2}/.test(s)) return "date/datetime";
+          return "text";
+        }
+        return "text";
+      };
+      const fieldsWithTypes = fields.map(f => `${f} (${inferType(f)})`).join(", ");
 
       const userMsg = `<task>BI Report Pre-Send Quality Test</task>
 <report_purpose>${reportPurpose || "General report review"}</report_purpose>
 <stakeholder>${stakeholder || "Unknown"}</stakeholder>
 <report_format>${reportFormat || "Mixed"}</report_format>
-<fields>${fields.join(", ")}</fields>
+<fields>${fieldsWithTypes}</fields>
 <sample_data>${sampleStr}</sample_data>
 <instructions>
 Run a four-dimension quality test on this report:
 
 DIMENSION 1 — DATA GOVERNANCE CLEARANCE
-Apply NDMO Section 4.3 + Section 6 sharing rules for the specified stakeholder. Produce a go/no-go verdict: CLEARED / CLEARED WITH CONDITIONS / CLEARED AFTER REMEDIATION / BLOCKED. List every field that blocks or conditions sending.
+Apply NDMO Section 4.3 + Section 6 sharing rules for the specified stakeholder.
+Produce a go/no-go verdict: CLEARED / CLEARED WITH CONDITIONS / CLEARED AFTER REMEDIATION / BLOCKED.
+List every field that blocks or conditions sending.
 
 DIMENSION 2 — DATA QUALITY ISSUES
-Scan sample rows for: Nulls/missing values, Duplicate rows, Type mismatches, Outliers or impossible values, Inconsistent formatting, Referential integrity issues. Severity: Critical / High / Medium / Low.
+Scan sample rows for:
+- Nulls and missing values (flag fields with >10% nulls in sample)
+- Duplicate rows
+- Type mismatches (numbers stored as text, dates as strings)
+- Outliers or impossible values (negative ages, future dates in past-tense fields, amounts = 0 where unexpected)
+- Inconsistent formatting (mixed case names, inconsistent date formats, mixed currency symbols)
+- Referential integrity issues (IDs that appear broken or inconsistent)
+Severity: Critical / High / Medium / Low
 
 DIMENSION 3 — BUSINESS LOGIC INTEGRITY
-Check: Are the right fields present? Are key fields missing? Are totals consistent? Are field names misleading? Are date ranges appropriate?
+Given the report purpose, check:
+- Are the right fields present to answer the business question?
+- Are any key fields missing that a stakeholder would expect?
+- Are totals and subtotals logically consistent with row-level data?
+- Are any field names misleading or ambiguous for the stated audience?
+- Are date ranges and granularity appropriate for the report purpose?
 
 DIMENSION 4 — PRESENTATION QUALITY
-Check: Column headers clear? Number formats appropriate (SAR, %, DD/MM/YYYY)? Sort order logical? Redundant columns? Recommend column order.
+- Are column headers clear and professional (no raw database names like CUST_ID_FK)?
+- Are number formats appropriate (currency with SAR symbol, percentages with % sign, dates in DD/MM/YYYY)?
+- Is the sort order logical for the stated purpose?
+- Are there redundant columns that add no value for the stakeholder?
+- Recommend a better column order for readability.
 </instructions>
 <json_schema>
 {
@@ -2461,28 +2510,65 @@ Check: Column headers clear? Number formats appropriate (SAR, %, DD/MM/YYYY)? So
       if (!fields || !Array.isArray(fields) || fields.length === 0) {
         return res.status(400).json({ ok: false, error: "fields_required" });
       }
-      const sampleStr = (sampleRows || []).slice(0, 10).map((r: Record<string, unknown>) =>
+      const samples = (sampleRows || []).slice(0, 10);
+      const sampleStr = samples.map((r: Record<string, unknown>) =>
         fields.map(f => `${f}: ${r[f] ?? ""}`).join(" | ")
       ).join("\n");
+
+      const inferType = (f: string): string => {
+        for (const row of samples) {
+          const v = row[f];
+          if (v === null || v === undefined || v === "") continue;
+          if (typeof v === "number") return "numeric";
+          if (typeof v === "boolean") return "boolean";
+          const s = String(v);
+          if (!isNaN(Number(s)) && s.trim() !== "") return "numeric";
+          if (/^\d{4}-\d{2}-\d{2}/.test(s)) return "date/datetime";
+          return "text";
+        }
+        return "text";
+      };
+      const fieldsWithTypes = fields.map(f => `${f} (${inferType(f)})`).join(", ");
 
       const userMsg = `<task>BI Report Test Case Generation</task>
 <report_purpose>${reportPurpose || "General report"}</report_purpose>
 <test_depth>${testDepth || "Standard"}</test_depth>
 <test_categories>${(testCategories || ["Data completeness", "Data accuracy", "Business rules", "Edge cases", "Security & governance", "Performance thresholds", "Formatting & presentation"]).join(", ")}</test_categories>
-<fields>${fields.join(", ")}</fields>
+<fields>${fieldsWithTypes}</fields>
 <sample_data>${sampleStr}</sample_data>
 <instructions>
-Generate structured test cases for this BI report. Each test case must be specific to the actual fields in the dataset.
+Generate structured test cases for this BI report. Each test case must be specific to the actual fields in the dataset — never generic.
 
 Test case structure:
-- TC-ID: TC-001, TC-002…
+- TC-ID: TC-001, TC-002… sequentially
 - category: Data Completeness / Data Accuracy / Business Rules / Edge Cases / Security & Governance / Performance / Formatting
-- test_name, objective, preconditions, test_steps (numbered), test_data, expected_result, actual_result (blank), pass_fail_criteria
+- test_name: short descriptive name
+- objective: one sentence — what this test verifies
+- preconditions: what must be true before running this test
+- test_steps: numbered list of exact steps the tester should follow
+- test_data: what specific data or values to use (reference actual field names and sample values)
+- expected_result: exactly what should happen if the report is correct
+- actual_result: leave blank (field for tester to fill in)
+- pass_fail_criteria: the precise condition that determines PASS or FAIL
 - severity: Critical / High / Medium / Low
 - estimated_duration_minutes: integer
-- ndmo_reference: cite NDMO section if applicable, otherwise "N/A"
+- ndmo_reference: if this test relates to data governance, cite the NDMO section (e.g. "NDMO Section 4.3 — Data Classification"). Otherwise "N/A".
 
-Categories: DATA COMPLETENESS, DATA ACCURACY, BUSINESS RULES, EDGE CASES, SECURITY & GOVERNANCE, PERFORMANCE, FORMATTING.
+Categories to cover (based on selected inputs):
+
+DATA COMPLETENESS: Are all expected fields populated? Are required fields ever null? Do row counts match expected totals? Is there data for all expected time periods?
+
+DATA ACCURACY: Do calculated fields match manual calculation from raw fields? Are aggregations correct? Are there rounding errors? Do currency fields show correct SAR values?
+
+BUSINESS RULES: Do values fall within valid business ranges (e.g. tax rates between 0–15%)? Are date fields logically consistent (end date after start date)? Are statuses valid per business rules? Are foreign key references valid?
+
+EDGE CASES: What happens with zero values? What happens with maximum possible values? What happens with special characters in text fields? What happens with data at date boundaries (first/last day of month/year)?
+
+SECURITY & GOVERNANCE: Are PII fields classified correctly per NDMO? Are Top Secret or Secret fields present that should not appear in this report? Does the report comply with PDPL for the intended audience? Are there any unmasked NID, salary, or account number fields?
+
+PERFORMANCE: Does the report load within acceptable time? Are there fields with high cardinality that could cause slow rendering? Are date filters applied to limit data volume?
+
+FORMATTING: Are dates in DD/MM/YYYY format? Are currency values showing SAR symbol? Are column headers in Title Case and business-friendly? Are negative numbers shown correctly?
 </instructions>
 <json_schema>
 {
@@ -2556,30 +2642,53 @@ Categories: DATA COMPLETENESS, DATA ACCURACY, BUSINESS RULES, EDGE CASES, SECURI
       if (!fields || !Array.isArray(fields) || fields.length === 0) {
         return res.status(400).json({ ok: false, error: "fields_required" });
       }
-      const sampleStr = (sampleRows || []).slice(0, 10).map((r: Record<string, unknown>) =>
+      const samples = (sampleRows || []).slice(0, 10);
+      const sampleStr = samples.map((r: Record<string, unknown>) =>
         fields.map(f => `${f}: ${r[f] ?? ""}`).join(" | ")
       ).join("\n");
+
+      const inferType = (f: string): string => {
+        for (const row of samples) {
+          const v = row[f];
+          if (v === null || v === undefined || v === "") continue;
+          if (typeof v === "number") return "numeric";
+          if (typeof v === "boolean") return "boolean";
+          const s = String(v);
+          if (!isNaN(Number(s)) && s.trim() !== "") return "numeric";
+          if (/^\d{4}-\d{2}-\d{2}/.test(s)) return "date/datetime";
+          return "text";
+        }
+        return "text";
+      };
+      const fieldsWithTypes = fields.map(f => `${f} (${inferType(f)})`).join(", ");
 
       const userMsg = `<task>Power BI Dashboard Test Case Generation</task>
 <dashboard_description>${dashboardDescription || "Power BI dashboard"}</dashboard_description>
 <visuals_list>${visualsList || "Not specified"}</visuals_list>
 <audience>${audience || "Internal ZATCA Team"}</audience>
 <test_depth>${testDepth || "Standard"}</test_depth>
-<fields>${fields.join(", ")}</fields>
+<fields>${fieldsWithTypes}</fields>
 <sample_data>${sampleStr}</sample_data>
 <instructions>
-Generate structured test cases for Power BI dashboard testing. Cover these categories:
+Generate structured test cases specifically for Power BI dashboard testing. Cover these categories:
 
-VISUAL ACCURACY: Does each visual show correct data? Do chart axes use the right fields? Do KPI cards calculate correctly?
-DAX VALIDATION: Are calculated measures producing correct results? Test each DAX measure manually.
-SLICER & FILTER BEHAVIOR: Does each slicer filter correctly? Do cross-filters behave as expected?
-DRILL-THROUGH & NAVIGATION: Do drill-through pages open with correct context? Do back buttons work?
-DATA GOVERNANCE: Are PII or classified fields visible to the wrong audience? NDMO compliance?
-PERFORMANCE: Dashboard load within 3 seconds? Slicer response within 1 second?
-FORMATTING & UX: Number formats correct? Color theme consistent? Tooltips meaningful?
-REFRESH & DATA FRESHNESS: Is refresh date shown? Does dashboard reflect latest data?
+VISUAL ACCURACY: Does each visual show the correct data? Do chart axes use the right fields? Do KPI cards calculate correctly against raw data? Are donut/bar totals consistent with underlying table?
 
-Each test case must reference actual fields and visuals described by the analyst.
+DAX VALIDATION: Are calculated measures producing correct results? Test each DAX measure with a manual calculation from sample data. Are running totals, YTD, and period-over-period measures correct?
+
+SLICER & FILTER BEHAVIOR: Does each slicer filter the correct visuals? Does selecting a value in one slicer cascade correctly to dependent slicers? Does clearing a slicer restore the full dataset? Do cross-filters between visuals behave as expected?
+
+DRILL-THROUGH & NAVIGATION: Do drill-through pages open with the correct filtered context? Do back navigation buttons work? Do bookmarks restore the correct state?
+
+DATA GOVERNANCE: Are any PII or classified fields visible to the wrong audience? Are sensitive fields masked or hidden per NDMO classification? Does the dashboard comply with PDPL for the intended audience tier?
+
+PERFORMANCE: Does the dashboard load within 3 seconds for the expected data volume? Do slicers respond within 1 second? Are visuals with high cardinality fields slow to render?
+
+FORMATTING & UX: Are all number formats correct (SAR currency, percentage, date DD/MM/YYYY)? Is the color theme consistent? Are tooltips meaningful? Are visual titles clear for the stated audience? Is the layout readable on a 1920x1080 screen?
+
+REFRESH & DATA FRESHNESS: Is the data refresh date shown on the dashboard? Does the dashboard reflect the most recent data after a refresh? Are stale data warnings present?
+
+Each test case must reference the actual fields and visuals described by the analyst.
 </instructions>
 <json_schema>
 {
