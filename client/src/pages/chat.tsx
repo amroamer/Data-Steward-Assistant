@@ -76,6 +76,7 @@ import {
   FileSearch,
   ListChecks,
   Monitor,
+  Square,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -3314,8 +3315,8 @@ export default function ChatPage() {
                           )}
                         </div>
                         {biLoading ? (
-                          <button type="button" onClick={() => { biAbortRef.current?.abort(); setBiLoading(false); }} className="h-9 px-4 flex-shrink-0 rounded-lg text-xs font-bold text-white flex items-center gap-1.5" style={{ backgroundColor: "#C62828" }} data-testid="bi-stop-btn">
-                            {t.stopButton}
+                          <button type="button" onClick={() => { biAbortRef.current?.abort(); setBiLoading(false); }} className="h-9 px-5 flex-shrink-0 rounded-lg text-xs font-semibold text-white flex items-center gap-2" style={{ backgroundColor: "#EF4444" }} data-testid="bi-stop-btn">
+                            <Square className="w-3 h-3 fill-white" /> stop agent
                           </button>
                         ) : (
                           <Button onClick={biRunAnalysis} className="h-9 px-4 flex-shrink-0 rounded-lg gap-1.5 text-xs font-medium text-white ripple-button" style={{ backgroundColor: "#2E7D32" }} disabled={!biFields.length || biLoading} data-testid="bi-run-btn">
