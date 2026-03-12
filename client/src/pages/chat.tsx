@@ -1044,6 +1044,7 @@ const FEATURE_CARDS = [
     bg: "bg-[#1A4B8C]/5",
     iconBg: "bg-[#1A4B8C]/10",
     agentMode: "bi" as const,
+    hidden: true,
   },
   {
     icon: Monitor,
@@ -3291,7 +3292,7 @@ export default function ChatPage() {
                         <button onClick={() => { setBiFile(null); setBiRows([]); setBiFields([]); }} className="ml-auto text-white/40 hover:text-white/70 text-sm" data-testid="bi-clear-file-btn">✕</button>
                       </div>
                       <div className="flex items-center gap-1 mb-2">
-                        {BI_TABS.filter(tb => tb.key !== "dashboard" && tb.key !== "dashtest").map(tb => (
+                        {BI_TABS.filter(tb => tb.key !== "dashboard" && tb.key !== "dashtest" && tb.key !== "testcases").map(tb => (
                           <button key={tb.key} onClick={() => setBiActiveTab(tb.key)}
                             className="px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all"
                             style={{ backgroundColor: biActiveTab === tb.key ? "rgba(26,75,140,0.5)" : "transparent", color: biActiveTab === tb.key ? "#E8EDF5" : "rgba(255,255,255,0.5)", border: `1px solid ${biActiveTab === tb.key ? "#1A4B8C" : "transparent"}` }}
