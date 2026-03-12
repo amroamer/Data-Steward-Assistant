@@ -3102,7 +3102,7 @@ export default function ChatPage() {
                           </div>
                         </div>
                       )}
-                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                      <div className="hidden grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                         {([
                           { icon: "🔍", titleKey: "biInfoCard1" as const, descKey: "biInfoCard1Desc" as const, color: "#1A4B8C" },
                           { icon: "📐", titleKey: "biInfoCard2" as const, descKey: "biInfoCard2Desc" as const, color: "#2E7D32" },
