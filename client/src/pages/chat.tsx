@@ -983,6 +983,7 @@ const FEATURE_CARDS = [
     bg: "bg-[#7C3AED]/5",
     iconBg: "bg-[#7C3AED]/10",
     agentMode: "nudge" as const,
+    hidden: true,
   },
   {
     icon: TrendingUp,
@@ -1003,6 +1004,7 @@ const FEATURE_CARDS = [
     bg: "bg-[#7C3AED]/5",
     iconBg: "bg-[#7C3AED]/10",
     agentMode: "nudge" as const,
+    hidden: true,
   },
   {
     icon: Share2,
