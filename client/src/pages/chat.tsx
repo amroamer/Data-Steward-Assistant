@@ -2949,15 +2949,6 @@ export default function ChatPage() {
             {t.useCases}
           </Link>
           <Link
-            href="/sharing-eligibility"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
-            style={{ color: "#6B7280" }}
-            data-testid="link-sharing-eligibility"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            {t.sharingEligibility}
-          </Link>
-          <Link
             href="/user-guide"
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
             style={{ color: "#6B7280" }}
