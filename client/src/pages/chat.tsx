@@ -1022,6 +1022,7 @@ const FEATURE_CARDS = [
     bg: "bg-[#1A4B8C]/5",
     iconBg: "bg-[#1A4B8C]/10",
     agentMode: "bi" as const,
+    hidden: true,
   },
   {
     icon: FileSearch,
@@ -1052,6 +1053,7 @@ const FEATURE_CARDS = [
     bg: "bg-[#1A4B8C]/5",
     iconBg: "bg-[#1A4B8C]/10",
     agentMode: "bi" as const,
+    hidden: true,
   },
 ];
 
@@ -3125,7 +3127,7 @@ export default function ChatPage() {
                     </div>
                   )}
                   <div className={`grid grid-cols-2 ${isMobile ? "" : "lg:grid-cols-3"} gap-4 w-full max-w-4xl`}>
-                    {FEATURE_CARDS.filter(c => c.agentMode === agentMode).map((card, cardIdx) => {
+                    {FEATURE_CARDS.filter(c => c.agentMode === agentMode && !c.hidden).map((card, cardIdx) => {
                       const globalIdx = FEATURE_CARDS.indexOf(card);
                       return (
                       <button
@@ -3244,7 +3246,7 @@ export default function ChatPage() {
           {activeConversationId && (
             <div className="px-4 pt-2 pb-1">
               <div className="max-w-4xl mx-auto flex gap-2 flex-wrap">
-                {FEATURE_CARDS.filter(c => c.agentMode === agentMode).map((card, cardIdx) => {
+                {FEATURE_CARDS.filter(c => c.agentMode === agentMode && !c.hidden).map((card, cardIdx) => {
                   const globalIdx = FEATURE_CARDS.indexOf(card);
                   return (
                   <button
@@ -3288,7 +3290,7 @@ export default function ChatPage() {
                         <button onClick={() => { setBiFile(null); setBiRows([]); setBiFields([]); }} className="ml-auto text-white/40 hover:text-white/70 text-sm" data-testid="bi-clear-file-btn">✕</button>
                       </div>
                       <div className="flex items-center gap-1 mb-2">
-                        {BI_TABS.map(tb => (
+                        {BI_TABS.filter(tb => tb.key !== "dashboard" && tb.key !== "dashtest").map(tb => (
                           <button key={tb.key} onClick={() => setBiActiveTab(tb.key)}
                             className="px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all"
                             style={{ backgroundColor: biActiveTab === tb.key ? "rgba(26,75,140,0.5)" : "transparent", color: biActiveTab === tb.key ? "#E8EDF5" : "rgba(255,255,255,0.5)", border: `1px solid ${biActiveTab === tb.key ? "#1A4B8C" : "transparent"}` }}
