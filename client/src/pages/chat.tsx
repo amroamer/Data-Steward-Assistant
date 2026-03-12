@@ -3325,13 +3325,6 @@ export default function ChatPage() {
                           </Button>
                         )}
                       </div>
-                      {hasBiSheets() && (
-                        <div className="mt-2 flex justify-end">
-                          <button onClick={() => downloadBiReport()} className="text-[10px] font-semibold px-3 py-1 rounded-lg" style={{ background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff" }} data-testid="bi-download-report">
-                            ⬇ {t.biDownloadReport as string}
-                          </button>
-                        </div>
-                      )}
                     </>
                   )}
                 </div>
@@ -4368,12 +4361,24 @@ function BiResultCard({ biReport, isRtl, lang }: { biReport: BiReport; isRtl: bo
     <div className="space-y-3 mt-2" data-testid="bi-result-card">
       <div className="flex items-center gap-2 mb-1">
         <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#1A4B8C", color: "#ffffff" }}>BI {BI_TABS.find(tb => tb.key === tab)?.label || tab}</span>
-        {hasBiSheets() && (
-          <button onClick={() => downloadBiReport()} className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#2E7D32", color: "#fff" }} data-testid="bi-result-download">
-            ⬇ {t.biDownloadXlsx as string}
-          </button>
-        )}
       </div>
+      {hasBiSheets() && (
+        <div
+          className="rounded-lg border p-3 cursor-pointer hover:shadow-sm transition-shadow bg-white flex items-center gap-2"
+          style={{ borderColor: "#E5E7EB" }}
+          onClick={() => downloadBiReport()}
+          data-testid="bi-result-download"
+        >
+          <FileSpreadsheet className="w-5 h-5 flex-shrink-0" style={{ color: "#1A4B8C" }} />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold" style={{ color: "#1A1A2E" }}>bi_agent_report.xlsx</p>
+            <p className="text-[10px]" style={{ color: "#6B7280" }}>{t.biSidebarDownload as string}</p>
+          </div>
+          <Button size="sm" className="h-7 px-2 text-[10px] text-white" style={{ backgroundColor: "#1A4B8C" }} onClick={(e) => { e.stopPropagation(); downloadBiReport(); }} data-testid="bi-result-download-btn">
+            <Download className="w-3 h-3" />
+          </Button>
+        </div>
+      )}
       {tab === "sharing" && <BiSharingResult data={data} t={t} />}
       {tab === "dashboard" && <BiDashboardResult data={data} t={t} />}
       {tab === "report" && <BiReportResult data={data} t={t} />}
