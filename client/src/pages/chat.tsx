@@ -3186,7 +3186,13 @@ export default function ChatPage() {
                         streamingContent={isActiveStreaming ? streamingContent : ""}
                         timeTick={isActiveStreaming ? timeTick : undefined}
                         summaryOverride={thread.assistantMsg ? summaryOverrides[thread.assistantMsg.id] : undefined}
-                        onDownloadResult={(resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis || latestInformaticaOutput) ? handleDownloadResult : undefined}
+                        onDownloadResult={
+                          (thread.assistantMsg && biReports[thread.assistantMsg.id])
+                            ? downloadBiReport
+                            : (resultRows.length > 0 || latestDataModel || latestPiiScan || latestDqAnalysis || latestInformaticaOutput)
+                              ? handleDownloadResult
+                              : undefined
+                        }
                         dataModel={thread.assistantMsg ? (dataModels[thread.assistantMsg.id] || undefined) : undefined}
                         dqAnalysis={thread.assistantMsg ? (dqAnalyses[thread.assistantMsg.id] || undefined) : undefined}
                         informaticaOutput={thread.assistantMsg ? (informaticaOutputs[thread.assistantMsg.id] || undefined) : undefined}
@@ -4362,23 +4368,6 @@ function BiResultCard({ biReport, isRtl, lang }: { biReport: BiReport; isRtl: bo
       <div className="flex items-center gap-2 mb-1">
         <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#1A4B8C", color: "#ffffff" }}>BI {BI_TABS.find(tb => tb.key === tab)?.label || tab}</span>
       </div>
-      {hasBiSheets() && (
-        <div
-          className="rounded-lg border p-3 cursor-pointer hover:shadow-sm transition-shadow bg-white flex items-center gap-2"
-          style={{ borderColor: "#E5E7EB" }}
-          onClick={() => downloadBiReport()}
-          data-testid="bi-result-download"
-        >
-          <FileSpreadsheet className="w-5 h-5 flex-shrink-0" style={{ color: "#1A4B8C" }} />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold" style={{ color: "#1A1A2E" }}>bi_agent_report.xlsx</p>
-            <p className="text-[10px]" style={{ color: "#6B7280" }}>{t.biSidebarDownload as string}</p>
-          </div>
-          <Button size="sm" className="h-7 px-2 text-[10px] text-white" style={{ backgroundColor: "#1A4B8C" }} onClick={(e) => { e.stopPropagation(); downloadBiReport(); }} data-testid="bi-result-download-btn">
-            <Download className="w-3 h-3" />
-          </Button>
-        </div>
-      )}
       {tab === "sharing" && <BiSharingResult data={data} t={t} />}
       {tab === "dashboard" && <BiDashboardResult data={data} t={t} />}
       {tab === "report" && <BiReportResult data={data} t={t} />}
@@ -5213,11 +5202,11 @@ function ThreadCard({
                   size="sm"
                   onClick={onDownloadResult}
                   className="gap-1 text-[10px] text-white font-medium h-6 px-2 rounded-md ripple-button"
-                  style={{ backgroundColor: "#2E7D32" }}
+                  style={{ backgroundColor: hasBi ? "#1A4B8C" : "#2E7D32" }}
                   data-testid={`button-download-result-${assistantMsg.id}`}
                 >
                   <Download className="w-2.5 h-2.5" />
-                  {t.resultXlsx}
+                  {hasBi ? "bi_agent_report.xlsx" : t.resultXlsx}
                 </Button>
               )}
             </div>
