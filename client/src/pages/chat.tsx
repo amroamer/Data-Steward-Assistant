@@ -3082,7 +3082,7 @@ export default function ChatPage() {
                           onClick={() => biFileInputRef.current?.click()}
                           onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleBiFile(f); }}
                           onDragOver={(e) => e.preventDefault()}
-                          className="bg-white rounded-xl border-2 border-dashed border-gray-300 hover:border-blue-400 p-12 text-center cursor-pointer transition-all"
+                          className="hidden bg-white rounded-xl border-2 border-dashed border-gray-300 hover:border-blue-400 p-12 text-center cursor-pointer transition-all"
                           data-testid="bi-upload-zone"
                         >
                           <input ref={biFileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleBiFile(e.target.files?.[0] ?? null)} data-testid="bi-input-file" />
