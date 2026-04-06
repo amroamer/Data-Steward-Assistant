@@ -1,9 +1,34 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-async function throwIfResNotOk(res: Response) {
+function dispatchApiError(detail: {
+  message: string;
+  status: number | null;
+  endpoint: string;
+  aiProvider: string;
+  timestamp: string;
+}) {
+  window.dispatchEvent(new CustomEvent("api-error", { detail }));
+}
+
+async function throwIfResNotOk(res: Response, url?: string) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let message = res.statusText;
+    try {
+      const body = await res.clone().json();
+      message = body.message || body.error || message;
+    } catch {
+      try { message = (await res.clone().text()) || message; } catch {}
+    }
+
+    dispatchApiError({
+      message,
+      status: res.status,
+      endpoint: url ?? res.url,
+      aiProvider: sessionStorage.getItem("ai-provider") ?? "claude",
+      timestamp: new Date().toISOString(),
+    });
+
+    throw new Error(`${res.status}: ${message}`);
   }
 }
 
@@ -19,7 +44,7 @@ export async function apiRequest(
     credentials: "include",
   });
 
-  await throwIfResNotOk(res);
+  await throwIfResNotOk(res, url);
   return res;
 }
 
@@ -29,7 +54,8 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = queryKey.join("/") as string;
+    const res = await fetch(url, {
       credentials: "include",
     });
 
@@ -37,7 +63,7 @@ export const getQueryFn: <T>(options: {
       return null;
     }
 
-    await throwIfResNotOk(res);
+    await throwIfResNotOk(res, url);
     return await res.json();
   };
 

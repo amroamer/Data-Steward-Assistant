@@ -13,6 +13,7 @@ export interface IChatStorage {
   deleteConversationsByMode(agentMode: string): Promise<void>;
   getMessagesByConversation(conversationId: number): Promise<(typeof messages.$inferSelect)[]>;
   createMessage(conversationId: number, role: string, content: string): Promise<typeof messages.$inferSelect>;
+  deleteLastMessage(conversationId: number): Promise<void>;
 }
 
 export const chatStorage: IChatStorage = {
@@ -63,5 +64,12 @@ export const chatStorage: IChatStorage = {
   async createMessage(conversationId: number, role: string, content: string) {
     const [message] = await db.insert(messages).values({ conversationId, role, content }).returning();
     return message;
+  },
+
+  async deleteLastMessage(conversationId: number) {
+    const msgs = await db.select().from(messages).where(eq(messages.conversationId, conversationId)).orderBy(desc(messages.createdAt));
+    if (msgs.length > 0) {
+      await db.delete(messages).where(eq(messages.id, msgs[0].id));
+    }
   },
 };

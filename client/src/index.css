@@ -301,3 +301,21 @@
 .font-mono-cmd {
   font-family: 'Courier New', monospace;
 }
+
+@keyframes check-slide-in {
+  from { opacity: 0; transform: translateX(-6px) scale(0.7); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+.animate-check-slide-in {
+  animation: check-slide-in 220ms ease-out forwards;
+}
+
+@keyframes progress-fill {
+  from { width: 0%; }
+  to   { width: var(--progress-target, 100%); }
+}
+
+.animate-progress-fill {
+  animation: progress-fill 600ms ease-in-out forwards;
+}

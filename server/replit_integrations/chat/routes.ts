@@ -1,16 +1,12 @@
 import type { Express, Request, Response } from "express";
-import Anthropic from "@anthropic-ai/sdk";
+import { aiComplete, aiStream } from "../../ai-provider";
+import { initPrompts, getPrompt, getAllPrompts, updatePrompt, resetPromptToDefault } from "./prompts";
 import { chatStorage } from "./storage";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 import sharp from "sharp";
-
-const anthropic = new Anthropic({
-  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
-});
 
 const upload = multer({ 
   storage: multer.memoryStorage(), 
@@ -74,7 +70,7 @@ Do not apologise. Do not explain further. Do not attempt to answer the question.
 
 <output_format_rules>
 Rule 1 — JSON OUTPUT:
-When a feature requires JSON output (data classification, business definitions, data quality rules, analytical data model, PII detection, data insights, Informatica logic, nudge analysis, ZATCA compliance topics) return ONLY raw valid JSON.
+When a feature requires JSON output (data quality rules, analytical data model, PII detection, data insights, Informatica logic, nudge analysis, ZATCA compliance topics) return ONLY raw valid JSON.
 No prose before it. No prose after it.
 No markdown code fences. No backticks. No explanation.
 The application parses your response directly with JSON.parse().
@@ -102,7 +98,7 @@ If one or more reference documents have been provided at the start of this conve
 `;
 
 function buildSystemPrompt(featurePrompt: string): string {
-  return ZATCA_SYSTEM_PROMPT.trim() + "\n\n---\n\n" + featurePrompt.trim();
+  return getPrompt("zatca_base").trim() + "\n\n---\n\n" + featurePrompt.trim();
 }
 
 const SYSTEM_PROMPT = `You are the "ZATCA Data Owner Agent", an expert AI assistant specialized in data governance, data management, and data strategy for ZATCA (Zakat, Tax and Customs Authority). You help data owners, data stewards, and data governance professionals with their daily tasks.
@@ -399,14 +395,16 @@ const DQ_TRIGGER_KEYWORDS = [
   "data quality",
   "dq rules",
   "quality rules",
-  "generate rules",
+  "dq rule",
+  "generate dq rules",
+  "generate data quality",
   "data quality rules",
+  "generate rules",
   "give me rules",
   "quality dimensions",
   "dq dimensions",
   "business rules",
   "business logic rules",
-  "quality checks",
   "validation rules",
   "dq analysis",
 ];
@@ -421,6 +419,34 @@ const INFORMATICA_TRIGGER_KEYWORDS = [
   "generate informatica output",
   "informatica mapping",
   "create informatica output",
+];
+
+const CLASSIFICATION_TRIGGER_KEYWORDS = [
+  "classify",
+  "classification",
+  "data classification",
+  "classify this data",
+  "classify the fields",
+  "classify these columns",
+  "classify the columns",
+  "classify the data",
+  "تصنيف",
+];
+
+const BUSINESS_DEF_TRIGGER_KEYWORDS = [
+  "business definition",
+  "business definitions",
+  "business def",
+  "data dictionary",
+  "define these fields",
+  "define the fields",
+  "define the columns",
+  "define these columns",
+  "generate definitions",
+  "generate business definitions",
+  "business glossary",
+  "تعريفات",
+  "قاموس البيانات",
 ];
 
 const DQ_DIMENSIONS_SYSTEM_PROMPT = `You are the "ZATCA Data Owner Agent" — a senior data quality architect. You are performing PART 1 of a 2-part data quality analysis.
@@ -556,6 +582,80 @@ function isInformaticaRequest(message: string): boolean {
   return INFORMATICA_TRIGGER_KEYWORDS.some(kw => lower.includes(kw));
 }
 
+function isClassificationRequest(message: string): boolean {
+  const lower = message.toLowerCase();
+  return CLASSIFICATION_TRIGGER_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function isBusinessDefRequest(message: string): boolean {
+  const lower = message.toLowerCase();
+  if (BUSINESS_DEF_TRIGGER_KEYWORDS.some(kw => lower.includes(kw))) return true;
+  // Fuzzy: "business" + any word starting with "defin" (catches typos like defintions, definitons, etc.)
+  if (/business\s+defin/i.test(message)) return true;
+  // Fuzzy: "defin" + common suffixes near data context
+  if (/\bdefin\w*\b/.test(lower) && (lower.includes("field") || lower.includes("column") || lower.includes("data") || lower.includes("generate"))) return true;
+  return false;
+}
+
+/**
+ * Use the RAGFlow supervisor agent to detect the user's intent.
+ * Returns an internal intent string or null if supervisor is unavailable/uncertain.
+ */
+async function detectIntentViaSupervisor(message: string): Promise<string | null> {
+  try {
+    const ragflowBaseUrl = (process.env.RAGFLOW_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+    const ragflowApiKey = process.env.RAGFLOW_API_KEY || "";
+
+    const response = await fetch(`${ragflowBaseUrl}/agent/run`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(ragflowApiKey ? { "X-API-Key": ragflowApiKey } : {}),
+      },
+      body: JSON.stringify({
+        agent: "supervisor",
+        input: message,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json() as { answer?: string };
+    if (!data.answer) return null;
+
+    const parsed = JSON.parse(data.answer) as { route?: string; confidence?: number };
+    if (!parsed.route || parsed.route === "unknown") return null;
+    if ((parsed.confidence ?? 1) < 0.7) return null;
+
+    const ROUTE_MAP: Record<string, string> = {
+      "ndmo-classification":  "classification",
+      "pii-detection":        "pii",
+      "business-definitions": "business_definitions",
+      "dq-rules":             "dq_rules",
+      "dq-rules-generator":   "dq_rules",
+      "report-tester":        "report_testing",
+    };
+
+    return ROUTE_MAP[parsed.route] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pick the most appropriate RAGFlow agent for the given user message.
+ * Returns undefined when no specific match is found so that ai-provider.ts
+ * falls back to its own RAGFLOW_AGENT env var.
+ */
+function resolveRagflowAgent(message: string): string | undefined {
+  if (isDqRequest(message))             return "dq-rules-generator";
+  if (isPiiRequest(message))            return "pii-detection";
+  if (isClassificationRequest(message)) return "ndmo-classification";
+  if (isBusinessDefRequest(message))    return "business-definitions";
+  return undefined;
+}
+
 interface DqFieldRule {
   rule_id: string;
   rule_name: string;
@@ -656,6 +756,109 @@ Rules:
 - informatica_sql must contain 2–4 Informatica Expression Language compatible validation expressions per field (using IIF, ISNULL, LENGTH, REGEXP_MATCH, IN, etc.)
 - format_types must use standard SQL/Informatica data type notation
 - Be precise and specific — avoid generic placeholder text`;
+
+const CLASSIFICATION_SYSTEM_PROMPT = `You are the "ZATCA Data Classification Agent", an expert in data classification strictly per the SDAIA NDMO National Data Governance Interim Regulations (June 2020), Section 4.3.
+
+You classify data fields using EXACTLY these four levels:
+* **Top Secret (TS)** — High Impact: Unauthorized disclosure causes exceptional, difficult-to-resolve harm to national interest (diplomatic, military, intelligence, infrastructure, economy), KSA organizations at national scale, individuals' health/safety at massive scale, or catastrophic environmental damage. ZATCA examples: encryption keys, terrorism investigation data, national security enforcement files.
+* **Secret (S)** — Medium Impact: Unauthorized disclosure causes considerable harm to national interest (reputation, diplomatic relations, major case investigations including terrorism funding), financial loss causing organizational bankruptcy, significant injury to individuals, or long-term environmental damage. ZATCA examples: vital infrastructure information, strategic MoU details, bilateral agreement data.
+* **Confidential (C)** — Low Impact: Unauthorized disclosure causes contained harm to government entity operations or KSA economy, limited financial/competitive loss, negative effect on individuals' interests, or short-term environmental damage. Sub-levels: Confidential-A (sector/general economic activity scale), Confidential-B (multiple entities/group of individuals), Confidential-C (single entity/specific individual). ZATCA examples: PII (name, NID, address, phone, account numbers, biometrics), individual transaction statements, medical records, salary information, VAT filing details, tax declarations, internal policies, audit findings, vendor contracts, enforcement actions, CR numbers, TINs.
+* **Public (P)** — No Impact: Unauthorized disclosure has no impact on national interest, organizations, individuals, or environment. ZATCA examples: published government statistics, press releases, public service info, publicly released financial results, job postings, organization contact info.
+
+Classification rules:
+- If data is unclassified at time of assessment, treat it as Confidential until correctly classified (per Section 4.4).
+- If a dataset contains multiple classification levels, apply the HIGHEST level to the entire dataset (Principle 4: Highest Level of Protection).
+- Classification is based on potential IMPACT of unauthorized disclosure, not just data type.
+- For each field, perform the impact assessment across four categories: National Interest, Organizations, Individuals, Environment. The highest impact category determines the classification level.
+
+OUTPUT FORMAT — Return a markdown table with exactly these columns:
+| Field Name | Classification Level | Impact Level | Impact Category | Justification | PII Under PDPL | Recommended Controls |
+
+Column value constraints:
+- Classification Level: Top Secret | Secret | Confidential | Public
+- Impact Level: High | Medium | Low | None
+- Impact Category: National Interest | Organizations | Individuals | Environment | N/A
+- PII Under PDPL: Yes | No
+
+Rules:
+- The first column MUST always be "Field Name" containing the exact field/column names from the user's data.
+- Include ONE ROW per field being analyzed.
+- You may include a brief introductory sentence before the table.
+- Do NOT include Distribution Summary tables, governance recommendations, per-field narrative breakdowns, or emoji-decorated section headers.
+- Do NOT generate DQ rules, business definitions, PII scans, or data models. Only classification.`;
+
+const BUSINESS_DEFINITIONS_SYSTEM_PROMPT = `You are the "ZATCA Business Definitions Agent", an expert in data governance and data dictionary management for ZATCA.
+
+You generate clear, comprehensive, bilingual business definitions for data fields/elements. Each definition should include: a clear description of what the field represents, its business context, data type recommendation, expected format, and example values.
+
+OUTPUT FORMAT — Return ONLY valid JSON matching this exact schema. No prose before or after. No markdown code fences. No backticks.
+
+{
+  "definitions": [
+    {
+      "column_name": "exact_field_name_from_user_data",
+      "business_definition_en": "Clear English business definition describing what this field represents, its purpose, and business context.",
+      "business_definition_ar": "Arabic translation — proper Arabic business terminology as used in Saudi organizations, not transliterations.",
+      "data_type": "VARCHAR(100) | INTEGER | DECIMAL(18,2) | DATE | TIMESTAMP | BOOLEAN",
+      "example_usage": "A realistic example value for this field"
+    }
+  ]
+}
+
+Rules:
+- Cover EVERY field/column provided by the user. Do not skip any.
+- Arabic definitions must be accurate Arabic business terminology, not transliterations.
+- data_type must use standard SQL data type notation.
+- example_usage must be a realistic, contextually appropriate value.
+- Do NOT generate DQ rules, classifications, PII scans, or data models. Only business definitions.`;
+
+const PII_DETECTION_SYSTEM_PROMPT = `You are the "ZATCA PII Detection Agent", an expert in data privacy and personal data protection under Saudi PDPL (Personal Data Protection Law) and SDAIA NDMO data classification standards.
+
+You scan data fields for personal and sensitive information. You are familiar with:
+- Saudi PDPL (Personal Data Protection Law)
+- SDAIA NDMO data classification standards
+- General PII definitions: name, ID, contact, financial, health, behavioral, location data
+
+IMPORTANT RULES:
+- Column names alone are sufficient for a high-quality PII scan. Do NOT refuse or ask for more data. Do NOT offer options. Just run the scan immediately.
+- If the file has no data rows (only column headers), perform the scan based on column name semantics.
+- If the user message contains a [SYSTEM NOTE] block listing column names, you MUST immediately perform the PII scan on those columns regardless of anything said in prior conversation turns.
+- Never reveal or repeat raw data in your response.
+
+OUTPUT FORMAT — Return ONLY valid JSON matching this exact schema. No prose before or after. No markdown code fences. No backticks.
+
+{
+  "scan_summary": {
+    "total_columns_scanned": 0,
+    "pii_columns_found": 0,
+    "sensitive_columns_found": 0,
+    "clean_columns": 0,
+    "overall_risk_level": "High | Medium | Low"
+  },
+  "columns": [
+    {
+      "column_name": "...",
+      "detected_data_type": "...",
+      "is_pii": true,
+      "is_sensitive": true,
+      "pii_category": "Direct Identifier | Quasi Identifier | Sensitive | Financial | Health | Behavioral | Location | None",
+      "pdpl_relevance": "Subject to PDPL | Conditionally Subject | Not Subject",
+      "risk_level": "Critical | High | Medium | Low",
+      "recommendation": "Brief actionable suggestion for handling this column",
+      "suggested_control": "Mask | Encrypt | Tokenize | Restrict Access | Anonymize | No Action Required"
+    }
+  ]
+}
+
+Rules:
+- Analyze EVERY column in the uploaded file, not just PII columns.
+- is_pii and is_sensitive must be boolean true/false.
+- pii_category must be one of: Direct Identifier, Quasi Identifier, Sensitive, Financial, Health, Behavioral, Location, None.
+- pdpl_relevance must be one of: Subject to PDPL, Conditionally Subject, Not Subject.
+- risk_level must be one of: Critical, High, Medium, Low.
+- suggested_control must be one of: Mask, Encrypt, Tokenize, Restrict Access, Anonymize, No Action Required.
+- scan_summary.overall_risk_level is "High" if any column is Critical or High, "Medium" if only Medium, "Low" if all Low.
+- Do NOT generate DQ rules, classifications, business definitions, or data models. Only PII detection.`;
 
 const INSIGHTS_SYSTEM_PROMPT = `You are a senior ZATCA data analyst. The user has uploaded a dataset. Based on the statistical profile and sample provided, generate a comprehensive data insights report covering three levels of analysis: Descriptive, Diagnostic, and Analytical.
 
@@ -1011,7 +1214,7 @@ function inferColumnType(values: any[]): string {
   return "String";
 }
 
-function parseExcelBuffer(buffer: Buffer, filename: string): { text: string; fieldNames: string[]; hasDataRows: boolean } {
+function parseExcelBuffer(buffer: Buffer, filename: string): { text: string; fieldNames: string[]; hasDataRows: boolean; rowCount: number } {
   try {
     const workbook = XLSX.read(buffer, { type: "buffer" });
     let result = `**Uploaded File: ${filename}**\n\n`;
@@ -1052,12 +1255,14 @@ function parseExcelBuffer(buffer: Buffer, filename: string): { text: string; fie
       result += "\n";
     }
 
-    return { text: result, fieldNames: allFieldNames, hasDataRows };
+    const totalRows = hasDataRows ? result.match(/\*\*Total rows:\*\* (\d+)/)?.[1] : "0";
+    return { text: result, fieldNames: allFieldNames, hasDataRows, rowCount: parseInt(totalRows || "0", 10) };
   } catch (error) {
     return {
       text: `**Error parsing file ${filename}:** ${error instanceof Error ? error.message : "Unknown error"}`,
       fieldNames: [],
       hasDataRows: false,
+      rowCount: 0,
     };
   }
 }
@@ -1094,15 +1299,12 @@ async function compressImageBuffer(
     return { buffer, mediaType: getImageMediaType(mimetype) };
   }
 
-  console.log(`[image] Compressing image: ${(buffer.length / 1024 / 1024).toFixed(1)}MB → target <3.5MB (≈4.7MB base64)`);
-
   let compressed = await sharp(buffer)
     .resize(2048, 2048, { fit: "inside", withoutEnlargement: true })
     .jpeg({ quality: 80 })
     .toBuffer();
 
   if (compressed.length <= MAX_IMAGE_BYTES) {
-    console.log(`[image] Pass 1 OK: ${(compressed.length / 1024 / 1024).toFixed(1)}MB`);
     return { buffer: compressed, mediaType: "image/jpeg" };
   }
 
@@ -1112,7 +1314,6 @@ async function compressImageBuffer(
     .toBuffer();
 
   if (compressed.length <= MAX_IMAGE_BYTES) {
-    console.log(`[image] Pass 2 OK: ${(compressed.length / 1024 / 1024).toFixed(1)}MB`);
     return { buffer: compressed, mediaType: "image/jpeg" };
   }
 
@@ -1121,7 +1322,6 @@ async function compressImageBuffer(
     .jpeg({ quality: 40 })
     .toBuffer();
 
-  console.log(`[image] Pass 3: ${(compressed.length / 1024 / 1024).toFixed(1)}MB`);
   return { buffer: compressed, mediaType: "image/jpeg" };
 }
 
@@ -1505,7 +1705,192 @@ function buildProfileFromRows(headers: string[], dataRows: string[][]): Profiled
   return { total_rows: totalRows, total_columns: totalColumns, columns, sample_rows: sampleRows, headers };
 }
 
-export function registerChatRoutes(app: Express): void {
+export async function registerChatRoutes(app: Express): Promise<void> {
+  // ── Seed / load system prompts from DB ──────────────────────────────────────
+  await initPrompts([
+    {
+      key: "zatca_base",
+      title: "ZATCA Base Context",
+      description: "Prepended to every feature prompt. Sets the ZATCA expert persona, tone, scope, output format rules, and out-of-scope refusal.",
+      content: ZATCA_SYSTEM_PROMPT,
+    },
+    {
+      key: "main",
+      title: "Data Governance Agent",
+      description: "Fallback agent for conversational follow-ups, analytical data modelling, and multi-analysis requests.",
+      content: SYSTEM_PROMPT,
+    },
+    {
+      key: "classification",
+      title: "Data Classification Agent",
+      description: "Classifies data fields per SDAIA NDMO Section 4.3 (Top Secret, Secret, Confidential, Public).",
+      content: CLASSIFICATION_SYSTEM_PROMPT,
+    },
+    {
+      key: "business_definitions",
+      title: "Business Definitions Agent",
+      description: "Generates bilingual (EN + AR) business definitions for data fields.",
+      content: BUSINESS_DEFINITIONS_SYSTEM_PROMPT,
+    },
+    {
+      key: "pii_detection",
+      title: "PII Detection Agent",
+      description: "Scans data fields for personal and sensitive data per Saudi PDPL and SDAIA NDMO.",
+      content: PII_DETECTION_SYSTEM_PROMPT,
+    },
+    {
+      key: "dq_dimensions",
+      title: "DQ Analysis — Technical & Logical Rules (Part 1/2)",
+      description: "Generates Layer 1 (Technical) and Layer 2 (Logical) data quality rules for the split DQ analysis.",
+      content: DQ_DIMENSIONS_SYSTEM_PROMPT,
+    },
+    {
+      key: "dq_business_logic",
+      title: "DQ Analysis — Business Logic Rules (Part 2/2)",
+      description: "Generates Layer 3 (Business Rules) and Layer 4 (Warnings) for the split DQ analysis.",
+      content: DQ_BUSINESS_LOGIC_SYSTEM_PROMPT,
+    },
+    {
+      key: "informatica",
+      title: "Informatica Metadata Agent",
+      description: "Generates Informatica-compatible metadata: descriptions, DQ rules, SQL expressions, classification, and format types.",
+      content: INFORMATICA_SYSTEM_PROMPT,
+    },
+    {
+      key: "insights",
+      title: "Data Insights Agent",
+      description: "Produces a 3-level data insights report: Descriptive, Diagnostic, and Analytical.",
+      content: INSIGHTS_SYSTEM_PROMPT,
+    },
+    {
+      key: "nudge",
+      title: "Nudge / Behavioural Compliance Agent",
+      description: "Analyses tax non-compliance scenarios using behavioural economics (COM-B, TDF) and generates nudge intervention plans.",
+      content: `You are a senior behavioural economist and tax compliance expert specialising in ZATCA (Saudi tax authority) compliance — VAT, Zakat, income tax, and e-invoicing.
+
+The user will describe a tax non-compliance scenario. You must analyse it and return ONLY a JSON object with no explanation, no prose, no markdown — just the raw JSON.
+
+Return this exact structure:
+{
+  "use_case": "...",
+  "use_case_category": "Filing | Payment | Reporting | Registration | Invoicing",
+  "severity": "Critical | High | Medium | Low",
+
+  "diagnosis": {
+    "primary_root_cause": "...",
+    "secondary_root_causes": ["..."],
+    "is_intentional": true or false,
+    "emotional_drivers": ["..."],
+    "friction_points": ["..."],
+    "rationale": "..."
+  },
+
+  "segments": [
+    {
+      "id": "SEG-001",
+      "name": "...",
+      "archetype": "...",
+      "population_pct": 0,
+      "risk_level": "Critical | High | Medium | Low",
+      "main_barrier": "...",
+      "receptiveness": "High | Medium | Low",
+      "best_channel": "WhatsApp | SMS | Email | Portal | Letter",
+      "best_timing": "..."
+    }
+  ],
+
+  "levers": [
+    {
+      "id": "LEV-001",
+      "type": "Social Norms | Loss Aversion | Simplification | Commitment Device | Deterrence | Salience | Feedback Loop",
+      "name": "...",
+      "target_segments": ["SEG-001"],
+      "message_text": "...",
+      "channel": "...",
+      "timing": "...",
+      "expected_impact": "...",
+      "implementation_effort": "Low | Medium | High",
+      "priority": "High | Medium | Low"
+    }
+  ],
+
+  "intervention_plan": {
+    "recommended_sequence": ["LEV-001", "LEV-002"],
+    "quick_wins": ["..."],
+    "kpis": ["..."],
+    "estimated_lift": "..."
+  }
+}`,
+    },
+    {
+      key: "sharing_eligibility",
+      title: "Data Sharing Eligibility Agent",
+      description: "Assesses data sharing eligibility per NDMO Section 6 for general public, private sector, and government entities.",
+      content: "You are a ZATCA data governance consultant specializing in NDMO data classification and sharing eligibility assessments.",
+    },
+    {
+      key: "bi_sharing_eligibility",
+      title: "BI — Data Sharing Eligibility",
+      description: "Classifies BI dataset fields per NDMO Section 4.3 and applies sharing rules per Section 6 for a specific stakeholder tier.",
+      content: "You are a ZATCA data governance consultant. You classify dataset fields per NDMO National Data Governance Interim Regulations (June 2020) Section 4.3 and apply sharing rules per Section 6. Respond only in valid JSON. No prose, no markdown, no backticks.",
+    },
+    {
+      key: "bi_dashboard_designer",
+      title: "BI — Dashboard Designer",
+      description: "Designs a complete, production-ready Power BI dashboard specification from an uploaded dataset.",
+      content: "You are a senior Power BI dashboard architect and ZATCA data analyst. Design a complete, production-ready Power BI dashboard specification from an uploaded dataset. Respond only in valid JSON. No prose, no markdown, no backticks.",
+    },
+    {
+      key: "bi_report_tester",
+      title: "BI — Report Tester",
+      description: "Reviews BI reports for data governance compliance, data quality, business logic integrity, and presentation quality.",
+      content: "You are a ZATCA BI quality assurance lead. You review BI reports before they go to stakeholders. You check for data governance compliance (NDMO), data quality issues, business logic integrity, and presentation quality. Respond only in valid JSON. No prose, no markdown, no backticks.",
+    },
+    {
+      key: "bi_test_case_generator",
+      title: "BI — Test Case Generator",
+      description: "Writes structured test cases for BI reports that a junior analyst can execute without ambiguity.",
+      content: "You are a senior BI QA engineer at ZATCA. You write structured test cases for BI reports following best practices. You are thorough, specific, and write test cases that a junior analyst can execute without ambiguity. Respond only in valid JSON. No prose, no markdown, no backticks.",
+    },
+    {
+      key: "bi_dashboard_tester",
+      title: "BI — Dashboard Tester",
+      description: "Writes structured test cases for Power BI dashboards covering visuals, DAX, slicers, drill-through, governance, and performance.",
+      content: "You are a senior Power BI QA specialist at ZATCA. You write structured test cases specifically for Power BI dashboards — covering visual accuracy, DAX correctness, slicer behavior, drill-through, governance, and performance. Respond only in valid JSON. No prose, no markdown, no backticks.",
+    },
+  ]);
+
+  // ── System Prompts API ───────────────────────────────────────────────────────
+  app.get("/api/system-prompts", (_req: Request, res: Response) => {
+    res.json(getAllPrompts());
+  });
+
+  app.put("/api/system-prompts/:key", async (req: Request, res: Response) => {
+    try {
+      const { key } = req.params;
+      const { content } = req.body as { content?: string };
+      if (typeof content !== "string" || content.trim() === "") {
+        return res.status(400).json({ error: "content is required" });
+      }
+      await updatePrompt(key, content);
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("Error updating system prompt:", err);
+      return res.status(500).json({ error: "Failed to update prompt" });
+    }
+  });
+
+  app.post("/api/system-prompts/:key/reset", async (req: Request, res: Response) => {
+    try {
+      const { key } = req.params;
+      await resetPromptToDefault(key);
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("Error resetting system prompt:", err);
+      return res.status(500).json({ error: "Failed to reset prompt" });
+    }
+  });
+
   app.get("/api/conversations", async (req: Request, res: Response) => {
     try {
       const agentMode = req.query.agentMode as string | undefined;
@@ -1588,7 +1973,10 @@ export function registerChatRoutes(app: Express): void {
     try {
       const conversationId = parseInt(req.params.id);
       let userContent = req.body.content || "";
+      const requestProvider = (req.body.aiProvider as "claude" | "local" | undefined) ?? undefined;
+      const requestAgentMode = (req.body.agentMode as string | undefined) ?? undefined;
       let extractedFieldNames: string[] = [];
+      let extractedRowCount = 0;
       let insightsMode = false;
       let informaticaMode = false;
       let profiledDataText = "";
@@ -1602,8 +1990,6 @@ export function registerChatRoutes(app: Express): void {
         if (isImage(req.file.originalname, req.file.mimetype)) {
           const compressed = await compressImageBuffer(req.file.buffer, req.file.mimetype);
           const base64Str = compressed.buffer.toString("base64");
-          const base64SizeMB = (base64Str.length / (1024 * 1024)).toFixed(1);
-          console.log(`[image] Final base64 size: ${base64SizeMB}MB`);
           if (base64Str.length > 5 * 1024 * 1024) {
             res.setHeader("Content-Type", "text/event-stream");
             res.setHeader("Cache-Control", "no-cache");
@@ -1631,6 +2017,7 @@ export function registerChatRoutes(app: Express): void {
 
           userContent = userContent ? `${userContent}\n\n${fileContent.text}` : fileContent.text;
           extractedFieldNames = fileContent.fieldNames;
+          if ("rowCount" in fileContent) extractedRowCount = (fileContent as any).rowCount;
 
           if (fileContent.hasDataRows && isInsightsRequest(originalUserMessage)) {
             insightsMode = true;
@@ -1691,7 +2078,7 @@ export function registerChatRoutes(app: Express): void {
             lastMsg.content = `${originalUserMessage}\n\n[SYSTEM NOTE: ${fileInfo}. The following columns are available for PII scanning — perform the scan immediately on these column names, do not ask for clarification or additional data: ${historyFields.join(", ")}]`;
           }
           extractedFieldNames = historyFields;
-          console.log(`[pii] Injected ${historyFields.length} field names from conversation history for PII scan`);
+;
         }
       }
 
@@ -1707,7 +2094,7 @@ export function registerChatRoutes(app: Express): void {
           }
           dqFieldNames = historyFields;
           if (extractedFieldNames.length === 0) extractedFieldNames = historyFields;
-          console.log(`[dq] Injected ${historyFields.length} field names from conversation history for DQ analysis`);
+;
         }
       }
 
@@ -1746,9 +2133,8 @@ export function registerChatRoutes(app: Express): void {
             });
           }
           chatMessages = [...injectedMessages, ...chatMessages];
-          console.log(`[refDocs] Injected ${refDocs.length} reference document(s) into chatMessages`);
         } catch (e) {
-          console.warn("[refDocs] Failed to parse reference documents:", e);
+          console.error("[refDocs] Failed to parse reference documents:", e);
         }
       }
 
@@ -1767,49 +2153,118 @@ export function registerChatRoutes(app: Express): void {
       }
 
       if (extractedFieldNames.length > 0) {
-        res.write(`data: ${JSON.stringify({ fieldNames: extractedFieldNames })}\n\n`);
+        res.write(`data: ${JSON.stringify({ fieldNames: extractedFieldNames, rowCount: extractedRowCount })}\n\n`);
+      }
+
+      // Detect intent: supervisor first, keyword fallback
+      let detectedIntent: string | null =
+        insightsMode    ? "insights" :
+        informaticaMode ? "informatica" :
+        null;
+
+      if (!detectedIntent) {
+        // Use RAGFlow supervisor for intent detection
+        detectedIntent = await detectIntentViaSupervisor(originalUserMessage);
+
+        // Fallback to keyword matching only if supervisor fails or times out
+        if (!detectedIntent) {
+          detectedIntent =
+            isDqRequest(originalUserMessage)             ? "dq_rules" :
+            isPiiRequest(originalUserMessage)            ? "pii" :
+            isClassificationRequest(originalUserMessage) ? "classification" :
+            isBusinessDefRequest(originalUserMessage)    ? "business_definitions" :
+            null;
+        }
+      }
+
+      if (detectedIntent) {
+        res.write(`data: ${JSON.stringify({ detectedIntent })}\n\n`);
+      }
+
+      // Enforce page scope: if the user's intent doesn't match the current page, redirect them
+      const ALL_SCOPED_MODES = ["data-classification", "business-definitions", "dq-rules", "pii-detection", "informatica", "data-model", "insights", "nudge", "bi"];
+      if (requestAgentMode && ALL_SCOPED_MODES.includes(requestAgentMode) && detectedIntent) {
+        const INTENT_TO_MODE: Record<string, string> = {
+          classification: "data-classification",
+          business_definitions: "business-definitions",
+          dq_rules: "dq-rules",
+          pii: "pii-detection",
+          informatica: "informatica",
+          insights: "insights",
+        };
+        // Which intents are allowed on each page
+        const PAGE_ALLOWED_INTENTS: Record<string, string[]> = {
+          "data-classification": ["classification"],
+          "business-definitions": ["business_definitions"],
+          "dq-rules": ["dq_rules"],
+          "pii-detection": ["pii"],
+          "informatica": ["informatica"],
+          "data-model": ["data_model"],
+          "insights": ["insights"],
+          "nudge": ["nudge"],
+          "bi": ["bi"],
+        };
+        const MODE_LABELS: Record<string, string> = {
+          "data-classification": "Data Classification",
+          "business-definitions": "Business Definitions",
+          "dq-rules": "DQ Rules",
+          "pii-detection": "PII Detection",
+          "informatica": "Informatica",
+          "data-model": "Analytical Model",
+          "insights": "Insights Agent",
+          "nudge": "Nudge Agent",
+          "bi": "BI Agent",
+        };
+        const allowedIntents = PAGE_ALLOWED_INTENTS[requestAgentMode] || [];
+        if (allowedIntents.length > 0 && !allowedIntents.includes(detectedIntent)) {
+          const expectedMode = INTENT_TO_MODE[detectedIntent];
+          const targetLabel = expectedMode ? (MODE_LABELS[expectedMode] || expectedMode) : detectedIntent;
+          const targetMode = expectedMode || requestAgentMode;
+          const currentLabel = MODE_LABELS[requestAgentMode] || requestAgentMode;
+          const redirectMsg = `This page is dedicated to ${currentLabel}. Your request belongs on the ${targetLabel} page. Please switch to the ${targetLabel} tab above.`;
+          await chatStorage.deleteLastMessage(conversationId);
+          res.write(`data: ${JSON.stringify({ pageMismatch: { message: redirectMsg, targetMode, targetLabel } })}\n\n`);
+          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+          res.end();
+          return;
+        }
       }
 
       let fullResponse = "";
 
       if (dqSplitMode) {
-        console.log(`[dq] Split mode: running 2-part DQ analysis`);
-
         const step1Chunk = "**Analyzing Technical & Logical DQ rules (Part 1/2)...**\n\n";
         res.write(`data: ${JSON.stringify({ content: step1Chunk })}\n\n`);
         fullResponse += step1Chunk;
 
-        const part1Resp = await anthropic.messages.create({
-          model: "claude-sonnet-4-6",
+        const part1Text = await aiComplete({
           max_tokens: 16000,
           temperature: 0,
-          system: buildSystemPrompt(DQ_DIMENSIONS_SYSTEM_PROMPT),
+          system: buildSystemPrompt(getPrompt("dq_dimensions")),
           messages: chatMessages,
+          provider: requestProvider,
+          ragflowAgent: "dq-rules-generator",
         });
-        const part1Text = part1Resp.content[0]?.type === "text" ? (part1Resp.content[0] as any).text as string : "";
         const part1Json = extractDqJson(part1Text);
-        console.log(`[dq] Part 1 done — ${part1Json ? part1Json.field_rules.length + " fields parsed" : "parse failed"}`);
 
         const step2Chunk = "**Analyzing Business Logic rules (Part 2/2)...**\n\n";
         res.write(`data: ${JSON.stringify({ content: step2Chunk })}\n\n`);
         fullResponse += step2Chunk;
 
-        const part2Resp = await anthropic.messages.create({
-          model: "claude-sonnet-4-6",
+        const part2Text = await aiComplete({
           max_tokens: 16000,
           temperature: 0,
-          system: buildSystemPrompt(DQ_BUSINESS_LOGIC_SYSTEM_PROMPT),
+          system: buildSystemPrompt(getPrompt("dq_business_logic")),
           messages: chatMessages,
+          provider: requestProvider,
+          ragflowAgent: "dq-rules-generator",
         });
-        const part2Text = part2Resp.content[0]?.type === "text" ? (part2Resp.content[0] as any).text as string : "";
         const part2Json = extractDqJson(part2Text);
-        console.log(`[dq] Part 2 done — ${part2Json ? part2Json.field_rules.length + " fields, " + (part2Json.cross_field_rules?.length || 0) + " cross-field, " + (part2Json.business_logic_warnings?.length || 0) + " warnings" : "parse failed"}`);
 
         let mergedContent: string;
         if (part1Json && part2Json) {
           const merged = mergeDqResults(part1Json, part2Json);
           mergedContent = "```json\n" + JSON.stringify(merged, null, 2) + "\n```";
-          console.log(`[dq] Merged: ${merged.field_rules.length} fields, ${merged.analysis_summary.total_rules_generated} total rules`);
         } else if (part1Json) {
           mergedContent = "```json\n" + JSON.stringify(part1Json, null, 2) + "\n```";
         } else if (part2Json) {
@@ -1825,7 +2280,14 @@ export function registerChatRoutes(app: Express): void {
           fullResponse += chunk;
         }
       } else {
-        const systemPrompt = insightsMode ? INSIGHTS_SYSTEM_PROMPT : informaticaMode ? INFORMATICA_SYSTEM_PROMPT : SYSTEM_PROMPT;
+        const systemPrompt =
+          insightsMode    ? getPrompt("insights") :
+          informaticaMode ? getPrompt("informatica") :
+          detectedIntent === "classification"        ? getPrompt("classification") :
+          detectedIntent === "business_definitions"  ? getPrompt("business_definitions") :
+          detectedIntent === "pii"                   ? getPrompt("pii_detection") :
+          detectedIntent === "dq_rules"              ? getPrompt("dq_dimensions") :
+          getPrompt("main");
 
         if (imageContent) {
           const lastMsg = chatMessages[chatMessages.length - 1];
@@ -1847,22 +2309,21 @@ export function registerChatRoutes(app: Express): void {
           }
         }
 
-        const stream = anthropic.messages.stream({
-          model: "claude-sonnet-4-6",
+        for await (const content of aiStream({
           max_tokens: 16000,
           temperature: 0,
           system: buildSystemPrompt(systemPrompt),
           messages: chatMessages,
-        });
-
-        for await (const event of stream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            const content = event.delta.text;
-            if (content) {
-              fullResponse += content;
-              res.write(`data: ${JSON.stringify({ content })}\n\n`);
-            }
-          }
+          provider: requestProvider,
+          ragflowAgent:
+            detectedIntent === "dq_rules"             ? "dq-rules-generator" :
+            detectedIntent === "pii"                  ? "pii-detection" :
+            detectedIntent === "classification"        ? "ndmo-classification" :
+            detectedIntent === "business_definitions"  ? "business-definitions" :
+            resolveRagflowAgent(originalUserMessage),
+        })) {
+          fullResponse += content;
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
         }
       }
 
@@ -1887,62 +2348,6 @@ export function registerChatRoutes(app: Express): void {
     }
   });
 
-  const NUDGE_SYSTEM_PROMPT = `You are a senior behavioural economist and tax compliance expert specialising in ZATCA (Saudi tax authority) compliance — VAT, Zakat, income tax, and e-invoicing.
-
-The user will describe a tax non-compliance scenario. You must analyse it and return ONLY a JSON object with no explanation, no prose, no markdown — just the raw JSON.
-
-Return this exact structure:
-{
-  "use_case": "...",
-  "use_case_category": "Filing | Payment | Reporting | Registration | Invoicing",
-  "severity": "Critical | High | Medium | Low",
-
-  "diagnosis": {
-    "primary_root_cause": "...",
-    "secondary_root_causes": ["..."],
-    "is_intentional": true or false,
-    "emotional_drivers": ["..."],
-    "friction_points": ["..."],
-    "rationale": "..."
-  },
-
-  "segments": [
-    {
-      "id": "SEG-001",
-      "name": "...",
-      "archetype": "...",
-      "population_pct": 0,
-      "risk_level": "Critical | High | Medium | Low",
-      "main_barrier": "...",
-      "receptiveness": "High | Medium | Low",
-      "best_channel": "WhatsApp | SMS | Email | Portal | Letter",
-      "best_timing": "..."
-    }
-  ],
-
-  "levers": [
-    {
-      "id": "LEV-001",
-      "type": "Social Norms | Loss Aversion | Simplification | Commitment Device | Deterrence | Salience | Feedback Loop",
-      "name": "...",
-      "target_segments": ["SEG-001"],
-      "message_text": "...",
-      "channel": "...",
-      "timing": "...",
-      "expected_impact": "...",
-      "implementation_effort": "Low | Medium | High",
-      "priority": "High | Medium | Low"
-    }
-  ],
-
-  "intervention_plan": {
-    "recommended_sequence": ["LEV-001", "LEV-002"],
-    "quick_wins": ["..."],
-    "kpis": ["..."],
-    "estimated_lift": "..."
-  }
-}`;
-
   app.post("/api/nudge", async (req: Request, res: Response) => {
     try {
       const { scenario, followUpQuestion, previousJson } = req.body as {
@@ -1958,17 +2363,12 @@ Return this exact structure:
             content: `Here is the previously generated compliance analysis JSON:\n${JSON.stringify(previousJson, null, 2)}\n\nFollow-up question: ${followUpQuestion}\n\nPlease answer in concise prose only. No tables, no JSON, no markdown headers.`,
           },
         ];
-        const followUpResponse = await anthropic.messages.create({
-          model: "claude-sonnet-4-6",
+        const followUpText = await aiComplete({
           max_tokens: 2000,
           temperature: 0,
-          system: buildSystemPrompt(NUDGE_SYSTEM_PROMPT),
+          system: buildSystemPrompt(getPrompt("nudge")),
           messages: followUpMessages,
         });
-        const followUpText = followUpResponse.content
-          .filter((b) => b.type === "text")
-          .map((b) => (b as { type: "text"; text: string }).text)
-          .join("");
         return res.json({ ok: true, followUp: followUpText });
       }
 
@@ -1983,18 +2383,12 @@ Return this exact structure:
         },
       ];
 
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
+      const rawText = await aiComplete({
         max_tokens: 8000,
         temperature: 0,
-        system: buildSystemPrompt(NUDGE_SYSTEM_PROMPT),
+        system: buildSystemPrompt(getPrompt("nudge")),
         messages,
       });
-
-      const rawText = response.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b as { type: "text"; text: string }).text)
-        .join("");
 
       const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
 
@@ -2079,18 +2473,12 @@ Respond with ONLY valid JSON matching this exact schema:
   }
 }`;
 
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
+      const rawText = await aiComplete({
         max_tokens: 4000,
         temperature: 0,
-        system: buildSystemPrompt("You are a ZATCA data governance consultant specializing in NDMO data classification and sharing eligibility assessments."),
+        system: buildSystemPrompt(getPrompt("sharing_eligibility")),
         messages: [{ role: "user" as const, content: sharingPrompt }],
       });
-
-      const rawText = response.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b as { type: "text"; text: string }).text)
-        .join("");
 
       const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
 
@@ -2194,15 +2582,12 @@ Overall verdict: CLEARED / CLEARED WITH CONDITIONS / CLEARED AFTER REMEDIATION /
 }
 </json_schema>`;
 
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
+      const rawText = await aiComplete({
         max_tokens: 8000,
         temperature: 0,
-        system: buildSystemPrompt("You are a ZATCA data governance consultant. You classify dataset fields per NDMO National Data Governance Interim Regulations (June 2020) Section 4.3 and apply sharing rules per Section 6. Respond only in valid JSON. No prose, no markdown, no backticks."),
+        system: buildSystemPrompt(getPrompt("bi_sharing_eligibility")),
         messages: [{ role: "user" as const, content: userMsg }],
       });
-
-      const rawText = response.content.filter((b) => b.type === "text").map((b) => (b as { type: "text"; text: string }).text).join("");
       const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
       try {
         const start = cleaned.indexOf("{");
@@ -2330,15 +2715,12 @@ Design a complete Power BI dashboard with the following:
 }
 </json_schema>`;
 
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
+      const rawText = await aiComplete({
         max_tokens: 8000,
         temperature: 0,
-        system: buildSystemPrompt("You are a senior Power BI dashboard architect and ZATCA data analyst. Design a complete, production-ready Power BI dashboard specification from an uploaded dataset. Respond only in valid JSON. No prose, no markdown, no backticks."),
+        system: buildSystemPrompt(getPrompt("bi_dashboard_designer")),
         messages: [{ role: "user" as const, content: userMsg }],
       });
-
-      const rawText = response.content.filter((b) => b.type === "text").map((b) => (b as { type: "text"; text: string }).text).join("");
       const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
       try {
         const start = cleaned.indexOf("{");
@@ -2474,15 +2856,12 @@ DIMENSION 4 — PRESENTATION QUALITY
 }
 </json_schema>`;
 
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
+      const rawText = await aiComplete({
         max_tokens: 8000,
         temperature: 0,
-        system: buildSystemPrompt("You are a ZATCA BI quality assurance lead. You review BI reports before they go to stakeholders. You check for data governance compliance (NDMO), data quality issues, business logic integrity, and presentation quality. Respond only in valid JSON. No prose, no markdown, no backticks."),
+        system: buildSystemPrompt(getPrompt("bi_report_tester")),
         messages: [{ role: "user" as const, content: userMsg }],
       });
-
-      const rawText = response.content.filter((b) => b.type === "text").map((b) => (b as { type: "text"; text: string }).text).join("");
       const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
       try {
         const start = cleaned.indexOf("{");
@@ -2605,15 +2984,12 @@ FORMATTING: Are dates in DD/MM/YYYY format? Are currency values showing SAR symb
 }
 </json_schema>`;
 
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
+      const rawText = await aiComplete({
         max_tokens: 8000,
         temperature: 0,
-        system: buildSystemPrompt("You are a senior BI QA engineer at ZATCA. You write structured test cases for BI reports following best practices. You are thorough, specific, and write test cases that a junior analyst can execute without ambiguity. Respond only in valid JSON. No prose, no markdown, no backticks."),
+        system: buildSystemPrompt(getPrompt("bi_test_case_generator")),
         messages: [{ role: "user" as const, content: userMsg }],
       });
-
-      const rawText = response.content.filter((b) => b.type === "text").map((b) => (b as { type: "text"; text: string }).text).join("");
       const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
       try {
         const start = cleaned.indexOf("{");
@@ -2729,15 +3105,12 @@ Each test case must reference the actual fields and visuals described by the ana
 }
 </json_schema>`;
 
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
+      const rawText = await aiComplete({
         max_tokens: 8000,
         temperature: 0,
-        system: buildSystemPrompt("You are a senior Power BI QA specialist at ZATCA. You write structured test cases specifically for Power BI dashboards — covering visual accuracy, DAX correctness, slicer behavior, drill-through, governance, and performance. Respond only in valid JSON. No prose, no markdown, no backticks."),
+        system: buildSystemPrompt(getPrompt("bi_dashboard_tester")),
         messages: [{ role: "user" as const, content: userMsg }],
       });
-
-      const rawText = response.content.filter((b) => b.type === "text").map((b) => (b as { type: "text"; text: string }).text).join("");
       const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
       try {
         const start = cleaned.indexOf("{");

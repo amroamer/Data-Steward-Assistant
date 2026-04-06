@@ -117,8 +117,6 @@ export interface ResultRow {
   data_type?: string;
   example?: string;
   classification_level?: string;
-  classification_code?: string;
-  confidential_sub_level?: string;
   impact_level?: string;
   impact_category?: string;
   justification?: string;
@@ -140,8 +138,8 @@ const ANALYSIS_COLUMNS: Record<AnalysisType, { keys: string[]; headers: string[]
     headers: ["Business Term (EN)", "Business Definition (EN)", "Business Term (AR)", "Business Definition (AR)", "Data Type", "Example"],
   },
   data_classification: {
-    keys: ["classification_level", "classification_code", "confidential_sub_level", "impact_level", "impact_category", "justification", "is_pii_under_pdpl", "recommended_controls"],
-    headers: ["Classification Level", "Classification Code", "Confidential Sub-Level", "Impact Level", "Impact Category", "Justification", "PII Under PDPL", "Recommended Controls"],
+    keys: ["classification_level", "impact_level", "impact_category", "justification", "is_pii_under_pdpl", "recommended_controls"],
+    headers: ["Classification Level", "Impact Level", "Impact Category", "Justification", "PII Under PDPL", "Recommended Controls"],
   },
   data_quality: {
     keys: ["dq_dimension", "dq_rule", "dq_threshold", "dq_priority"],
@@ -219,15 +217,11 @@ const HEADER_MAPPINGS: Record<AnalysisType, Record<string, string[]>> = {
   },
   data_classification: {
     classification_level: ["classification_level", "classification", "level", "class"],
-    classification_code: ["classification_code", "code"],
-    confidential_sub_level: ["confidential_sub_level", "sub_level", "sublevel", "confidential_sub"],
     impact_level: ["impact_level", "impact"],
     impact_category: ["impact_category"],
     justification: ["justification", "classification_rationale", "rationale", "reason"],
     is_pii_under_pdpl: ["is_pii_under_pdpl", "pii_under_pdpl", "pii", "pdpl"],
     recommended_controls: ["recommended_controls", "controls", "handling_rules"],
-    data_owner: ["data_owner", "owner"],
-    sensitivity_category: ["sensitivity_category", "sensitivity", "category"],
   },
   data_quality: {
     dq_dimension: ["dq_dimension", "dimension", "quality_dimension", "data_quality_dimension"],
@@ -452,6 +446,22 @@ export function detectPiiScanJSON(content: string): PiiScanResult | null {
       }
     } catch {}
   }
+  // Fallback: RAGFlow returns plain JSON (no fences)
+  try {
+    const parsed = JSON.parse(content.trim());
+    if (
+      parsed &&
+      parsed.scan_summary &&
+      Array.isArray(parsed.columns) &&
+      typeof parsed.scan_summary.total_columns_scanned === "number" &&
+      typeof parsed.scan_summary.pii_columns_found === "number" &&
+      typeof parsed.scan_summary.overall_risk_level === "string" &&
+      !parsed.fact_tables &&
+      !parsed.dimension_tables
+    ) {
+      return parsed as PiiScanResult;
+    }
+  } catch {}
   return null;
 }
 
@@ -489,6 +499,98 @@ function appendPiiScanSheet(wb: XLSX.WorkBook, scan: PiiScanResult): void {
   ws["!freeze"] = { xSplit: 0, ySplit: 1, topLeftCell: "A2", activePane: "bottomLeft", state: "frozen" };
   if (!ws["!rows"]) ws["!rows"] = [];
   XLSX.utils.book_append_sheet(wb, ws, "pii_scan");
+}
+
+export function detectClassificationJSON(content: string): AnalysisResult | null {
+  if (!content) return null;
+
+  const isClassificationShape = (parsed: any): boolean => {
+    if (!parsed || !Array.isArray(parsed.classifications) || parsed.classifications.length === 0) return false;
+    const first = parsed.classifications[0];
+    return first != null &&
+      typeof first.column_name === "string" &&
+      (typeof first.sensitivity_level === "string" || typeof first.classification_level === "string");
+  };
+
+  const toAnalysisResult = (parsed: any): AnalysisResult => {
+    const fieldData: Record<string, Record<string, string>> = {};
+    for (const item of parsed.classifications) {
+      if (item == null) continue;
+      const name: string = item.column_name || item.field_name || "";
+      if (!name) continue;
+      fieldData[name] = {
+        classification_level: item.classification_level || item.sensitivity_level || "",
+        impact_level: item.impact_level || "",
+        impact_category: item.impact_category || "",
+        justification: item.justification || item.reasoning || item.matched_rule || "",
+        is_pii_under_pdpl: item.is_pii_under_pdpl ?? item.is_pii ?? "",
+        recommended_controls: item.recommended_controls || "",
+      };
+    }
+    return { analysisType: "data_classification", fieldData };
+  };
+
+  // Try fenced code blocks first
+  for (const match of content.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)) {
+    const candidate = match[1].trim();
+    if (!candidate) continue;
+    try {
+      const parsed = JSON.parse(candidate);
+      if (isClassificationShape(parsed)) return toAnalysisResult(parsed);
+    } catch {}
+  }
+  // Fallback: plain JSON (RAGFlow returns without fences)
+  try {
+    const parsed = JSON.parse(content.trim());
+    if (isClassificationShape(parsed)) return toAnalysisResult(parsed);
+  } catch {}
+  return null;
+}
+
+export function detectBusinessDefJSON(content: string): AnalysisResult | null {
+  if (!content) return null;
+
+  const isBusinessDefShape = (parsed: any): boolean => {
+    if (!parsed || !Array.isArray(parsed.definitions) || parsed.definitions.length === 0) return false;
+    const first = parsed.definitions[0];
+    return first != null &&
+      typeof first.column_name === "string" &&
+      typeof first.business_definition_en === "string";
+  };
+
+  const toAnalysisResult = (parsed: any): AnalysisResult => {
+    const fieldData: Record<string, Record<string, string>> = {};
+    for (const def of parsed.definitions) {
+      if (def == null) continue;
+      const name: string = def.column_name || "";
+      if (!name) continue;
+      fieldData[name] = {
+        business_term_en: def.business_term_en || name,
+        business_definition_en: def.business_definition_en || "",
+        business_term_ar: def.business_term_ar || name,
+        business_definition_ar: def.business_definition_ar || "",
+        data_type: def.data_type || "",
+        example: def.example_usage || def.example || "",
+      };
+    }
+    return { analysisType: "business_definitions", fieldData };
+  };
+
+  // Try fenced code blocks first
+  for (const match of content.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)) {
+    const candidate = match[1].trim();
+    if (!candidate) continue;
+    try {
+      const parsed = JSON.parse(candidate);
+      if (isBusinessDefShape(parsed)) return toAnalysisResult(parsed);
+    } catch {}
+  }
+  // Fallback: plain JSON (RAGFlow returns without fences)
+  try {
+    const parsed = JSON.parse(content.trim());
+    if (isBusinessDefShape(parsed)) return toAnalysisResult(parsed);
+  } catch {}
+  return null;
 }
 
 function repairTruncatedDqJson(candidate: string): DqAnalysisResult | null {
@@ -562,6 +664,20 @@ export function detectDqAnalysisJSON(content: string): DqAnalysisResult | null {
       if (recovered) return recovered;
     }
   }
+  // Fallback: RAGFlow returns plain JSON (no fences)
+  try {
+    const parsed = JSON.parse(content.trim());
+    if (
+      parsed &&
+      parsed.analysis_summary &&
+      Array.isArray(parsed.field_rules) &&
+      typeof parsed.analysis_summary.total_rules_generated === "number" &&
+      !parsed.fact_tables &&
+      !parsed.scan_summary
+    ) {
+      return parsed as DqAnalysisResult;
+    }
+  } catch {}
   return null;
 }
 
@@ -685,6 +801,20 @@ export function detectInformaticaJSON(content: string): InformaticaOutput | null
       }
     } catch {}
   }
+  // Fallback: RAGFlow returns plain JSON (no fences)
+  try {
+    const parsed = JSON.parse(content.trim());
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      parsed.informatica_sql &&
+      parsed.descriptions &&
+      parsed.data_classification &&
+      parsed.format_types
+    ) {
+      return parsed as InformaticaOutput;
+    }
+  } catch {}
   return null;
 }
 
@@ -975,7 +1105,7 @@ export function generateAnalysisSummary(
       const levelPriority: Record<string, number> = { "TS": 4, "S": 3, "C": 2, "P": 1 };
       const codes: Record<string, number> = {};
       for (const columns of Object.values(result.fieldData)) {
-        const code = columns.classification_code || (columns.classification_level ? columns.classification_level.charAt(0).toUpperCase() === "T" ? "TS" : columns.classification_level.charAt(0).toUpperCase() : "C");
+        const code = columns.classification_level ? (columns.classification_level.toLowerCase().startsWith("top") ? "TS" : columns.classification_level.charAt(0).toUpperCase()) : "C";
         codes[code] = (codes[code] || 0) + 1;
       }
       const breakdownParts: string[] = [];

@@ -77,6 +77,7 @@ import {
   ListChecks,
   Monitor,
   Square,
+  Settings,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -100,12 +101,16 @@ import {
   getAnalysisLabel,
   detectPiiScanJSON,
   generatePiiScanSummary,
+  detectClassificationJSON,
+  detectBusinessDefJSON,
   detectDqAnalysisJSON,
   generateDqAnalysisSummary,
   detectInformaticaJSON,
   generateInformaticaSummary,
 } from "@/lib/result-store";
 import DataModelDiagram from "@/components/DataModelDiagram";
+import ClassificationResultCard, { type ClassificationItem } from "@/components/ClassificationResultCard";
+import { loadPageVisibility, type PageVisibility } from "@/pages/settings";
 import ExcelPreview from "@/components/ExcelPreview";
 import {
   type InsightsReport,
@@ -430,6 +435,7 @@ const translations = {
     agentWorking: "Agent Working...",
     agentCompleted: "Agent Completed Task",
     stepReadingFile: "Reading uploaded file",
+    stepProcessingRequest: "Processing request",
     stepProfilingData: "Profiling data structure",
     stepGenerating: "Generating analysis",
     stepExecuting: "Executing checks",
@@ -529,6 +535,9 @@ const translations = {
     nudgeInfoCard3: "Map Behavioural Levers",
     nudgeInfoCard3Desc: "Get the right intervention for each group",
     refDocHeader: "📎 Reference Documents",
+    aiProviderLabel: "AI Provider",
+    aiProviderClaude: "Claude",
+    aiProviderLocal: "Local",
     addDocument: "Add Document",
     noDocsLoaded: "No documents loaded",
     docsActive: (n: number) => `${n} document(s) active`,
@@ -701,6 +710,7 @@ const translations = {
     agentWorking: "الوكيل يعمل...",
     agentCompleted: "أكمل الوكيل المهمة",
     stepReadingFile: "قراءة الملف المحمل",
+    stepProcessingRequest: "معالجة الطلب",
     stepProfilingData: "تحليل هيكل البيانات",
     stepGenerating: "إنشاء التحليل",
     stepExecuting: "تنفيذ الفحوصات",
@@ -800,6 +810,9 @@ const translations = {
     nudgeInfoCard3: "رسم خريطة الرافعات السلوكية",
     nudgeInfoCard3Desc: "احصل على التدخل المناسب لكل مجموعة",
     refDocHeader: "📎 المستندات المرجعية",
+    aiProviderLabel: "مزود الذكاء الاصطناعي",
+    aiProviderClaude: "Claude",
+    aiProviderLocal: "محلي",
     addDocument: "إضافة مستند",
     noDocsLoaded: "لا توجد مستندات محملة",
     docsActive: (n: number) => `${n} مستند(ات) نشط`,
@@ -902,17 +915,17 @@ const FEATURE_CARDS = [
     color: "text-[#067647]",
     bg: "bg-[#067647]/5",
     iconBg: "bg-[#067647]/10",
-    agentMode: "data-management" as const,
+    agentMode: "data-classification" as const,
   },
   {
     icon: BookOpen,
     title: "Business Definitions",
     description: "Generate comprehensive business definitions for data fields",
-    prompt: "I need help generating business definitions for my data fields. Can you explain what a good business definition includes and guide me through the process?",
+    prompt: "Generate business definitions for all fields in the uploaded data. For each field provide: Business Term (EN), Business Definition (EN), Business Term (AR), Business Definition (AR), Data Type, and an example value.",
     color: "text-[#51BAB4]",
     bg: "bg-[#51BAB4]/5",
     iconBg: "bg-[#51BAB4]/10",
-    agentMode: "data-management" as const,
+    agentMode: "business-definitions" as const,
   },
   {
     icon: CheckCircle,
@@ -922,7 +935,7 @@ const FEATURE_CARDS = [
     color: "text-[#774896]",
     bg: "bg-[#774896]/5",
     iconBg: "bg-[#774896]/10",
-    agentMode: "data-management" as const,
+    agentMode: "dq-rules" as const,
   },
   {
     icon: Database,
@@ -942,7 +955,7 @@ const FEATURE_CARDS = [
     color: "text-red-600",
     bg: "bg-red-50",
     iconBg: "bg-red-100",
-    agentMode: "data-management" as const,
+    agentMode: "pii-detection" as const,
   },
   {
     icon: BarChart3,
@@ -962,7 +975,7 @@ const FEATURE_CARDS = [
     color: "text-[#F57C00]",
     bg: "bg-[#F57C00]/5",
     iconBg: "bg-[#F57C00]/10",
-    agentMode: "data-management" as const,
+    agentMode: "informatica" as const,
   },
   {
     icon: FileText,
@@ -1070,6 +1083,7 @@ interface ActivityLogEntry {
   icon: string;
   text: string;
   timestamp: string;
+  messageId?: number;
 }
 
 type AgentStatus = "idle" | "thinking" | "executing" | "done";
@@ -1092,6 +1106,10 @@ const SHEET_TAG_COLORS: Record<string, string> = {
   informatica: "#F57C00",
 };
 
+type AgentMode = "data-classification" | "business-definitions" | "dq-rules" | "pii-detection" | "informatica" | "data-model" | "insights" | "nudge" | "bi";
+const DM_SUB_MODES: AgentMode[] = ["data-classification", "business-definitions", "dq-rules", "pii-detection", "informatica"];
+const isDmSubMode = (mode: AgentMode) => DM_SUB_MODES.includes(mode);
+
 const STATUS_COLORS: Record<AgentStatus, { bg: string; text: string; pulse: boolean }> = {
   idle: { bg: "#6B7280", text: "#ffffff", pulse: false },
   thinking: { bg: "#2563EB", text: "#ffffff", pulse: true },
@@ -1106,7 +1124,11 @@ function isOutOfScope(text: string): boolean {
 function detectAnalysisTag(userContent: string, assistantContent?: string, t?: Translation): string | null {
   const tr = t || translations.en;
   const combined = `${userContent} ${assistantContent || ""}`.toLowerCase();
-  const userOnly = userContent.toLowerCase();
+
+  // Strip injected column data from the user's typed text before keyword matching.
+  // Injected data is appended after " --- Column" or "[SYSTEM NOTE:" separators.
+  const strippedUser = userContent.split(/\s*---\s*Column\s|\n\n\[SYSTEM NOTE:/)[0];
+  const userOnly = strippedUser.toLowerCase();
 
   // 1. Unambiguous JSON structure markers in the AI response (checked first — very precise)
   if (combined.includes("report_title") && combined.includes("key_insights")) return tr.tagInsights;
@@ -1115,7 +1137,7 @@ function detectAnalysisTag(userContent: string, assistantContent?: string, t?: T
   if (combined.includes("dq_dimension") || combined.includes("rule_layer")) return tr.tagDataQuality;
   if (combined.includes("informatica_sql") || combined.includes("format_types")) return tr.tagInformatica;
 
-  // 2. User intent only — based on what the user typed, not the AI response
+  // 2. User intent only — based on the user's typed text (stripped of injected data)
   if (
     userOnly.includes("insight") || userOnly.includes("رؤى") ||
     userOnly.includes("analyze this data") || userOnly.includes("analyse this data") ||
@@ -1139,29 +1161,53 @@ function detectAnalysisTag(userContent: string, assistantContent?: string, t?: T
   ) return tr.tagPiiScan;
 
   if (
-    userOnly.includes("classif") || userOnly.includes("تصنيف")
-  ) return tr.tagDataClassification;
-
-  if (
     userOnly.includes("data model") || userOnly.includes("star schema") ||
     userOnly.includes("dimensional model") || userOnly.includes("analytical model") ||
     userOnly.includes("نموذج بيانات") || userOnly.includes("نموذج تحليلي")
   ) return tr.tagDataModel;
 
+  // Business definitions checked BEFORE classification — more specific intent
   if (
-    userOnly.includes("definition") || userOnly.includes("تعريف") ||
-    userOnly.includes("business def") || userOnly.includes("business term")
+    userOnly.includes("definition") || userOnly.includes("defintions") || userOnly.includes("definiton") ||
+    userOnly.includes("تعريف") ||
+    userOnly.includes("business def") || userOnly.includes("business term") ||
+    userOnly.includes("data dictionary") || userOnly.includes("define the") ||
+    userOnly.includes("define these") || /business\s+defin/.test(userOnly)
   ) return tr.tagBusinessDefs;
 
+  if (
+    userOnly.includes("classif") || userOnly.includes("تصنيف")
+  ) return tr.tagDataClassification;
+
   return null;
+}
+
+function intentToTag(intent: string, t: Translation): string | null {
+  const map: Record<string, string> = {
+    classification:       t.tagDataClassification,
+    business_definitions: t.tagBusinessDefs,
+    dq_rules:             t.tagDataQuality,
+    pii:                  t.tagPiiScan,
+    data_model:           t.tagDataModel,
+    insights:             t.tagInsights,
+  };
+  return map[intent] ?? null;
 }
 
 function detectDataModelJSON(content: string): DataModelJSON | null {
   const fencedMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   const candidate = fencedMatch ? fencedMatch[1].trim() : null;
-  if (!candidate) return null;
+  if (candidate) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed && Array.isArray(parsed.fact_tables) && Array.isArray(parsed.dimension_tables) && Array.isArray(parsed.relationships)) {
+        return parsed as DataModelJSON;
+      }
+    } catch {}
+  }
+  // Fallback: RAGFlow returns plain JSON (no fences)
   try {
-    const parsed = JSON.parse(candidate);
+    const parsed = JSON.parse(content.trim());
     if (parsed && Array.isArray(parsed.fact_tables) && Array.isArray(parsed.dimension_tables) && Array.isArray(parsed.relationships)) {
       return parsed as DataModelJSON;
     }
@@ -1197,6 +1243,10 @@ function formatTimestamp(date: Date | string): string {
 
 function inferStepsForCommand(content: string, t: Translation): ThinkingStep[] {
   const lower = content.toLowerCase();
+  const hasFile =
+    content.includes("**Uploaded File:") ||
+    content.includes("**Uploaded Image:") ||
+    content.includes("**Uploaded Document:");
   const isDq = lower.includes("quality") || lower.includes("dq") || lower.includes("جودة");
   const isClassification = lower.includes("classification") || lower.includes("تصنيف");
   const isDefinition = lower.includes("definition") || lower.includes("تعريف");
@@ -1206,7 +1256,7 @@ function inferStepsForCommand(content: string, t: Translation): ThinkingStep[] {
 
   type StepDef = { label: string; est: number };
   const stepDefs: StepDef[] = [
-    { label: t.stepReadingFile, est: 2 },
+    { label: hasFile ? t.stepReadingFile : t.stepProcessingRequest, est: 2 },
     { label: t.stepProfilingData, est: 3 },
   ];
 
@@ -1241,6 +1291,93 @@ function inferStepsForCommand(content: string, t: Translation): ThinkingStep[] {
     estimatedSeconds: est,
   }));
 }
+
+function getStepIcon(label: string): string {
+  const l = label.toLowerCase();
+  if (l.includes("saving") || l.includes("export") || l.includes("result")) return "💾";
+  if (l.includes("executing") || l.includes("running"))                       return "▶️";
+  if (l.includes("checking") || l.includes("validation"))                     return "✅";
+  if (l.includes("profiling") || l.includes("structure") || l.includes("data")) return "📊";
+  if (l.includes("generating") || l.includes("analysis") || l.includes("output")) return "⚙️";
+  return "🔄";
+}
+
+function isRawData(text: string): boolean {
+  if (!text || text.trim().length === 0) return false;
+  const trimmed = text.trim();
+  if ((trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"))) return true;
+  if (trimmed.includes("--- Pasted Data ---")) return true;
+  const lines = trimmed.split("\n");
+  if (lines.length >= 3 && (lines[0].includes(",") || lines[0].includes("|"))) return true;
+  if (lines.length > 2 && !/[.?!]/.test(lines[0])) return true;
+  return false;
+}
+
+function normalizeProviderError(message: string): string {
+  if (!message) return "An unexpected error occurred. Please try again.";
+  const m = message.toLowerCase();
+  if (m.includes("401") || m.includes("403") || m.includes("unauthorized") || m.includes("forbidden"))
+    return "Authentication failed. Please check your API configuration.";
+  if (m.includes("404") || m.includes("not found"))
+    return "Service not found. Please verify your API endpoint.";
+  if (m.includes("500") || m.includes("internal server"))
+    return "The AI service encountered an error. Please try again.";
+  if (m.includes("timeout") || m.includes("timed out"))
+    return "Request timed out. Please try again.";
+  if (m.includes("network") || m.includes("failed to fetch") || m.includes("econnrefused"))
+    return "Could not connect to the AI service. Please check your connection.";
+  if (m.includes("ragflow") || m.includes("rag flow"))
+    return "The AI service encountered an error. Please try again.";
+  return message;
+}
+
+type MetricPill = { label: string; count: number; color: "red" | "amber" | "green" };
+
+function extractMetricPills(
+  piiScan?: PiiScanResult | null,
+  dqAnalysis?: DqAnalysisResult | null
+): MetricPill[] {
+  const pills: MetricPill[] = [];
+  if (piiScan) {
+    const s = piiScan.scan_summary;
+    if (s.pii_columns_found > 0)
+      pills.push({ label: "PII columns", count: s.pii_columns_found, color: "red" });
+    if (s.sensitive_columns_found > 0)
+      pills.push({ label: "Sensitive", count: s.sensitive_columns_found, color: "amber" });
+    if (s.clean_columns > 0)
+      pills.push({ label: "Clean", count: s.clean_columns, color: "green" });
+  }
+  if (dqAnalysis) {
+    const s = dqAnalysis.analysis_summary;
+    if (s.fields_with_critical_rules > 0)
+      pills.push({ label: "Critical fields", count: s.fields_with_critical_rules, color: "red" });
+    if (s.warnings_count > 0)
+      pills.push({ label: "Warnings", count: s.warnings_count, color: "amber" });
+  }
+  return pills;
+}
+
+type CommandType = "pii" | "dq" | "model" | "informatica" | "insights";
+
+function detectRequestedCommandTypes(content: string): CommandType[] {
+  const lower = content.toLowerCase();
+  const types: CommandType[] = [];
+  if (lower.includes("pii") || lower.includes("privacy") || lower.includes("pdpl") || lower.includes("personal data")) types.push("pii");
+  if (lower.includes("data quality") || lower.includes("dq rules") || lower.includes("quality rules") || lower.includes("validation rules")) types.push("dq");
+  if (lower.includes("data model") || lower.includes("star schema") || lower.includes("dimensional model") || lower.includes("fact table")) types.push("model");
+  if (lower.includes("informatica")) types.push("informatica");
+  if ((lower.includes("insight") || lower.includes("analyze") || lower.includes("analyse")) && !types.includes("dq")) types.push("insights");
+  return types;
+}
+
+const FOLLOW_UP_MESSAGES: Record<CommandType, string> = {
+  pii:         "Now perform a PII scan on the same dataset and return the PII detection results.",
+  dq:          "Now generate data quality rules for the same dataset.",
+  model:       "Now generate a dimensional data model (star schema) for the same dataset.",
+  informatica: "Now generate Informatica-compatible output for the same dataset.",
+  insights:    "Now generate a data insights report for the same dataset.",
+};
 
 function stripExcelContent(content: string): { displayText: string; fileName: string | null } {
   const uploadPatterns = [
@@ -1311,11 +1448,8 @@ function SidebarContent({
   setEditTitle,
   handleSaveRename,
   agentMode,
-  referenceDocuments,
-  refDocError,
-  onAddDocument,
-  onRemoveDocument,
-  refDocInputRef,
+  aiProvider,
+  onAiProviderChange,
 }: {
   t: Translation;
   conversations: Conversation[];
@@ -1338,12 +1472,9 @@ function SidebarContent({
   editTitle: string;
   setEditTitle: (t: string) => void;
   handleSaveRename: (id: number) => void;
-  agentMode: "data-management" | "data-model" | "insights" | "nudge" | "bi";
-  referenceDocuments: Array<{ id: string; filename: string; fileType: "pdf" | "text"; sizeKb: number }>;
-  refDocError: string | null;
-  onAddDocument: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onRemoveDocument: (id: string) => void;
-  refDocInputRef: React.RefObject<HTMLInputElement>;
+  agentMode: AgentMode;
+  aiProvider: "claude" | "local";
+  onAiProviderChange: (v: "claude" | "local") => void;
 }) {
   const statusConfig = STATUS_COLORS[agentStatus];
   const statusLabel = agentStatus === "idle" ? t.agentIdle : agentStatus === "thinking" ? t.agentThinking : agentStatus === "executing" ? t.agentExecuting : t.agentDone;
@@ -1382,65 +1513,18 @@ function SidebarContent({
       <div className="border-t border-white/10" />
 
       <div className="px-3 pt-3 pb-2 border-b border-white/10">
-        <p className="text-[10px] font-semibold text-white/50 uppercase tracking-wide mb-2" data-testid="text-ref-doc-header">
-          {t.refDocHeader}
-        </p>
-        <input
-          ref={refDocInputRef}
-          type="file"
-          accept=".pdf,.txt,text/plain,application/pdf"
-          multiple
-          className="hidden"
-          onChange={onAddDocument}
-          data-testid="input-ref-doc-file"
-        />
-        <button
-          onClick={() => refDocInputRef.current?.click()}
-          className="w-full text-[11px] py-1.5 rounded border border-dashed border-white/30 text-white/60 hover:text-white hover:border-white/60 transition-colors"
-          data-testid="button-add-document"
-        >
-          + {t.addDocument}
-        </button>
-        {refDocError && (
-          <p className="mt-1 text-[10px] text-red-400" data-testid="text-ref-doc-error">{refDocError}</p>
-        )}
-        <div
-          className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
-          style={{
-            backgroundColor: referenceDocuments.length > 0 ? "#06764720" : "#ffffff10",
-            color: referenceDocuments.length > 0 ? "#4ADE80" : "rgba(255,255,255,0.35)",
-          }}
-          data-testid="status-ref-docs"
-        >
-          <span>{referenceDocuments.length > 0 ? "🟢" : "🔘"}</span>
-          <span>{referenceDocuments.length > 0 ? t.docsActive(referenceDocuments.length) : t.noDocsLoaded}</span>
+        <div className="mb-2">
+          <p className="text-[9px] text-white/40 uppercase tracking-wide mb-1">{t.aiProviderLabel}</p>
+          <select
+            value={aiProvider}
+            onChange={(e) => onAiProviderChange(e.target.value as "claude" | "local")}
+            className="w-full text-[11px] py-1 px-2 rounded border border-white/20 bg-white/10 text-white/80 focus:outline-none focus:border-white/40 cursor-pointer"
+            data-testid="select-ai-provider"
+          >
+            <option value="claude" className="bg-[#1a1a2e] text-white">{t.aiProviderClaude}</option>
+            <option value="local" className="bg-[#1a1a2e] text-white">{t.aiProviderLocal}</option>
+          </select>
         </div>
-        {referenceDocuments.length > 0 && (
-          <div className="mt-2 space-y-1" data-testid="list-ref-docs">
-            {referenceDocuments.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex items-center gap-1.5 px-2 py-1 rounded"
-                style={{ backgroundColor: "#ffffff08" }}
-                data-testid={`ref-doc-item-${doc.id}`}
-              >
-                <FileText className="w-3 h-3 flex-shrink-0 text-white/50" />
-                <span className="flex-1 min-w-0 text-[10px] text-white/70 truncate" title={doc.filename}>
-                  {doc.filename.length > 22 ? doc.filename.slice(0, 22) + "…" : doc.filename}
-                </span>
-                <span className="text-[9px] text-white/35 flex-shrink-0">{doc.sizeKb} KB</span>
-                <button
-                  onClick={() => onRemoveDocument(doc.id)}
-                  className="flex-shrink-0 text-white/35 hover:text-red-400 transition-colors text-[11px] leading-none"
-                  data-testid={`button-remove-doc-${doc.id}`}
-                  title="Remove"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <ScrollArea className="flex-1">
@@ -1633,6 +1717,7 @@ export default function ChatPage() {
   const [resultRows, setResultRows] = useState<ResultRow[]>([]);
   const [includedAnalyses, setIncludedAnalyses] = useState<AnalysisType[]>([]);
   const [sessionFieldNames, setSessionFieldNames] = useState<string[] | null>(null);
+  const [sessionRowCount, setSessionRowCount] = useState<number>(0);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -1644,6 +1729,7 @@ export default function ChatPage() {
   const [dqAnalyses, setDqAnalyses] = useState<Record<number, DqAnalysisResult>>({});
   const [latestDqAnalysis, setLatestDqAnalysis] = useState<DqAnalysisResult | null>(null);
   const [informaticaOutputs, setInformaticaOutputs] = useState<Record<number, InformaticaOutput>>({});
+  const [classificationForMessage, setClassificationForMessage] = useState<Record<number, ClassificationItem[]>>({});
   const [latestInformaticaOutput, setLatestInformaticaOutput] = useState<InformaticaOutput | null>(null);
 
   const [insightsReports, setInsightsReports] = useState<{ report: InsightsReport; fileName: string; timestamp: string; excelFileName: string; columns: BackendColumnProfile[] }[]>([]);
@@ -1657,6 +1743,7 @@ export default function ChatPage() {
   const [agentStatus, setAgentStatus] = useState<AgentStatus>("idle");
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
+  const [pendingAutoTypes, setPendingAutoTypes] = useState<CommandType[]>([]);
   const [completedStepsForMessage, setCompletedStepsForMessage] = useState<Record<number, ThinkingStep[]>>({});
   const [timeTick, setTimeTick] = useState<number>(Date.now());
   const [mobileOutputsOpen, setMobileOutputsOpen] = useState(false);
@@ -1668,7 +1755,7 @@ export default function ChatPage() {
   const [editingConvId, setEditingConvId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [outputsPanelCollapsed, setOutputsPanelCollapsed] = useState(false);
-  const [agentMode, setAgentMode] = useState<"insights" | "data-management" | "data-model" | "nudge" | "bi">("data-management");
+  const [agentMode, setAgentMode] = useState<AgentMode>("data-classification");
   const [referenceDocuments, setReferenceDocuments] = useState<Array<{
     id: string;
     filename: string;
@@ -1678,6 +1765,16 @@ export default function ChatPage() {
     uploadedAt: string;
   }>>([]);
   const [refDocError, setRefDocError] = useState<string | null>(null);
+  const [aiProvider, setAiProvider] = useState<"claude" | "local">("local");
+  const [pageVisibility, setPageVisibility] = useState<PageVisibility>(loadPageVisibility);
+
+  // Re-read settings when window regains focus (user may have changed settings page)
+  useEffect(() => {
+    const onFocus = () => setPageVisibility(loadPageVisibility());
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+  useEffect(() => { sessionStorage.setItem("ai-provider", aiProvider); }, [aiProvider]);
   const refDocInputRef = useRef<HTMLInputElement>(null);
   const refDocErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [nudgeReports, setNudgeReports] = useState<Record<number, NudgeReport>>({});
@@ -1707,8 +1804,11 @@ export default function ChatPage() {
   const [showExcelPreview, setShowExcelPreview] = useState(false);
   const [previewResultFile, setPreviewResultFile] = useState<File | null>(null);
   const [chatError, setChatError] = useState<{ message: string; retry: () => void } | null>(null);
+  const [pageMismatch, setPageMismatch] = useState<{ message: string; targetMode: AgentMode; targetLabel: string } | null>(null);
   const [wasCancelled, setWasCancelled] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const streamingDetectedIntentRef = useRef<string | null>(null);
+  const [messageIntents, setMessageIntents] = useState<Record<number, string>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastRequestRef = useRef<{ content: string; file?: File | null; extraText?: string } | null>(null);
@@ -1721,9 +1821,10 @@ export default function ChatPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const promptParam = params.get("prompt");
-    const modeParam = params.get("mode") as "data-management" | "data-model" | "insights" | "nudge" | "bi" | null;
+    const modeParam = params.get("mode") as AgentMode | "data-management" | null;
     if (promptParam) setInputValue(promptParam);
-    if (modeParam && ["data-management", "data-model", "insights", "nudge", "bi"].includes(modeParam)) setAgentMode(modeParam);
+    if (modeParam === "data-management") setAgentMode("data-classification");
+    else if (modeParam && [...DM_SUB_MODES, "data-model", "insights", "nudge", "bi"].includes(modeParam)) setAgentMode(modeParam as AgentMode);
     if (promptParam || modeParam) history.replaceState({}, "", window.location.pathname);
   }, []);
 
@@ -1807,6 +1908,7 @@ export default function ChatPage() {
     const insightsMap: Record<number, InsightsReport> = {};
     const dqMap: Record<number, DqAnalysisResult> = {};
     const informaticaMap: Record<number, InformaticaOutput> = {};
+    const classificationMap: Record<number, ClassificationItem[]> = {};
     let lastModel: DataModelJSON | null = null;
     let lastPii: PiiScanResult | null = null;
     let lastDq: DqAnalysisResult | null = null;
@@ -1849,10 +1951,31 @@ export default function ChatPage() {
         const tf = [...msgModel.fact_tables, ...msgModel.dimension_tables].reduce((acc, tbl) => acc + tbl.fields.length, 0);
         msgParts.push(`✅ Analytical data model "${msgModel.model_name}" generated — ${factCount} fact table${factCount !== 1 ? "s" : ""}, ${dimCount} dimension table${dimCount !== 1 ? "s" : ""}, ${relCount} relationship${relCount !== 1 ? "s" : ""}, ${tf} total fields.\n\nSheets added to result.xlsx: data_model_fields, data_model_relationships, data_model_ddl`);
       }
+      const msgClassification = detectClassificationJSON(msg.content);
+      if (msgClassification && Object.keys(msgClassification.fieldData).length > 0) {
+        msgParts.push(`✅ Data classification completed for ${Object.keys(msgClassification.fieldData).length} fields.\n\nResults saved to result.xlsx — Sheet: data_classification`);
+        const classItems: ClassificationItem[] = Object.entries(msgClassification.fieldData).map(([name, cols]) => ({
+          field_name: name,
+          classification_level: cols.classification_level || "",
+          impact_level: cols.impact_level || "",
+          impact_category: cols.impact_category || "",
+          justification: cols.justification || "",
+          is_pii_under_pdpl: cols.is_pii_under_pdpl || "",
+          recommended_controls: cols.recommended_controls || "",
+          requires_human_review: false,
+          human_reviewed: false,
+          human_override_level: "",
+        }));
+        classificationMap[msg.id] = classItems;
+      }
+      const msgBusinessDef = detectBusinessDefJSON(msg.content);
+      if (msgBusinessDef && Object.keys(msgBusinessDef.fieldData).length > 0) {
+        msgParts.push(`✅ Business definitions generated for ${Object.keys(msgBusinessDef.fieldData).length} fields.\n\nResults saved to result.xlsx — Sheet: business_definitions`);
+      }
       const rawResults = detectAndExtractAllAnalyses(msg.content);
-      const results = dqResult
-        ? rawResults.filter(r => r.analysisType !== "data_quality")
-        : rawResults;
+      const results = (dqResult ? rawResults.filter(r => r.analysisType !== "data_quality") : rawResults)
+        .filter(r => !(msgBusinessDef && r.analysisType === "business_definitions"))
+        .filter(r => !(msgClassification && r.analysisType === "data_classification"));
       if (results.length > 0) {
         const totalFields = new Set(
           results.flatMap(r => [
@@ -1880,6 +2003,9 @@ export default function ChatPage() {
     if (Object.keys(informaticaMap).length > 0) {
       setInformaticaOutputs(prev => ({ ...prev, ...informaticaMap }));
       setLatestInformaticaOutput(lastInformatica);
+    }
+    if (Object.keys(classificationMap).length > 0) {
+      setClassificationForMessage(prev => ({ ...prev, ...classificationMap }));
     }
     if (Object.keys(insightsMap).length > 0) {
       setInsightsForMessage(prev => ({ ...prev, ...insightsMap }));
@@ -1945,10 +2071,10 @@ export default function ChatPage() {
     }
   }, [activeConversation?.messages]);
 
-  const addActivityEntry = useCallback((icon: string, text: string) => {
+  const addActivityEntry = useCallback((icon: string, text: string, messageId?: number) => {
     const now = new Date();
     const ts = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    setActivityLog(prev => [...prev, { icon, text, timestamp: ts }]);
+    setActivityLog(prev => [...prev, { icon, text, timestamp: ts, messageId }]);
   }, []);
 
   const getThinkingStepsForCommand = useCallback((content: string): ThinkingStep[] => {
@@ -1964,6 +2090,7 @@ export default function ChatPage() {
     setResultRows([]);
     setIncludedAnalyses([]);
     setSessionFieldNames(null);
+    setSessionRowCount(0);
     setUploadedFileName(null);
     setSummaryOverrides({});
     setDataModels({});
@@ -2052,10 +2179,43 @@ export default function ChatPage() {
       toastParts.push(t.dataModelToast(model.model_name));
     }
 
+    const classificationResult = detectClassificationJSON(content);
+    if (classificationResult && Object.keys(classificationResult.fieldData).length > 0) {
+      setResultRows((prev) => mergeResults(prev, [classificationResult]));
+      setIncludedAnalyses((prev) => prev.includes("data_classification") ? prev : [...prev, "data_classification"]);
+      const fieldCount = Object.keys(classificationResult.fieldData).length;
+      summaryParts.push(`✅ Data classification completed for ${fieldCount} fields.\n\nResults saved to result.xlsx — Sheet: data_classification`);
+      toastParts.push(`${fieldCount} fields classified`);
+
+      if (messageId) {
+        const classItems: ClassificationItem[] = Object.entries(classificationResult.fieldData).map(([name, cols]) => ({
+          field_name: name,
+          classification_level: cols.classification_level || "",
+          impact_level: cols.impact_level || "",
+          impact_category: cols.impact_category || "",
+          justification: cols.justification || "",
+          is_pii_under_pdpl: cols.is_pii_under_pdpl || "",
+          recommended_controls: cols.recommended_controls || "",
+          requires_human_review: false,
+          human_reviewed: false,
+          human_override_level: "",
+        }));
+        setClassificationForMessage(prev => ({ ...prev, [messageId]: classItems }));
+      }
+    }
+
+    const businessDefResult = detectBusinessDefJSON(content);
+    if (businessDefResult && Object.keys(businessDefResult.fieldData).length > 0) {
+      setResultRows((prev) => mergeResults(prev, [businessDefResult]));
+      setIncludedAnalyses((prev) => prev.includes("business_definitions") ? prev : [...prev, "business_definitions"]);
+      summaryParts.push(`✅ Business definitions generated for ${Object.keys(businessDefResult.fieldData).length} fields.\n\nResults saved to result.xlsx — Sheet: business_definitions`);
+      toastParts.push(`${Object.keys(businessDefResult.fieldData).length} business definitions generated`);
+    }
+
     const rawAnalysisResults = detectAndExtractAllAnalyses(content);
-    const analysisResults = dqResult
-      ? rawAnalysisResults.filter(r => r.analysisType !== "data_quality")
-      : rawAnalysisResults;
+    const analysisResults = (dqResult ? rawAnalysisResults.filter(r => r.analysisType !== "data_quality") : rawAnalysisResults)
+      .filter(r => !(businessDefResult && r.analysisType === "business_definitions"))
+      .filter(r => !(classificationResult && r.analysisType === "data_classification"));
     if (analysisResults.length > 0) {
       const newTypes: AnalysisType[] = [];
 
@@ -2247,6 +2407,12 @@ export default function ChatPage() {
     setThinkingSteps(getThinkingStepsForCommand(content));
     addActivityEntry("📤", `${t.commandLabel} ${content.substring(0, 40)}...`);
 
+    // Queue extra command types that need separate requests
+    const requestedTypes = detectRequestedCommandTypes(finalContent);
+    if (requestedTypes.length > 1) {
+      setPendingAutoTypes(requestedTypes.slice(1));
+    }
+
     if (agentMode === "nudge") {
       const userMsgId = Date.now();
       const assistantMsgId = userMsgId + 1;
@@ -2346,7 +2512,7 @@ export default function ChatPage() {
       if (file) {
         formData.append("file", file);
       }
-      if (agentMode === "data-management" && referenceDocuments.length > 0) {
+      if (isDmSubMode(agentMode) && referenceDocuments.length > 0) {
         const refDocsPayload = referenceDocuments.map(d => ({
           filename: d.filename,
           fileType: d.fileType,
@@ -2354,6 +2520,8 @@ export default function ChatPage() {
         }));
         formData.append("refDocs", JSON.stringify(refDocsPayload));
       }
+      formData.append("aiProvider", aiProvider);
+      formData.append("agentMode", agentMode);
 
       const response = await fetch(`/api/conversations/${conversationId}/messages`, {
         method: "POST",
@@ -2379,6 +2547,21 @@ export default function ChatPage() {
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
+                if (data.pageMismatch) {
+                  setIsStreaming(false);
+                  setStreamingContent("");
+                  await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
+                  await queryClient.invalidateQueries({ queryKey: ["/api/conversations", agentMode] });
+                  setPageMismatch({
+                    message: data.pageMismatch.message,
+                    targetMode: data.pageMismatch.targetMode as AgentMode,
+                    targetLabel: data.pageMismatch.targetLabel,
+                  });
+                  return;
+                }
+                if (data.detectedIntent) {
+                  streamingDetectedIntentRef.current = data.detectedIntent;
+                }
                 if (data.insightsMode) {
                   setIsInsightsMode(true);
                 }
@@ -2388,6 +2571,7 @@ export default function ChatPage() {
                 }
                 if (data.fieldNames) {
                   setSessionFieldNames(data.fieldNames);
+                  if (data.rowCount) setSessionRowCount(data.rowCount);
                   if (file) setUploadedFileName(file.name);
                 }
                 if (data.type === "error") {
@@ -2395,7 +2579,7 @@ export default function ChatPage() {
                   setStreamingContent("");
                   await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
                   await queryClient.invalidateQueries({ queryKey: ["/api/conversations", agentMode] });
-                  setChatError({ message: data.content || (lang === "ar" ? "حدث خطأ أثناء معالجة الصورة" : "An error occurred while processing the image."), retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
+                  setChatError({ message: normalizeProviderError(data.content || (lang === "ar" ? "حدث خطأ أثناء معالجة الصورة" : "An error occurred while processing the image.")), retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
                   return;
                 }
                 if (data.content) {
@@ -2434,20 +2618,12 @@ export default function ChatPage() {
                   const detectedPii = detectPiiScanJSON(accumulated);
                   const detectedDq = detectDqAnalysisJSON(accumulated);
                   const detectedModel = detectDataModelJSON(accumulated);
+                  const detectedBusinessDef = detectBusinessDefJSON(accumulated);
+                  const detectedClassification = detectClassificationJSON(accumulated);
                   const analysisResults = detectAndExtractAllAnalyses(accumulated);
-                  const hasAnyDetection = detectedInsights || detectedPii || detectedDq || detectedModel || analysisResults.length > 0;
+                  const hasAnyDetection = detectedInsights || detectedPii || detectedDq || detectedModel || detectedBusinessDef || detectedClassification || analysisResults.length > 0;
                   if (hasAnyDetection) {
                     processAIResponse(accumulated);
-                    if (detectedInsights) addActivityEntry("📊", t.tagInsights);
-                    if (detectedPii) addActivityEntry("🛡️", t.tagPiiScan);
-                    if (detectedDq) addActivityEntry("🔬", t.tagDataQuality);
-                    if (detectedModel) addActivityEntry("🏗️", t.tagDataModel);
-                    if (analysisResults.length > 0) {
-                      for (const r of analysisResults) {
-                        if (r.analysisType === "data_classification") addActivityEntry("📋", t.tagDataClassification);
-                        else if (r.analysisType === "business_definitions") addActivityEntry("📖", t.tagBusinessDefs);
-                      }
-                    }
 
                     await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
                     await queryClient.invalidateQueries({ queryKey: ["/api/conversations", agentMode] });
@@ -2456,6 +2632,10 @@ export default function ChatPage() {
                     if (convData?.messages) {
                       const lastMsg = convData.messages[convData.messages.length - 1];
                       if (lastMsg?.role === "assistant") {
+                        if (streamingDetectedIntentRef.current) {
+                          setMessageIntents((prev: Record<number, string>) => ({ ...prev, [lastMsg.id]: streamingDetectedIntentRef.current! }));
+                          streamingDetectedIntentRef.current = null;
+                        }
                         setCompletedStepsForMessage(prev => ({
                           ...prev,
                           [lastMsg.id]: thinkingSteps.map(s => ({ ...s, status: "done" as const })),
@@ -2464,17 +2644,41 @@ export default function ChatPage() {
                         if (detectedInsights) {
                           setInsightsForMessage(prev => ({ ...prev, [lastMsg.id]: detectedInsights }));
                           msgSummaryParts.push(t.insightsReportGenerated);
+                          addActivityEntry("📊", t.tagInsights, lastMsg.id);
                         }
                         if (detectedPii) {
                           setPiiScans(prev => ({ ...prev, [lastMsg.id]: detectedPii }));
                           msgSummaryParts.push(generatePiiScanSummary(detectedPii));
+                          addActivityEntry("🛡️", t.tagPiiScan, lastMsg.id);
                         }
                         if (detectedDq) {
                           setDqAnalyses(prev => ({ ...prev, [lastMsg.id]: detectedDq }));
                           msgSummaryParts.push(generateDqAnalysisSummary(detectedDq));
+                          addActivityEntry("🔬", t.tagDataQuality, lastMsg.id);
                         }
                         if (detectedModel) {
                           setDataModels(prev => ({ ...prev, [lastMsg.id]: detectedModel }));
+                          addActivityEntry("🏗️", t.tagDataModel, lastMsg.id);
+                        }
+                        if (detectedBusinessDef && Object.keys(detectedBusinessDef.fieldData).length > 0) {
+                          addActivityEntry("📖", t.tagBusinessDefs, lastMsg.id);
+                        }
+                        if (detectedClassification && Object.keys(detectedClassification.fieldData).length > 0) {
+                          const classItems: ClassificationItem[] = Object.entries(detectedClassification.fieldData).map(([name, cols]) => ({
+                            field_name: name,
+                            classification_level: cols.classification_level || "",
+                            classification_code: cols.classification_code || "",
+                            confidential_sub_level: cols.confidential_sub_level || "N/A",
+                            impact_level: cols.impact_level || "",
+                            impact_category: cols.impact_category || "",
+                            justification: cols.justification || "",
+                            is_pii_under_pdpl: cols.is_pii_under_pdpl || "",
+                            recommended_controls: cols.recommended_controls || "",
+                            requires_human_review: false,
+                            human_reviewed: false,
+                            human_override_level: "",
+                          }));
+                          setClassificationForMessage(prev => ({ ...prev, [lastMsg.id]: classItems }));
                         }
                         if (analysisResults.length > 0) {
                           const totalFields = new Set(
@@ -2484,6 +2688,10 @@ export default function ChatPage() {
                             ])
                           ).size;
                           msgSummaryParts.push(generateAnalysisSummary(analysisResults, totalFields));
+                          for (const r of analysisResults) {
+                            if (r.analysisType === "data_classification") addActivityEntry("📋", t.tagDataClassification, lastMsg.id);
+                            else if (r.analysisType === "business_definitions") addActivityEntry("📖", t.tagBusinessDefs, lastMsg.id);
+                          }
                         }
                         if (msgSummaryParts.length > 0) {
                           const combined = msgSummaryParts.join("\n\n");
@@ -2498,6 +2706,10 @@ export default function ChatPage() {
                     if (convData2?.messages) {
                       const lastMsg2 = convData2.messages[convData2.messages.length - 1];
                       if (lastMsg2?.role === "assistant") {
+                        if (streamingDetectedIntentRef.current) {
+                          setMessageIntents((prev: Record<number, string>) => ({ ...prev, [lastMsg2.id]: streamingDetectedIntentRef.current! }));
+                          streamingDetectedIntentRef.current = null;
+                        }
                         setCompletedStepsForMessage(prev => ({
                           ...prev,
                           [lastMsg2.id]: thinkingSteps.map(s => ({ ...s, status: "done" as const })),
@@ -2505,9 +2717,17 @@ export default function ChatPage() {
                       }
                     }
                   }
+
+                  // Fire next pending auto-command if any (multi-command support)
+                  setPendingAutoTypes(prev => {
+                    if (prev.length === 0) return prev;
+                    const [next, ...rest] = prev;
+                    setTimeout(() => sendMessage(FOLLOW_UP_MESSAGES[next]), 400);
+                    return rest;
+                  });
                 }
                 if (data.error) {
-                  setChatError({ message: data.error, retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
+                  setChatError({ message: normalizeProviderError(data.error || ""), retry: () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } });
                 }
               } catch {}
             }
@@ -2724,7 +2944,17 @@ export default function ChatPage() {
   const messages = activeConversation?.messages || [];
   const threads = groupMessagesIntoThreads(messages);
 
-  const sheetCount = includedAnalyses.length + (latestDataModel ? 3 : 0) + (latestPiiScan ? 1 : 0) + (latestDqAnalysis ? 3 : 0) + (latestInformaticaOutput ? 1 : 0);
+  const dqSheetCount = latestDqAnalysis
+    ? (latestDqAnalysis.field_rules.some(g => g.rules.length > 0) ? 1 : 0)
+      + (latestDqAnalysis.cross_field_rules.length > 0 ? 1 : 0)
+      + (latestDqAnalysis.business_logic_warnings.length > 0 ? 1 : 0)
+    : 0;
+  const sheetCount =
+    includedAnalyses.filter(a => !(a === "data_quality" && latestDqAnalysis)).length
+    + (latestDataModel ? 3 : 0)
+    + (latestPiiScan ? 1 : 0)
+    + dqSheetCount
+    + (latestInformaticaOutput ? 1 : 0);
 
   const sidebarProps = {
     t,
@@ -2749,13 +2979,15 @@ export default function ChatPage() {
     agentMode,
     referenceDocuments,
     refDocError,
+    aiProvider,
+    onAiProviderChange: setAiProvider,
     onAddDocument: handleAddDocument,
     onRemoveDocument: handleRemoveDocument,
     refDocInputRef,
   };
 
   return (
-    <div className="flex h-screen font-main" dir={isRtl ? "rtl" : "ltr"} data-testid="chat-page">
+    <div className="flex h-screen overflow-hidden font-main" dir={isRtl ? "rtl" : "ltr"} data-testid="chat-page">
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -2767,6 +2999,41 @@ export default function ChatPage() {
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleResetCancel} data-testid="button-reset-cancel">{t.keepCurrent}</AlertDialogCancel>
             <AlertDialogAction onClick={handleResetConfirm} data-testid="button-reset-confirm">{t.resetUpload}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!pageMismatch} onOpenChange={(open) => { if (!open) setPageMismatch(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              <span className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5" style={{ color: "#D97706" }} />
+                {lang === "ar" ? "صفحة غير صحيحة" : "Wrong Page"}
+              </span>
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pageMismatch?.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPageMismatch(null)}>
+              {lang === "ar" ? "إغلاق" : "Dismiss"}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pageMismatch) {
+                  setAgentMode(pageMismatch.targetMode);
+                  setActiveConversationId(null);
+                  resetResultState(true);
+                  setCollapsedThreads(new Set());
+                }
+                setPageMismatch(null);
+              }}
+              style={{ backgroundColor: "#2563EB" }}
+            >
+              {lang === "ar" ? `انتقل إلى ${pageMismatch?.targetLabel}` : `Go to ${pageMismatch?.targetLabel}`}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -2904,7 +3171,7 @@ export default function ChatPage() {
               {uploadedFileName ? `📁 ${uploadedFileName}` : t.noFileLoaded}
             </span>
             {sessionFieldNames && (
-              <span className="text-[10px]" style={{ color: "#6B7280" }}> — {sessionFieldNames.length} columns</span>
+              <span className="text-[10px]" style={{ color: "#6B7280" }}> — {sessionFieldNames.length} columns{sessionRowCount > 0 ? `, ${sessionRowCount} rows` : ""}</span>
             )}
           </div>
           {sheetCount > 0 && (
@@ -2957,6 +3224,24 @@ export default function ChatPage() {
             <BookOpen className="w-3.5 h-3.5" />
             {t.userGuide}
           </Link>
+          <Link
+            href="/system-prompts"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
+            style={{ color: "#6B7280" }}
+            data-testid="link-system-prompts"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            {lang === "ar" ? "مطالبات النظام" : "System Prompts"}
+          </Link>
+          <Link
+            href="/settings"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
+            style={{ color: "#6B7280" }}
+            data-testid="link-settings"
+          >
+            <Settings className="w-3.5 h-3.5" />
+            {lang === "ar" ? "إعدادات" : "Settings"}
+          </Link>
           <Button
             size="sm"
             variant="ghost"
@@ -2983,19 +3268,29 @@ export default function ChatPage() {
         {!isMobile && (
           <div className="flex items-center gap-1 px-4 py-2 border-b flex-shrink-0 bg-white" style={{ borderColor: "#E5E7EB" }} data-testid="agent-mode-tabs">
             {([
-              { id: "data-management", icon: Database, labelKey: "agentDataMgmt", descKey: "agentDataMgmtDesc", color: "#0094D3", href: null as string | null },
-              { id: "data-model", icon: Layers, labelKey: "agentDataModel", descKey: "agentDataModelDesc", color: "#774896", href: null as string | null },
-              { id: "insights", icon: Brain, labelKey: "agentInsights", descKey: "agentInsightsDesc", color: "#067647", href: null as string | null },
-              { id: "nudge", icon: Target, labelKey: "agentNudge", descKey: "agentDataMgmtDesc", color: "#7C3AED", href: null as string | null },
-              { id: "bi", icon: BarChart3, labelKey: "biAgent", descKey: "agentDataMgmtDesc", color: "#1A4B8C", href: null as string | null },
-            ]).map((tab) => (
+              { id: "data-management", icon: Database, labelKey: "agentDataMgmt", descKey: "agentDataMgmtDesc", color: "#0094D3" },
+              { id: "data-model", icon: Layers, labelKey: "agentDataModel", descKey: "agentDataModelDesc", color: "#774896" },
+              { id: "insights", icon: Brain, labelKey: "agentInsights", descKey: "agentInsightsDesc", color: "#067647" },
+              { id: "nudge", icon: Target, labelKey: "agentNudge", descKey: "agentDataMgmtDesc", color: "#7C3AED" },
+              { id: "bi", icon: BarChart3, labelKey: "biAgent", descKey: "agentDataMgmtDesc", color: "#1A4B8C" },
+            ]).filter(tab => {
+              if (tab.id === "data-management") return DM_SUB_MODES.some(m => pageVisibility[m]);
+              return pageVisibility[tab.id as keyof PageVisibility] !== false;
+            }).map((tab) => {
+              const isActive = tab.id === "data-management" ? isDmSubMode(agentMode) : agentMode === tab.id;
+              return (
               <button
                 key={tab.id}
                 onClick={() => {
-                  if (tab.href) {
-                    navigate(tab.href);
+                  if (tab.id === "data-management") {
+                    if (!isDmSubMode(agentMode)) {
+                      setAgentMode("data-classification");
+                      setActiveConversationId(null);
+                      resetResultState(true);
+                      setCollapsedThreads(new Set());
+                    }
                   } else if (agentMode !== tab.id) {
-                    setAgentMode(tab.id as typeof agentMode);
+                    setAgentMode(tab.id as AgentMode);
                     setActiveConversationId(null);
                     resetResultState(true);
                     setCollapsedThreads(new Set());
@@ -3003,13 +3298,47 @@ export default function ChatPage() {
                 }}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                 style={{
-                  backgroundColor: !tab.href && agentMode === tab.id ? "#0D2E5C" : "transparent",
-                  color: !tab.href && agentMode === tab.id ? "white" : "#6B7280",
+                  backgroundColor: isActive ? "#0D2E5C" : "transparent",
+                  color: isActive ? "white" : "#6B7280",
                 }}
                 data-testid={`tab-agent-${tab.id}`}
               >
                 <tab.icon className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>{t[tab.labelKey] as string}</span>
+              </button>
+              );
+            })}
+          </div>
+        )}
+
+        {isDmSubMode(agentMode) && (
+          <div className="flex items-center gap-1 px-4 py-1.5 border-b flex-shrink-0" style={{ borderColor: "#E5E7EB", backgroundColor: "#F8FAFC" }} data-testid="dm-sub-tabs">
+            {([
+              { id: "data-classification" as AgentMode, icon: ShieldCheck, label: t.cardDataClassification || "Data Classification", color: "#067647" },
+              { id: "business-definitions" as AgentMode, icon: BookOpen, label: t.cardBusinessDefs || "Business Definitions", color: "#51BAB4" },
+              { id: "dq-rules" as AgentMode, icon: CheckCircle, label: t.cardDataQuality || "DQ Rules", color: "#774896" },
+              { id: "pii-detection" as AgentMode, icon: ScanEye, label: t.cardPiiDetection || "PII Detection", color: "#E53935" },
+              { id: "informatica" as AgentMode, icon: Cpu, label: t.cardInformatica || "Informatica", color: "#F57C00" },
+            ]).filter(sub => pageVisibility[sub.id as keyof PageVisibility] !== false).map(sub => (
+              <button
+                key={sub.id}
+                onClick={() => {
+                  if (agentMode !== sub.id) {
+                    setAgentMode(sub.id);
+                    setActiveConversationId(null);
+                    resetResultState(true);
+                    setCollapsedThreads(new Set());
+                  }
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
+                style={{
+                  backgroundColor: agentMode === sub.id ? sub.color : "transparent",
+                  color: agentMode === sub.id ? "white" : "#6B7280",
+                }}
+                data-testid={`dm-sub-tab-${sub.id}`}
+              >
+                <sub.icon className="w-3 h-3 flex-shrink-0" />
+                <span>{sub.label as string}</span>
               </button>
             ))}
           </div>
@@ -3157,11 +3486,12 @@ export default function ChatPage() {
                     const isCollapsed = collapsedThreads.has(idx);
                     const isLastThread = idx === threads.length - 1;
                     const isActiveStreaming = isLastThread && isStreaming;
-                    const tag = detectAnalysisTag(
-                      thread.userMsg.content,
-                      thread.assistantMsg?.content,
-                      t
-                    );
+                    const storedIntent = thread.assistantMsg
+                      ? messageIntents[thread.assistantMsg.id]
+                      : undefined;
+                    const tag = storedIntent
+                      ? intentToTag(storedIntent, t)
+                      : detectAnalysisTag(thread.userMsg.content, thread.assistantMsg?.content, t);
                     return (
                       <ThreadCard
                         key={thread.userMsg.id}
@@ -3195,6 +3525,11 @@ export default function ChatPage() {
                         uploadedFileName={uploadedFileName}
                         nudgeReport={thread.assistantMsg ? (nudgeReports[thread.assistantMsg.id] || undefined) : undefined}
                         biReport={thread.assistantMsg ? (biReports[thread.assistantMsg.id] || undefined) : undefined}
+                        piiScan={thread.assistantMsg ? (piiScans[thread.assistantMsg.id] || undefined) : undefined}
+                        onRetry={isLastThread && !isStreaming ? () => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); } : undefined}
+                        usedAiProvider={aiProvider}
+                        classificationItems={thread.assistantMsg ? classificationForMessage[thread.assistantMsg.id] : undefined}
+                        onClassificationChange={thread.assistantMsg ? (items) => setClassificationForMessage(prev => ({ ...prev, [thread.assistantMsg!.id]: items })) : undefined}
                       />
                     );
                   })}
@@ -3519,11 +3854,11 @@ export default function ChatPage() {
 
       {!isMobile && (
         <div
-          className="flex-shrink-0 overflow-hidden transition-all duration-200 ease-in-out"
-          style={{ width: outputsPanelCollapsed ? 0 : 300 }}
+          className="flex-shrink-0 h-full overflow-hidden transition-all duration-200 ease-in-out"
+          style={{ width: outputsPanelCollapsed ? 0 : 300, maxHeight: "100vh" }}
           data-testid="outputs-panel-wrapper"
         >
-          <div className="w-[300px] h-full border-l" style={{ borderColor: "#E5E7EB" }} data-testid="outputs-panel">
+          <div className="w-[300px] h-full overflow-hidden border-l" style={{ borderColor: "#E5E7EB" }} data-testid="outputs-panel">
             <OutputsPanel
               t={t}
               isRtl={isRtl}
@@ -3575,13 +3910,13 @@ function OutputsPanel({
   if (latestInformaticaOutput) sheetTags.push({ label: "Informatica", color: SHEET_TAG_COLORS.informatica });
 
   return (
-    <div className="h-full bg-white flex flex-col font-main" style={{ borderLeft: isRtl ? "none" : "1px solid #E5E7EB", borderRight: isRtl ? "1px solid #E5E7EB" : "none" }} data-testid="outputs-panel-content">
-      <div className="p-4 pb-3">
+    <div className="h-full bg-white flex flex-col font-main overflow-hidden" style={{ borderLeft: isRtl ? "none" : "1px solid #E5E7EB", borderRight: isRtl ? "1px solid #E5E7EB" : "none", maxWidth: 300 }} data-testid="outputs-panel-content">
+      <div className="p-4 pb-3 flex-shrink-0">
         <h2 className="text-sm font-bold" style={{ color: "#2563EB" }}>{t.outputsActivity}</h2>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="px-4 space-y-4">
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="px-4 space-y-4 pb-4 overflow-hidden">
           <div className="border-b pb-2" style={{ borderColor: "#F3F4F6" }}>
             <h3 
               className="text-[11px] font-semibold mb-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors" 
@@ -3605,16 +3940,16 @@ function OutputsPanel({
                         onClick={onDownloadResult}
                         data-testid="output-card-result"
                       >
-                        <div className="flex items-center gap-2">
-                          <FileSpreadsheet className="w-5 h-5" style={{ color: "#2E7D32" }} />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold" style={{ color: "#1A1A2E" }}>result.xlsx</p>
-                            <p className="text-[10px]" style={{ color: "#6B7280" }}>{sheetCount} {t.sheetsInResult}{uploadedFileName ? ` — ${uploadedFileName}` : ""}</p>
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <FileSpreadsheet className="w-5 h-5 flex-shrink-0" style={{ color: "#2E7D32" }} />
+                          <div className="flex-1 min-w-0 overflow-hidden">
+                            <p className="text-xs font-semibold truncate" style={{ color: "#1A1A2E" }}>result.xlsx</p>
+                            <p className="text-[10px] truncate" style={{ color: "#6B7280" }}>{sheetCount} {t.sheetsInResult}{uploadedFileName ? ` — ${uploadedFileName}` : ""}</p>
                           </div>
-                          <Button size="sm" className="h-7 px-2 text-[10px] text-white" style={{ backgroundColor: "#2563EB" }} onClick={(e) => { e.stopPropagation(); onPreviewResult(); }} data-testid="button-preview-result">
+                          <Button size="sm" className="h-7 w-7 p-0 flex-shrink-0 text-white" style={{ backgroundColor: "#2563EB" }} onClick={(e) => { e.stopPropagation(); onPreviewResult(); }} data-testid="button-preview-result">
                             <Eye className="w-3 h-3" />
                           </Button>
-                          <Button size="sm" className="h-7 px-2 text-[10px] text-white" style={{ backgroundColor: "#2E7D32" }} onClick={(e) => { e.stopPropagation(); onDownloadResult(); }} data-testid="button-download-result">
+                          <Button size="sm" className="h-7 w-7 p-0 flex-shrink-0 text-white" style={{ backgroundColor: "#2E7D32" }} onClick={(e) => { e.stopPropagation(); onDownloadResult(); }} data-testid="button-download-result">
                             <Download className="w-3 h-3" />
                           </Button>
                         </div>
@@ -3706,7 +4041,7 @@ function OutputsPanel({
                 {activityLog.length > 0 ? (
                   <div className="space-y-0">
                     {activityLog.slice(-20).reverse().map((entry, i) => (
-                      <div key={i} className="flex items-start gap-2 py-1.5" style={{ borderLeft: isRtl ? "none" : "2px solid #E5E7EB", borderRight: isRtl ? "2px solid #E5E7EB" : "none", paddingLeft: isRtl ? 0 : 10, paddingRight: isRtl ? 10 : 0 }}>
+                      <div key={i} className="flex items-start gap-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 transition-colors" style={{ borderLeft: isRtl ? "none" : "2px solid #E5E7EB", borderRight: isRtl ? "2px solid #E5E7EB" : "none", paddingLeft: isRtl ? 0 : 10, paddingRight: isRtl ? 10 : 0 }} onClick={() => { const target = entry.messageId ? document.querySelector(`[data-message-id="${entry.messageId}"]`) : document.querySelector("[data-message-id]"); target?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>
                         <span className="text-[11px] flex-shrink-0">{entry.icon}</span>
                         <div className="flex-1 min-w-0">
                           <p className="text-[10px] truncate" style={{ color: "#1A1A2E" }}>{entry.text}</p>
@@ -4797,7 +5132,8 @@ function ThreadCard({
   thread, idx, isCollapsed, onToggle, tag, isRtl, t, lang,
   isActiveStreaming, liveSteps, completedSteps, streamingContent, timeTick,
   summaryOverride, onDownloadResult, dataModel, dqAnalysis, informaticaOutput, insightsReport,
-  allInsightsReports, profiledColumns = [], uploadedFileName, nudgeReport, biReport,
+  allInsightsReports, profiledColumns = [], uploadedFileName, nudgeReport, biReport, piiScan,
+  onRetry, usedAiProvider, classificationItems, onClassificationChange,
 }: {
   thread: ThreadPair; idx: number; isCollapsed: boolean; onToggle: () => void;
   tag: string | null; isRtl: boolean; t: Translation; lang: Lang;
@@ -4809,6 +5145,11 @@ function ThreadCard({
   profiledColumns?: BackendColumnProfile[]; uploadedFileName?: string | null;
   nudgeReport?: NudgeReport | null;
   biReport?: BiReport | null;
+  piiScan?: PiiScanResult | null;
+  onRetry?: () => void;
+  usedAiProvider?: "claude" | "local";
+  classificationItems?: ClassificationItem[];
+  onClassificationChange?: (items: ClassificationItem[]) => void;
 }) {
   const { userMsg, assistantMsg } = thread;
   const { displayText, fileName: attachedFile } = stripExcelContent(userMsg.content);
@@ -4824,17 +5165,32 @@ function ThreadCard({
   const hasNudge = nudgeReport != null;
   const hasBi = biReport != null;
 
+  const [isDataExpanded, setIsDataExpanded] = useState(false);
+
   const isDone = !!assistantMsg && !isActiveStreaming;
+
+  const FALLBACK_STEPS: ThinkingStep[] = [
+    { label: t.stepProcessingRequest, status: "done", estimatedSeconds: 2 },
+    { label: t.stepProfilingData,     status: "done", estimatedSeconds: 3 },
+    { label: t.stepGenerating,        status: "done", estimatedSeconds: 20 },
+    { label: t.stepSaving,            status: "done", estimatedSeconds: 5 },
+  ];
+
+  const inferredOrFallback = (() => {
+    const inferred = inferStepsForCommand(userMsg.content, t);
+    return inferred.length > 0 ? inferred : FALLBACK_STEPS;
+  })();
+
   const stepsToShow = isActiveStreaming
     ? liveSteps
     : (completedSteps && completedSteps.length > 0)
       ? completedSteps
       : isDone
-        ? inferStepsForCommand(userMsg.content, t)
+        ? inferredOrFallback
         : [];
   const excelName = attachedFile || uploadedFileName;
 
-  const borderColor = isActiveStreaming ? "#E65100" : (assistantMsg ? "#2E7D32" : "#2563EB");
+  const borderColor = isActiveStreaming ? "#E65100" : (assistantMsg ? "#2E7D32" : "#D1D5DB");
 
   const handleDownloadInsights = (report: InsightsReport, srcFile?: string, cols?: BackendColumnProfile[]) => {
     generateInsightsExcel(report, srcFile || "data.xlsx", cols || profiledColumns);
@@ -4849,6 +5205,7 @@ function ThreadCard({
         animationDelay: `${idx * 30}ms`,
       }}
       data-testid={`thread-block-${idx}`}
+      data-message-id={userMsg.id}
     >
       {/* Collapsed header — always visible */}
       <div
@@ -4894,15 +5251,98 @@ function ThreadCard({
         <div className="border-t" style={{ borderColor: "#E5E7EB" }}>
 
           {/* Full user command */}
-          <div className="px-4 py-3" style={{ backgroundColor: "#F8FAFC" }}>
+          <div className="px-4 py-2.5" style={{ backgroundColor: "#F8FAFC" }}>
             <div className="flex items-start gap-2">
               <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                 <User className="w-3 h-3" style={{ color: "#6B7280" }} />
               </div>
-              <div className="flex-1">
-                <p className="text-xs leading-relaxed whitespace-pre-wrap break-words" style={{ color: "#374151" }}>
-                  {displayText || userMsg.content}
-                </p>
+              <div className="flex-1 min-w-0">
+                {(() => {
+                  const rawText = displayText || userMsg.content;
+                  const pastedMarker = "--- Pasted Data ---";
+                  const hasPastedMarker = rawText.includes(pastedMarker);
+
+                  if (hasPastedMarker) {
+                    const [cmdPart, dataPart] = rawText.split(pastedMarker);
+                    const dataLines = dataPart ? dataPart.trim().split("\n") : [];
+                    return (
+                      <>
+                        {cmdPart.trim() && (
+                          <p className="text-xs leading-relaxed whitespace-pre-wrap break-words mb-1.5" style={{ color: "#374151" }}>
+                            {cmdPart.trim()}
+                          </p>
+                        )}
+                        <div>
+                          <button
+                            className="text-[10px] font-medium px-2 py-0.5 rounded border"
+                            style={{ color: "#2563EB", borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }}
+                            onClick={(e) => { e.stopPropagation(); setIsDataExpanded(v => !v); }}
+                          >
+                            {isDataExpanded ? "Hide data" : `Show data (${dataLines.length} lines)`}
+                          </button>
+                          {isDataExpanded && (
+                            <div className="relative mt-1.5">
+                              <div
+                                className="rounded text-[10px] overflow-x-auto overflow-y-auto"
+                                style={{ backgroundColor: "#1E293B", color: "#E2E8F0", fontFamily: "'Fira Code', monospace", maxHeight: "150px", padding: "8px 10px", whiteSpace: "pre" }}
+                              >
+                                {dataPart.trim()}
+                              </div>
+                              <button
+                                className="absolute top-1 right-1 text-[9px] px-1.5 py-0.5 rounded"
+                                style={{ backgroundColor: "#334155", color: "#94A3B8" }}
+                                onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(dataPart.trim()); }}
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    );
+                  }
+
+                  if (isRawData(rawText)) {
+                    const lines = rawText.split("\n");
+                    return (
+                      <div>
+                        <p className="text-xs leading-relaxed break-words mb-1.5" style={{ color: "#374151" }}>
+                          {lines[0]}
+                        </p>
+                        <button
+                          className="text-[10px] font-medium px-2 py-0.5 rounded border"
+                          style={{ color: "#2563EB", borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }}
+                          onClick={(e) => { e.stopPropagation(); setIsDataExpanded(v => !v); }}
+                        >
+                          {isDataExpanded ? "Hide data" : `Show data (${lines.length} lines)`}
+                        </button>
+                        {isDataExpanded && (
+                          <div className="relative mt-1.5">
+                            <div
+                              className="rounded text-[10px] overflow-x-auto overflow-y-auto"
+                              style={{ backgroundColor: "#1E293B", color: "#E2E8F0", fontFamily: "'Fira Code', monospace", maxHeight: "150px", padding: "8px 10px", whiteSpace: "pre" }}
+                            >
+                              {rawText}
+                            </div>
+                            <button
+                              className="absolute top-1 right-1 text-[9px] px-1.5 py-0.5 rounded"
+                              style={{ backgroundColor: "#334155", color: "#94A3B8" }}
+                              onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(rawText); }}
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <p className="text-xs leading-relaxed whitespace-pre-wrap break-words" style={{ color: "#374151" }}>
+                      {rawText}
+                    </p>
+                  );
+                })()}
                 {excelName && (
                   <div className="flex items-center gap-1 mt-1.5">
                     <FileSpreadsheet className="w-3 h-3" style={{ color: "#51BAB4" }} />
@@ -4915,8 +5355,8 @@ function ThreadCard({
 
           {/* Agent steps */}
           {stepsToShow.length > 0 && (
-            <div className="px-4 py-3 border-t" style={{ borderColor: "#E5E7EB" }}>
-              <div className="flex items-center justify-between mb-2.5">
+            <div className="px-4 py-2.5 border-t" style={{ borderColor: "#E5E7EB" }}>
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   {isDone ? (
                     <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "#2E7D32" }} />
@@ -4942,6 +5382,19 @@ function ThreadCard({
                   return null;
                 })()}
               </div>
+              {/* Progress bar */}
+              {(() => {
+                const doneCount = stepsToShow.filter(s => s.status === "done" || isDone).length;
+                const pct = isDone ? 100 : Math.round((doneCount / stepsToShow.length) * 100);
+                return (
+                  <div style={{ height: "3px", backgroundColor: "#E5E7EB" }} className="w-full rounded-full mb-2.5 overflow-hidden">
+                    <div
+                      className="h-full rounded-full animate-progress-fill"
+                      style={{ "--progress-target": `${pct}%`, width: `${pct}%`, backgroundColor: isDone ? "#2E7D32" : "#E65100" } as React.CSSProperties}
+                    />
+                  </div>
+                );
+              })()}
               <div className="space-y-1.5 ml-5">
                 {stepsToShow.map((step, i) => {
                   const effectivelyDone = step.status === "done" || isDone;
@@ -4953,9 +5406,9 @@ function ThreadCard({
                     ? Math.round((step.completedAt - step.startedAt) / 1000)
                     : null;
                   return (
-                    <div key={i} className="flex items-center gap-2">
+                    <div key={i} className="flex items-center gap-2" style={effectivelyDone ? { animationDelay: `${i * 100}ms` } : {}}>
                       {effectivelyDone ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#2E7D32" }} />
+                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 animate-check-slide-in" style={{ color: "#2E7D32" }} />
                       ) : isActive ? (
                         <Loader2 className="w-3.5 h-3.5 flex-shrink-0 animate-spin" style={{ color: "#E65100" }} />
                       ) : (
@@ -4968,11 +5421,11 @@ function ThreadCard({
                           fontWeight: isActive ? 600 : 400,
                         }}
                       >
-                        {step.label}
+                        <span className="mr-1">{getStepIcon(step.label)}</span>{step.label}
                       </span>
                       {effectivelyDone && doneSec !== null && (
                         <span className="text-[10px] font-medium" style={{ color: "#6B7280" }}>
-                          {doneSec}s
+                          {doneSec === 0 ? "<1s" : `${doneSec}s`}
                         </span>
                       )}
                       {isActive && elapsedSec !== null && step.estimatedSeconds && (
@@ -4999,7 +5452,7 @@ function ThreadCard({
 
           {/* Streaming content preview */}
           {isActiveStreaming && streamingContent && (
-            <div className="px-4 py-3 border-t" style={{ borderColor: "#E5E7EB" }}>
+            <div className="px-4 py-2.5 border-t" style={{ borderColor: "#E5E7EB" }}>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: "#067647" }}>
                   <Bot className="w-3 h-3 text-white" />
@@ -5022,20 +5475,64 @@ function ThreadCard({
 
           {/* Agent response body */}
           {assistantMsg && (
-            <div className="px-4 py-3 border-t space-y-3" style={{ borderColor: "#E5E7EB" }}>
+            <div className="px-4 py-2.5 border-t space-y-3" style={{ borderColor: "#E5E7EB" }}>
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: "#067647" }}>
                   <Bot className="w-3 h-3 text-white" />
                 </div>
-                {tag && (
-                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#0D2E5C", color: "#ffffff" }}>{tag}</span>
+                {/* Agent name badge — always shows, never shows provider name */}
+                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#0D2E5C", color: "#ffffff" }}>
+                  {tag || "Data Agent"}
+                </span>
+                {/* Status chip */}
+                {isActiveStreaming ? (
+                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}>
+                    {t.agentWorking}
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#DCFCE7", color: "#2E7D32" }}>
+                    {t.agentCompleted}
+                  </span>
                 )}
-                <span className="text-[10px] font-medium" style={{ color: "#2E7D32" }}>✅ Complete</span>
                 <div className="flex-1" />
                 {agentTimestamp && (
                   <span className="text-[9px] tabular-nums" style={{ color: "#9CA3AF" }}>{agentTimestamp}</span>
                 )}
               </div>
+              {/* Metric pills row — hidden when empty */}
+              {(() => {
+                const pills = extractMetricPills(piiScan ?? null, dqAnalysis ?? null);
+                if (!pills.length) return null;
+                return (
+                  <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                    {pills.map((pill, pi) => (
+                      <span key={pi} className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums"
+                        style={{
+                          backgroundColor: pill.color === "red" ? "#FEE2E2" : pill.color === "amber" ? "#FEF3C7" : "#DCFCE7",
+                          color: pill.color === "red" ? "#C62828" : pill.color === "amber" ? "#92400E" : "#2E7D32"
+                        }}>
+                        {pill.count} {pill.label}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
+              {/* Risk level badge — only when piiScan has a risk level */}
+              {piiScan?.scan_summary?.overall_risk_level && (() => {
+                const risk = piiScan.scan_summary.overall_risk_level;
+                const isHigh = risk === "High" || risk === "HIGH";
+                const isMed = risk === "Medium" || risk === "MEDIUM";
+                const bg = isHigh ? "#FEE2E2" : isMed ? "#FEF3C7" : risk === "None" || risk === "NONE" ? "#F3F4F6" : "#DCFCE7";
+                const fg = isHigh ? "#C62828" : isMed ? "#92400E" : risk === "None" || risk === "NONE" ? "#6B7280" : "#2E7D32";
+                return (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
+                      style={{ backgroundColor: bg, color: fg }}>
+                      {lang === "ar" ? "مستوى المخاطر:" : "Risk:"} {risk}
+                    </span>
+                  </div>
+                );
+              })()}
 
               {hasSummary && (
                 <div className="text-xs leading-relaxed whitespace-pre-wrap break-words" style={{ color: "#1A1A2E" }}>{summaryOverride}</div>
@@ -5054,6 +5551,14 @@ function ThreadCard({
                       : `${dqAnalysis.analysis_summary.total_fields_analyzed} fields analyzed — ${dqAnalysis.analysis_summary.total_rules_generated} quality rules generated`}
                   </div>
                 </div>
+              )}
+
+              {classificationItems && classificationItems.length > 0 && (
+                <ClassificationResultCard
+                  items={classificationItems}
+                  lang={lang}
+                  onItemsChange={onClassificationChange}
+                />
               )}
 
               {hasInformatica && informaticaOutput && (
@@ -5117,7 +5622,7 @@ function ThreadCard({
                 <BiResultCard biReport={biReport} isRtl={isRtl} lang={lang} />
               )}
 
-              {!hasSummary && !hasDataModel && !hasDqAnalysis && !hasInsights && !hasNudge && !hasBi && (() => {
+              {!hasSummary && !hasDataModel && !hasDqAnalysis && !hasInsights && !hasNudge && !hasBi && !(classificationItems && classificationItems.length > 0) && (() => {
                 const isFailedInsights = looksLikeInsightsJSON(assistantMsg.content);
                 if (isFailedInsights) {
                   return (
@@ -5190,6 +5695,36 @@ function ThreadCard({
               )}
             </div>
             <div className="flex items-center gap-2">
+              {usedAiProvider && assistantMsg && !isActiveStreaming && (
+                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full" style={{
+                  backgroundColor: usedAiProvider === "claude" ? "#DBEAFE" : "#E0E7FF",
+                  color: usedAiProvider === "claude" ? "#1D4ED8" : "#4338CA",
+                }}>{usedAiProvider === "claude" ? "Claude" : "Local"}</span>
+              )}
+              {assistantMsg && !isActiveStreaming && assistantMsg.content && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { navigator.clipboard.writeText(assistantMsg.content); }}
+                  className="gap-1 text-[10px] font-medium h-6 px-2 rounded-md"
+                  style={{ color: "#6B7280", borderColor: "#D1D5DB" }}
+                >
+                  <Square className="w-2.5 h-2.5" />
+                  {lang === "ar" ? "نسخ" : "Copy"}
+                </Button>
+              )}
+              {onRetry && assistantMsg && !isActiveStreaming && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onRetry}
+                  className="gap-1 text-[10px] font-medium h-6 px-2 rounded-md"
+                  style={{ color: "#6B7280", borderColor: "#D1D5DB" }}
+                >
+                  <Play className="w-2.5 h-2.5" />
+                  {lang === "ar" ? "إعادة" : "Retry"}
+                </Button>
+              )}
               {onDownloadResult && assistantMsg && (
                 <Button
                   size="sm"
