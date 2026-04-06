@@ -606,7 +606,7 @@ async function detectIntentViaSupervisor(message: string): Promise<string | null
     const ragflowBaseUrl = (process.env.RAGFLOW_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
     const ragflowApiKey = process.env.RAGFLOW_API_KEY || "";
 
-    const response = await fetch(`${ragflowBaseUrl}/agent/run`, {
+    const response = await fetch(`${ragflowBaseUrl}/ragclient/agent/run`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

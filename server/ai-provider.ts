@@ -138,7 +138,7 @@ interface AgentRunResponse {
 }
 
 async function ragflowComplete(params: CompletionParams): Promise<string> {
-  const url = `${RAGFLOW_BASE_URL}/agent/run`;
+  const url = `${RAGFLOW_BASE_URL}/ragclient/agent/run`;
   const agent = params.ragflowAgent || RAGFLOW_AGENT;
   try {
     const resp = await fetch(url, {

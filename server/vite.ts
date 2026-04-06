@@ -11,7 +11,7 @@ const viteLogger = createLogger();
 export async function setupVite(server: Server, app: Express) {
   const serverOptions = {
     middlewareMode: true,
-    hmr: { server, path: "/vite-hmr" },
+    hmr: { server, path: "/dataowner/vite-hmr" },
     allowedHosts: true as const,
   };
 
@@ -29,9 +29,10 @@ export async function setupVite(server: Server, app: Express) {
     appType: "custom",
   });
 
+  app.use("/dataowner", vite.middlewares);
   app.use(vite.middlewares);
 
-  app.use("/{*path}", async (req, res, next) => {
+  app.use("/dataowner/{*path}", async (req, res, next) => {
     const url = req.originalUrl;
 
     try {

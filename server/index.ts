@@ -3,6 +3,8 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 
+const BASE_PATH = "/dataowner";
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -61,6 +63,9 @@ app.use((req, res, next) => {
 
 (async () => {
   await registerRoutes(httpServer, app);
+
+  // Redirect root to /dataowner/
+  app.get("/", (_req, res) => res.redirect(`${BASE_PATH}/`));
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
