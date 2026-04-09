@@ -145,12 +145,9 @@ async function resolveAgentId(shortName?: string): Promise<string> {
 }
 
 // ── Session management ────────────────────────────────────────────────────────
+// Create a fresh session for every request to avoid stale session errors.
 
-const sessionCache = new Map<string, string>();
-
-async function getOrCreateSession(agentId: string): Promise<string> {
-  if (sessionCache.has(agentId)) return sessionCache.get(agentId)!;
-
+async function createSession(agentId: string): Promise<string> {
   const url = `${RAGFLOW_BASE_URL}/api/v1/agents/${agentId}/sessions`;
   const resp = await fetch(url, {
     method: "POST",
@@ -164,8 +161,6 @@ async function getOrCreateSession(agentId: string): Promise<string> {
   const data = await resp.json();
   const sessionId: string = data.data?.id;
   if (!sessionId) throw new Error("No session ID returned from RAGFlow");
-
-  sessionCache.set(agentId, sessionId);
   return sessionId;
 }
 
@@ -196,7 +191,7 @@ function buildInput(params: CompletionParams): string {
 
 async function ragflowComplete(params: CompletionParams, _retried = false): Promise<string> {
   const agentId = await resolveAgentId(params.ragflowAgent);
-  const sessionId = await getOrCreateSession(agentId);
+  const sessionId = await createSession(agentId);
   const question = buildInput(params);
 
   const url = `${RAGFLOW_BASE_URL}/api/v1/agents/${agentId}/completions`;
@@ -212,10 +207,9 @@ async function ragflowComplete(params: CompletionParams, _retried = false): Prom
     });
     if (!resp.ok) {
       const body = await resp.text();
-      // Session may be stale — clear and retry once
+      // Retry once on session errors
       if (!_retried && (resp.status === 400 || resp.status === 404)) {
-        sessionCache.delete(agentId);
-        aiLog("ERROR", `ragflow session may be stale (${resp.status}), retrying`);
+        aiLog("ERROR", `ragflow session error (${resp.status}), retrying with new session`);
         return ragflowComplete(params, true);
       }
       aiLog("ERROR", `ragflow error ${resp.status} | body=${body}`);
