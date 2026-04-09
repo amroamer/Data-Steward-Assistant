@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { apiUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -2055,7 +2056,7 @@ export default function ChatPage() {
   // Fetch page visibility from DB when entity changes
   useEffect(() => {
     if (currentEntity) {
-      fetch(`/api/entities/${currentEntity.id}/page-visibility`)
+      fetch(apiUrl(`/api/entities/${currentEntity.id}/page-visibility`))
         .then((res) => res.ok ? res.json() : null)
         .then((data) => { if (data) setPageVisibility((prev) => ({ ...prev, ...data })); })
         .catch(() => {});
@@ -2068,7 +2069,7 @@ export default function ChatPage() {
   useEffect(() => {
     const onFocus = () => {
       if (currentEntity) {
-        fetch(`/api/entities/${currentEntity.id}/page-visibility`)
+        fetch(apiUrl(`/api/entities/${currentEntity.id}/page-visibility`))
           .then((res) => res.ok ? res.json() : null)
           .then((data) => { if (data) setPageVisibility((prev) => ({ ...prev, ...data })); })
           .catch(() => {});
@@ -2135,7 +2136,7 @@ export default function ChatPage() {
 
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
     queryKey: ["/api/conversations", agentMode],
-    queryFn: () => fetch(`/api/conversations?agentMode=${agentMode}`).then(r => r.json()),
+    queryFn: () => fetch(apiUrl(`/api/conversations?agentMode=${agentMode}`)).then(r => r.json()),
   });
 
   const { data: activeConversation } = useQuery<Conversation & { messages: Message[] }>({
@@ -2749,7 +2750,7 @@ export default function ChatPage() {
       }, 900);
 
       try {
-        const res = await fetch("/api/nudge", {
+        const res = await fetch(apiUrl("/api/nudge"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: abortControllerRef.current?.signal,
@@ -2829,7 +2830,7 @@ export default function ChatPage() {
       formData.append("agentMode", agentMode);
       if (currentEntity) formData.append("entityId", String(currentEntity.id));
 
-      const response = await fetch(`/api/conversations/${conversationId}/messages`, {
+      const response = await fetch(apiUrl(`/api/conversations/${conversationId}/messages`), {
         method: "POST",
         signal: abortControllerRef.current?.signal,
         body: formData,

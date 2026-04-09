@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, Fragment } from "react";
 import * as XLSX from "xlsx";
 import { useLocation } from "wouter";
+import { apiUrl } from "@/lib/api";
 
 interface SharingVerdict {
   verdict: string;
@@ -191,7 +192,7 @@ export default function SharingEligibilityPage() {
   const analyse = async () => {
     setLoading(true); setError(null); setResult(null);
     try {
-      const resp = await fetch("/api/sharing-eligibility", {
+      const resp = await fetch(apiUrl("/api/sharing-eligibility"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fields, sampleRows: rows.slice(0, 10) }),

@@ -12,6 +12,7 @@ import {
   ImageIcon, Type, X, Users, Pencil, Mail, Lock,
 } from "lucide-react";
 import { useEntity, type Entity } from "@/context/entity-context";
+import { apiUrl } from "@/lib/api";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ export default function EntitySettingsPage() {
   const { data: entities = [], isLoading: entitiesLoading } = useQuery<Entity[]>({
     queryKey: ["/api/entities"],
     queryFn: async () => {
-      const res = await fetch("/api/entities");
+      const res = await fetch(apiUrl("/api/entities"));
       if (!res.ok) throw new Error("Failed to load entities");
       return res.json();
     },
@@ -109,7 +110,7 @@ export default function EntitySettingsPage() {
   const { data: prompts = [], isLoading: promptsLoading } = useQuery<EntityPrompt[]>({
     queryKey: ["/api/entities", selectedEntityId, "prompts"],
     queryFn: async () => {
-      const res = await fetch(`/api/entities/${selectedEntityId}/prompts`);
+      const res = await fetch(apiUrl(`/api/entities/${selectedEntityId}/prompts`));
       if (!res.ok) throw new Error("Failed to load prompts");
       return res.json();
     },
@@ -119,7 +120,7 @@ export default function EntitySettingsPage() {
   const { data: pageVisibility = {}, isLoading: visibilityLoading } = useQuery<Record<string, boolean>>({
     queryKey: ["/api/entities", selectedEntityId, "page-visibility"],
     queryFn: async () => {
-      const res = await fetch(`/api/entities/${selectedEntityId}/page-visibility`);
+      const res = await fetch(apiUrl(`/api/entities/${selectedEntityId}/page-visibility`));
       if (!res.ok) throw new Error("Failed to load page visibility");
       return res.json();
     },
@@ -129,7 +130,7 @@ export default function EntitySettingsPage() {
   const { data: usersData = [], isLoading: usersLoading } = useQuery<UserRecord[]>({
     queryKey: ["/api/users"],
     queryFn: async () => {
-      const res = await fetch("/api/users");
+      const res = await fetch(apiUrl("/api/users"));
       if (!res.ok) throw new Error("Failed to load users");
       return res.json();
     },
@@ -160,7 +161,7 @@ export default function EntitySettingsPage() {
 
   const saveBrandingMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/entities/${selectedEntityId}/branding`, {
+      const res = await fetch(apiUrl(`/api/entities/${selectedEntityId}/branding`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -201,21 +202,21 @@ export default function EntitySettingsPage() {
       const body: Record<string, unknown> = { name: userFormName, email: userFormEmail, entityIds: userFormEntityIds };
       if (editingUserId) {
         if (userFormPassword) body.password = userFormPassword;
-        const res = await fetch(`/api/users/${editingUserId}`, {
+        const res = await fetch(apiUrl(`/api/users/${editingUserId}`), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
         if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed"); }
         // Update entity assignments
-        await fetch(`/api/users/${editingUserId}/entities`, {
+        await fetch(apiUrl(`/api/users/${editingUserId}/entities`), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ entityIds: userFormEntityIds }),
         });
       } else {
         body.password = userFormPassword;
-        const res = await fetch("/api/users", {
+        const res = await fetch(apiUrl("/api/users"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -235,7 +236,7 @@ export default function EntitySettingsPage() {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
+      const res = await fetch(apiUrl(`/api/users/${id}`), { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete user");
     },
     onSuccess: () => {
@@ -249,7 +250,7 @@ export default function EntitySettingsPage() {
 
   const toggleUserActiveMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
-      const res = await fetch(`/api/users/${id}`, {
+      const res = await fetch(apiUrl(`/api/users/${id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive }),
@@ -265,7 +266,7 @@ export default function EntitySettingsPage() {
 
   const createEntityMutation = useMutation({
     mutationFn: async ({ slug, name }: { slug: string; name: string }) => {
-      const res = await fetch("/api/entities", {
+      const res = await fetch(apiUrl("/api/entities"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug, name }),
@@ -291,7 +292,7 @@ export default function EntitySettingsPage() {
 
   const deleteEntityMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/entities/${id}`, { method: "DELETE" });
+      const res = await fetch(apiUrl(`/api/entities/${id}`), { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete entity");
     },
     onSuccess: () => {
@@ -306,7 +307,7 @@ export default function EntitySettingsPage() {
 
   const savePromptMutation = useMutation({
     mutationFn: async ({ key, content }: { key: string; content: string }) => {
-      const res = await fetch(`/api/entities/${selectedEntityId}/prompts/${encodeURIComponent(key)}`, {
+      const res = await fetch(apiUrl(`/api/entities/${selectedEntityId}/prompts/${encodeURIComponent(key)}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
@@ -325,7 +326,7 @@ export default function EntitySettingsPage() {
 
   const resetPromptMutation = useMutation({
     mutationFn: async (key: string) => {
-      const res = await fetch(`/api/entities/${selectedEntityId}/prompts/${encodeURIComponent(key)}/reset`, {
+      const res = await fetch(apiUrl(`/api/entities/${selectedEntityId}/prompts/${encodeURIComponent(key)}/reset`), {
         method: "POST",
       });
       if (!res.ok) throw new Error("Failed to reset");
@@ -342,7 +343,7 @@ export default function EntitySettingsPage() {
 
   const toggleVisibilityMutation = useMutation({
     mutationFn: async ({ pageKey, visible }: { pageKey: string; visible: boolean }) => {
-      const res = await fetch(`/api/entities/${selectedEntityId}/page-visibility/${pageKey}`, {
+      const res = await fetch(apiUrl(`/api/entities/${selectedEntityId}/page-visibility/${pageKey}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ visible }),
@@ -358,7 +359,7 @@ export default function EntitySettingsPage() {
 
   async function handleExport() {
     try {
-      const res = await fetch(`/api/entities/${selectedEntityId}/prompts/export`, { method: "POST" });
+      const res = await fetch(apiUrl(`/api/entities/${selectedEntityId}/prompts/export`), { method: "POST" });
       if (!res.ok) throw new Error("Export failed");
       const data = await res.json();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -378,7 +379,7 @@ export default function EntitySettingsPage() {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      const res = await fetch(`/api/entities/${selectedEntityId}/prompts/import`, {
+      const res = await fetch(apiUrl(`/api/entities/${selectedEntityId}/prompts/import`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

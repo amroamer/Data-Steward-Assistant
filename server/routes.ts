@@ -1,12 +1,21 @@
-import type { Express, Request, Response } from "express";
+import express, { type Express, type Request, type Response } from "express";
 import { type Server } from "http";
 import { registerChatRoutes } from "./replit_integrations/chat";
+
+const BASE_PATH = "/dataowner";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  await registerChatRoutes(app);
+  // Create a sub-router for all API routes so they work under both
+  // /api/* (local dev) and /dataowner/api/* (behind reverse proxy)
+  const apiRouter = express.Router();
+  await registerChatRoutes(apiRouter as any);
+
+  // Mount at root (local dev) and under base path (reverse proxy)
+  app.use(apiRouter);
+  app.use(BASE_PATH, apiRouter);
 
   // ── Debug config endpoint ─────────────────────────────────────────────────
   // Available when NODE_ENV !== "production" OR when DEBUG_MODE=true is set.

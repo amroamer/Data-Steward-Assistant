@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import * as XLSX from "xlsx";
+import { apiUrl } from "@/lib/api";
 import { ErrorCard } from "@/components/error-card";
 import {
   ArrowLeft,
@@ -405,7 +406,7 @@ export default function NudgePage() {
     const stepsPromise = simulateSteps();
 
     try {
-      const res = await fetch("/api/nudge", {
+      const res = await fetch(apiUrl("/api/nudge"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: abortControllerRef.current.signal,

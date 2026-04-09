@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { apiUrl } from "@/lib/api";
 
 export interface Entity {
   id: number;
@@ -41,7 +42,7 @@ export function EntityProvider({ children }: { children: ReactNode }) {
 
   const fetchEntities = async () => {
     try {
-      const res = await fetch("/api/entities");
+      const res = await fetch(apiUrl("/api/entities"));
       if (res.ok) {
         const list: Entity[] = await res.json();
         setEntities(list);
