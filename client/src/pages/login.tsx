@@ -25,6 +25,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    // Allow guest login with empty credentials
+    if (!email.trim() && !password.trim()) {
+      onLogin({ id: 0, name: "Guest", email: "guest" });
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch(apiUrl("/api/auth/login"), {
@@ -141,7 +148,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@company.com"
                     className="pl-10 h-11 text-sm border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                    required
                   />
                 </div>
               </div>
@@ -155,7 +161,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     className="pl-10 h-11 text-sm border-gray-200 focus:border-blue-400 focus:ring-blue-400"
-                    required
                   />
                 </div>
               </div>
