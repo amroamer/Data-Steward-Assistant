@@ -5,7 +5,7 @@ services:
       target: builder
     command: npm run db:push
     env_file:
-      - .env.example
+      - .env
     environment:
       DATABASE_URL: postgres://zatca:zatca@db:5432/zatca
     depends_on:
@@ -17,13 +17,13 @@ services:
     ports:
       - "5000:5000"
     env_file:
-      - .env.example
+      - .env
     environment:
       # These override whatever is in .env.example for Docker networking
       NODE_ENV: production
       PORT: 5000
       DATABASE_URL: postgres://zatca:zatca@db:5432/zatca
-      RAGFLOW_BASE_URL: http://host.docker.internal:8000
+      RAGFLOW_BASE_URL: http://host.docker.internal:80
     depends_on:
       db:
         condition: service_healthy

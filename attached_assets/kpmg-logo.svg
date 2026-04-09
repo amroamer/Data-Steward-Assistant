@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 200">
+  <defs>
+    <style>
+      .kpmg-blue { fill: #00338D; }
+    </style>
+  </defs>
+  <!-- Four squares -->
+  <rect class="kpmg-blue" x="148" y="8" width="28" height="28" rx="2"/>
+  <rect class="kpmg-blue" x="184" y="8" width="28" height="28" rx="2"/>
+  <rect class="kpmg-blue" x="220" y="8" width="28" height="28" rx="2"/>
+  <rect class="kpmg-blue" x="256" y="8" width="28" height="28" rx="2"/>
+  <!-- K -->
+  <path class="kpmg-blue" d="M30 56h32v52l44-52h40l-50 56 54 68h-42l-38-50-8 9v41H30V56z"/>
+  <!-- P -->
+  <path class="kpmg-blue" d="M152 56h56c32 0 50 16 50 40s-18 40-50 40h-24v44h-32V56zm32 56h20c14 0 22-7 22-16s-8-16-22-16h-20v32z"/>
+  <!-- M -->
+  <path class="kpmg-blue" d="M264 56h38l24 76h1l24-76h38v124h-28V92h-1l-26 88h-16l-26-88h-1v88h-27V56z"/>
+  <!-- G -->
+  <path class="kpmg-blue" d="M492 100v-6c0-14-10-22-26-22-18 0-28 12-28 36 0 26 10 38 30 38 8 0 16-2 24-6v-30h-26v-22h54v66c-12 10-30 18-52 18-40 0-62-24-62-64s22-64 62-64c32 0 52 14 54 40h-32l2 16z"/>
+</svg>

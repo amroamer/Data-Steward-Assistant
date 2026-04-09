@@ -28,7 +28,7 @@ export async function registerRoutes(
 
     return res.json({
       ai_provider: process.env.AI_PROVIDER || "claude",
-      ragflow_base_url: process.env.RAGFLOW_BASE_URL || "http://localhost:8000",
+      ragflow_base_url: process.env.RAGFLOW_BASE_URL || "http://localhost:3000",
       ragflow_api_key_set: !!ragflowKey,
       ragflow_api_key_prefix: ragflowKey ? ragflowKey.slice(0, 7) : null,
       anthropic_key_set: !!anthropicKey,

@@ -78,6 +78,11 @@ import {
   Monitor,
   Square,
   Settings,
+  Sparkles,
+  AlertTriangle,
+  RotateCcw,
+  Code,
+  GitBranch,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -110,7 +115,30 @@ import {
 } from "@/lib/result-store";
 import DataModelDiagram from "@/components/DataModelDiagram";
 import ClassificationResultCard, { type ClassificationItem } from "@/components/ClassificationResultCard";
-import { loadPageVisibility, type PageVisibility } from "@/pages/settings";
+interface PageVisibility {
+  "data-classification": boolean;
+  "business-definitions": boolean;
+  "dq-rules": boolean;
+  "pii-detection": boolean;
+  "informatica": boolean;
+  "data-model": boolean;
+  "insights": boolean;
+  "nudge": boolean;
+  "bi": boolean;
+}
+
+const DEFAULT_VISIBILITY: PageVisibility = {
+  "data-classification": true,
+  "business-definitions": true,
+  "dq-rules": true,
+  "pii-detection": true,
+  "informatica": true,
+  "data-model": true,
+  "insights": true,
+  "nudge": true,
+  "bi": true,
+};
+import { useEntity } from "@/context/entity-context";
 import ExcelPreview from "@/components/ExcelPreview";
 import {
   type InsightsReport,
@@ -119,7 +147,7 @@ import {
   looksLikeInsightsJSON,
   generateInsightsExcel,
 } from "@/lib/insights-store";
-import zatcaLogoPath from "@assets/zatca-logo.svg";
+import { useBranding, type BrandTheme } from "@/hooks/use-branding";
 import * as XLSX from "xlsx";
 import {
   Panel,
@@ -369,16 +397,40 @@ const translations = {
     tryAgain: "Try Again",
     invalidFile: "Invalid file",
     invalidFileDesc: "Please upload an Excel, CSV, PDF, Word, or image file.",
-    cardDataClassification: "Data Classification",
-    cardDataClassificationDesc: "Classify data fields per Saudi SDAIA NDMO standards",
-    cardBusinessDefs: "Business Definitions",
-    cardBusinessDefsDesc: "Generate comprehensive business definitions for data fields",
-    cardDataQuality: "Full DQ Rules (Technical + Logical + Business)",
-    cardDataQualityDesc: "Generate technical, logical & business data quality rules",
+    cardDataClassification: "Classify from File",
+    cardDataClassificationDesc: "Upload an Excel or CSV file and classify all columns by NDMO sensitivity level",
+    cardClassifyFields: "Classify Specific Fields",
+    cardClassifyFieldsDesc: "Manually enter column names to get their classification",
+    cardClassifySummary: "Classification Summary Report",
+    cardClassifySummaryDesc: "Generate an executive summary of classification results with distribution chart",
+    cardReclassify: "Reclassify with Justification",
+    cardReclassifyDesc: "Override a previous classification and provide a reason",
+    cardBusinessDefs: "Generate Definitions from File",
+    cardBusinessDefsDesc: "Upload a data dictionary or dataset and auto-generate business definitions",
+    cardDefineTerms: "Define Specific Terms",
+    cardDefineTermsDesc: "Enter specific data element names to get bilingual (EN/AR) definitions",
+    cardEnrichDefs: "Enrich Existing Definitions",
+    cardEnrichDefsDesc: "Upload existing definitions and enhance them with ownership, usage context, and DQ notes",
+    cardExportDict: "Export Data Dictionary",
+    cardExportDictDesc: "Generate a full data dictionary document from your definitions",
+    cardDataQuality: "Auto-Generate DQ Rules",
+    cardDataQualityDesc: "Upload a dataset and generate completeness, validity, and consistency rules",
+    cardProfileRules: "Profile & Suggest Rules",
+    cardProfileRulesDesc: "Run a data profile first, then suggest rules based on detected patterns",
+    cardCustomRule: "Custom Rule Builder",
+    cardCustomRuleDesc: "Define your own business rules and get them formatted as implementable DQ checks",
+    cardDqInformatica: "DQ Rules for Informatica",
+    cardDqInformaticaDesc: "Generate DQ rules formatted for import into Informatica Data Quality",
     cardDataModel: "Analytical Data Model",
     cardDataModelDesc: "Design a star schema with fact & dimension tables",
-    cardPiiDetection: "PII Detection",
-    cardPiiDetectionDesc: "Scan data for personal & sensitive information per PDPL",
+    cardPiiDetection: "Scan File for PII",
+    cardPiiDetectionDesc: "Upload a file and detect all personally identifiable information across every column",
+    cardPiiFields: "Scan Specific Fields",
+    cardPiiFieldsDesc: "Enter column names with sample values to check for PII presence",
+    cardPiiRisk: "PII Risk Assessment",
+    cardPiiRiskDesc: "Generate a PII risk report with severity levels and recommended controls",
+    cardPdplCheck: "Saudi PDPL Compliance Check",
+    cardPdplCheckDesc: "Check detected PII against Saudi Personal Data Protection Law requirements",
     factTables: "Fact Tables",
     dimensionTables: "Dimension Tables",
     downloadPng: "Download Diagram as PNG",
@@ -397,8 +449,14 @@ const translations = {
     tagInformatica: "Informatica Output",
     cardInsights: "Data Insights Report",
     cardInsightsDesc: "Analyze data and generate comprehensive insights report",
-    cardInformatica: "Informatica Output",
-    cardInformaticaDesc: "Generate Informatica-compatible metadata, SQL expressions & classifications",
+    cardInformatica: "Generate Mapping Spec",
+    cardInformaticaDesc: "Upload source and target schemas to generate an Informatica mapping specification",
+    cardIdqExport: "Export DQ Rules to IDQ",
+    cardIdqExportDesc: "Convert generated DQ rules into Informatica Data Quality importable format",
+    cardTransformLogic: "Generate Transformation Logic",
+    cardTransformLogicDesc: "Describe a transformation and get it formatted as Informatica expression syntax",
+    cardLineage: "Data Lineage Documentation",
+    cardLineageDesc: "Generate data lineage documentation from uploaded mapping files",
     insightsReportGenerated: "📊 Data Insights Report Generated",
     insightsToast: (title: string) => `Insights report "${title}" generated`,
     downloadInsightsReport: "📥 Download Insights Report",
@@ -644,16 +702,40 @@ const translations = {
     tryAgain: "حاول مجدداً",
     invalidFile: "ملف غير صالح",
     invalidFileDesc: "يرجى تحميل ملف Excel أو CSV أو PDF أو Word أو صورة.",
-    cardDataClassification: "تصنيف البيانات",
-    cardDataClassificationDesc: "تصنيف حقول البيانات وفقاً لمعايير SDAIA NDMO السعودية",
-    cardBusinessDefs: "تعريفات الأعمال",
-    cardBusinessDefsDesc: "إنشاء تعريفات أعمال شاملة لحقول البيانات",
-    cardDataQuality: "توليد قواعد جودة البيانات الكاملة",
-    cardDataQualityDesc: "توليد القواعد التقنية والمنطقية وقواعد الأعمال لجودة البيانات",
+    cardDataClassification: "تصنيف من ملف",
+    cardDataClassificationDesc: "تحميل ملف Excel أو CSV وتصنيف جميع الأعمدة حسب مستوى حساسية NDMO",
+    cardClassifyFields: "تصنيف حقول محددة",
+    cardClassifyFieldsDesc: "إدخال أسماء الأعمدة يدوياً للحصول على تصنيفها",
+    cardClassifySummary: "تقرير ملخص التصنيف",
+    cardClassifySummaryDesc: "إنشاء ملخص تنفيذي لنتائج التصنيف مع مخطط التوزيع",
+    cardReclassify: "إعادة التصنيف مع التبرير",
+    cardReclassifyDesc: "تجاوز تصنيف سابق وتقديم سبب",
+    cardBusinessDefs: "إنشاء تعريفات من ملف",
+    cardBusinessDefsDesc: "تحميل قاموس بيانات أو مجموعة بيانات وإنشاء تعريفات أعمال تلقائياً",
+    cardDefineTerms: "تعريف مصطلحات محددة",
+    cardDefineTermsDesc: "إدخال أسماء عناصر بيانات محددة للحصول على تعريفات ثنائية اللغة",
+    cardEnrichDefs: "إثراء التعريفات الموجودة",
+    cardEnrichDefsDesc: "تحميل تعريفات موجودة وتعزيزها بالملكية وسياق الاستخدام",
+    cardExportDict: "تصدير قاموس البيانات",
+    cardExportDictDesc: "إنشاء وثيقة قاموس بيانات كاملة من تعريفاتك",
+    cardDataQuality: "إنشاء قواعد جودة البيانات تلقائياً",
+    cardDataQualityDesc: "تحميل مجموعة بيانات وإنشاء قواعد الاكتمال والصحة والاتساق",
+    cardProfileRules: "تحليل واقتراح القواعد",
+    cardProfileRulesDesc: "تشغيل ملف تعريف البيانات أولاً ثم اقتراح قواعد بناءً على الأنماط المكتشفة",
+    cardCustomRule: "منشئ القواعد المخصصة",
+    cardCustomRuleDesc: "تحديد قواعد أعمالك الخاصة وتنسيقها كفحوصات جودة قابلة للتنفيذ",
+    cardDqInformatica: "قواعد جودة لـ Informatica",
+    cardDqInformaticaDesc: "إنشاء قواعد جودة بتنسيق متوافق مع Informatica Data Quality",
     cardDataModel: "نموذج البيانات التحليلي",
     cardDataModelDesc: "تصميم مخطط نجمي مع جداول الحقائق والأبعاد",
-    cardPiiDetection: "كشف البيانات الشخصية",
-    cardPiiDetectionDesc: "فحص البيانات للمعلومات الشخصية والحساسة وفقاً لنظام حماية البيانات",
+    cardPiiDetection: "فحص ملف للبيانات الشخصية",
+    cardPiiDetectionDesc: "تحميل ملف واكتشاف جميع المعلومات الشخصية في كل عمود",
+    cardPiiFields: "فحص حقول محددة",
+    cardPiiFieldsDesc: "إدخال أسماء الأعمدة مع قيم عينة للتحقق من وجود بيانات شخصية",
+    cardPiiRisk: "تقييم مخاطر البيانات الشخصية",
+    cardPiiRiskDesc: "إنشاء تقرير مخاطر مع مستويات الخطورة والضوابط الموصى بها",
+    cardPdplCheck: "فحص امتثال نظام حماية البيانات",
+    cardPdplCheckDesc: "التحقق من نتائج البيانات الشخصية مقابل متطلبات نظام حماية البيانات السعودي",
     factTables: "جداول الحقائق",
     dimensionTables: "جداول الأبعاد",
     downloadPng: "تحميل المخطط كصورة PNG",
@@ -672,8 +754,14 @@ const translations = {
     tagInformatica: "مخرجات إنفورماتيكا",
     cardInsights: "تقرير رؤى البيانات",
     cardInsightsDesc: "تحليل البيانات وإنشاء تقرير رؤى شامل",
-    cardInformatica: "مخرجات إنفورماتيكا",
-    cardInformaticaDesc: "إنشاء بيانات وصفية وتعبيرات SQL وتصنيفات متوافقة مع إنفورماتيكا",
+    cardInformatica: "إنشاء مواصفات التعيين",
+    cardInformaticaDesc: "تحميل مخططات المصدر والهدف لإنشاء مواصفات تعيين Informatica",
+    cardIdqExport: "تصدير قواعد الجودة إلى IDQ",
+    cardIdqExportDesc: "تحويل قواعد الجودة المُنشأة إلى تنسيق قابل للاستيراد في Informatica",
+    cardTransformLogic: "إنشاء منطق التحويل",
+    cardTransformLogicDesc: "وصف تحويل والحصول عليه بتنسيق تعبيرات Informatica",
+    cardLineage: "توثيق سلسلة البيانات",
+    cardLineageDesc: "إنشاء توثيق سلسلة البيانات من ملفات التعيين المحملة",
     insightsReportGenerated: "📊 تم إنشاء تقرير رؤى البيانات",
     insightsToast: (title: string) => `تم إنشاء تقرير الرؤى "${title}"`,
     downloadInsightsReport: "📥 تحميل تقرير الرؤى",
@@ -887,18 +975,51 @@ const translations = {
 type Translation = (typeof translations)[Lang];
 type TranslationKey = keyof Translation;
 
+// Hero descriptions per DM sub-mode
+const DM_HERO_DESCRIPTIONS: Record<string, string> = {
+  "data-classification": "Classify your data fields according to Saudi NDMO and SDAIA sensitivity standards",
+  "business-definitions": "Generate and manage bilingual business definitions for your data elements",
+  "dq-rules": "Create comprehensive data quality rules \u2014 technical, logical, and business",
+  "pii-detection": "Detect and assess personally identifiable information in your datasets",
+  "informatica": "Generate Informatica-ready outputs for mappings, DQ rules, and transformations",
+};
+
 const featureCardKeys: { titleKey: TranslationKey; descKey: TranslationKey }[] = [
+  // Data Classification (4 cards)
   { titleKey: "cardDataClassification", descKey: "cardDataClassificationDesc" },
+  { titleKey: "cardClassifyFields", descKey: "cardClassifyFieldsDesc" },
+  { titleKey: "cardClassifySummary", descKey: "cardClassifySummaryDesc" },
+  { titleKey: "cardReclassify", descKey: "cardReclassifyDesc" },
+  // Business Definitions (4 cards)
   { titleKey: "cardBusinessDefs", descKey: "cardBusinessDefsDesc" },
+  { titleKey: "cardDefineTerms", descKey: "cardDefineTermsDesc" },
+  { titleKey: "cardEnrichDefs", descKey: "cardEnrichDefsDesc" },
+  { titleKey: "cardExportDict", descKey: "cardExportDictDesc" },
+  // DQ Rules (4 cards)
   { titleKey: "cardDataQuality", descKey: "cardDataQualityDesc" },
+  { titleKey: "cardProfileRules", descKey: "cardProfileRulesDesc" },
+  { titleKey: "cardCustomRule", descKey: "cardCustomRuleDesc" },
+  { titleKey: "cardDqInformatica", descKey: "cardDqInformaticaDesc" },
+  // Data Model (1 card)
   { titleKey: "cardDataModel", descKey: "cardDataModelDesc" },
+  // PII Detection (4 cards)
   { titleKey: "cardPiiDetection", descKey: "cardPiiDetectionDesc" },
+  { titleKey: "cardPiiFields", descKey: "cardPiiFieldsDesc" },
+  { titleKey: "cardPiiRisk", descKey: "cardPiiRiskDesc" },
+  { titleKey: "cardPdplCheck", descKey: "cardPdplCheckDesc" },
+  // Insights (1 card)
   { titleKey: "cardInsights", descKey: "cardInsightsDesc" },
+  // Informatica (4 cards)
   { titleKey: "cardInformatica", descKey: "cardInformaticaDesc" },
+  { titleKey: "cardIdqExport", descKey: "cardIdqExportDesc" },
+  { titleKey: "cardTransformLogic", descKey: "cardTransformLogicDesc" },
+  { titleKey: "cardLineage", descKey: "cardLineageDesc" },
+  // Nudge
   { titleKey: "cardNudgeFiling", descKey: "cardNudgeFilingDesc" },
   { titleKey: "cardNudgeZakat", descKey: "cardNudgeZakatDesc" },
   { titleKey: "cardNudgeUnderreport", descKey: "cardNudgeUnderreportDesc" },
   { titleKey: "cardNudgeAudit", descKey: "cardNudgeAuditDesc" },
+  // BI
   { titleKey: "biCardSharing", descKey: "biCardSharingDesc" },
   { titleKey: "biCardDashboard", descKey: "biCardDashboardDesc" },
   { titleKey: "biCardReport", descKey: "biCardReportDesc" },
@@ -907,36 +1028,130 @@ const featureCardKeys: { titleKey: TranslationKey; descKey: TranslationKey }[] =
 ];
 
 const FEATURE_CARDS = [
+  // ── Data Classification (4 cards) ─────────────────────────────────────────
   {
     icon: ShieldCheck,
-    title: "Data Classification",
-    description: "Classify data fields per Saudi SDAIA NDMO standards",
-    prompt: "I'd like to classify some data fields according to the Saudi SDAIA NDMO data classification framework. Please help me understand the classification levels and what I need to provide.",
+    title: "Classify from File",
+    description: "Upload an Excel or CSV file and classify all columns by NDMO sensitivity level",
+    prompt: "Classify all columns in the uploaded file per NDMO data classification standards",
     color: "text-[#067647]",
     bg: "bg-[#067647]/5",
     iconBg: "bg-[#067647]/10",
     agentMode: "data-classification" as const,
   },
   {
+    icon: Layers,
+    title: "Classify Specific Fields",
+    description: "Manually enter column names to get their classification",
+    prompt: "Classify these data fields: [field1], [field2], [field3]",
+    color: "text-[#067647]",
+    bg: "bg-[#067647]/5",
+    iconBg: "bg-[#067647]/10",
+    agentMode: "data-classification" as const,
+  },
+  {
+    icon: FileText,
+    title: "Classification Summary Report",
+    description: "Generate an executive summary of classification results with distribution chart",
+    prompt: "Generate a classification summary report for the uploaded dataset",
+    color: "text-[#067647]",
+    bg: "bg-[#067647]/5",
+    iconBg: "bg-[#067647]/10",
+    agentMode: "data-classification" as const,
+  },
+  {
+    icon: RotateCcw,
+    title: "Reclassify with Justification",
+    description: "Override a previous classification and provide a reason",
+    prompt: "Reclassify the following fields with justification: [field] from [current] to [new]",
+    color: "text-[#067647]",
+    bg: "bg-[#067647]/5",
+    iconBg: "bg-[#067647]/10",
+    agentMode: "data-classification" as const,
+  },
+  // ── Business Definitions (4 cards) ────────────────────────────────────────
+  {
     icon: BookOpen,
-    title: "Business Definitions",
-    description: "Generate comprehensive business definitions for data fields",
-    prompt: "Generate business definitions for all fields in the uploaded data. For each field provide: Business Term (EN), Business Definition (EN), Business Term (AR), Business Definition (AR), Data Type, and an example value.",
+    title: "Generate Definitions from File",
+    description: "Upload a data dictionary or dataset and auto-generate business definitions",
+    prompt: "Generate business definitions for all columns in the uploaded file",
     color: "text-[#51BAB4]",
     bg: "bg-[#51BAB4]/5",
     iconBg: "bg-[#51BAB4]/10",
     agentMode: "business-definitions" as const,
   },
   {
+    icon: FileText,
+    title: "Define Specific Terms",
+    description: "Enter specific data element names to get bilingual (EN/AR) definitions",
+    prompt: "Define the following data elements: [term1], [term2], [term3]",
+    color: "text-[#51BAB4]",
+    bg: "bg-[#51BAB4]/5",
+    iconBg: "bg-[#51BAB4]/10",
+    agentMode: "business-definitions" as const,
+  },
+  {
+    icon: Sparkles,
+    title: "Enrich Existing Definitions",
+    description: "Upload existing definitions and enhance them with ownership, usage context, and DQ notes",
+    prompt: "Enrich these existing business definitions with data owner and quality notes",
+    color: "text-[#51BAB4]",
+    bg: "bg-[#51BAB4]/5",
+    iconBg: "bg-[#51BAB4]/10",
+    agentMode: "business-definitions" as const,
+  },
+  {
+    icon: Download,
+    title: "Export Data Dictionary",
+    description: "Generate a full data dictionary document from your definitions",
+    prompt: "Export all generated business definitions as a data dictionary",
+    color: "text-[#51BAB4]",
+    bg: "bg-[#51BAB4]/5",
+    iconBg: "bg-[#51BAB4]/10",
+    agentMode: "business-definitions" as const,
+  },
+  // ── DQ Rules (4 cards) ────────────────────────────────────────────────────
+  {
     icon: CheckCircle,
-    title: "Full DQ Rules",
-    description: "Generate technical, logical & business data quality rules",
-    prompt: "Generate full data quality rules for all fields in the uploaded data. Include all layers: technical rules, logical rules, business rules, cross-field rules, and business logic warnings.",
+    title: "Auto-Generate DQ Rules",
+    description: "Upload a dataset and generate completeness, validity, and consistency rules",
+    prompt: "Generate full DQ rules (technical, logical, and business) for the uploaded dataset",
     color: "text-[#774896]",
     bg: "bg-[#774896]/5",
     iconBg: "bg-[#774896]/10",
     agentMode: "dq-rules" as const,
   },
+  {
+    icon: Search,
+    title: "Profile & Suggest Rules",
+    description: "Run a data profile first, then suggest rules based on detected patterns",
+    prompt: "Profile the uploaded data and suggest appropriate DQ rules",
+    color: "text-[#774896]",
+    bg: "bg-[#774896]/5",
+    iconBg: "bg-[#774896]/10",
+    agentMode: "dq-rules" as const,
+  },
+  {
+    icon: Pencil,
+    title: "Custom Rule Builder",
+    description: "Define your own business rules and get them formatted as implementable DQ checks",
+    prompt: "Create a custom DQ rule: [describe your rule logic]",
+    color: "text-[#774896]",
+    bg: "bg-[#774896]/5",
+    iconBg: "bg-[#774896]/10",
+    agentMode: "dq-rules" as const,
+  },
+  {
+    icon: Cpu,
+    title: "DQ Rules for Informatica",
+    description: "Generate DQ rules formatted for import into Informatica Data Quality",
+    prompt: "Generate DQ rules in Informatica-compatible format for the uploaded dataset",
+    color: "text-[#774896]",
+    bg: "bg-[#774896]/5",
+    iconBg: "bg-[#774896]/10",
+    agentMode: "dq-rules" as const,
+  },
+  // ── Analytical Data Model (1 card) ────────────────────────────────────────
   {
     icon: Database,
     title: "Analytical Data Model",
@@ -947,16 +1162,48 @@ const FEATURE_CARDS = [
     iconBg: "bg-[#0094D3]/10",
     agentMode: "data-model" as const,
   },
+  // ── PII Detection (4 cards) ───────────────────────────────────────────────
   {
     icon: ScanEye,
-    title: "PII Detection",
-    description: "Scan data for personal & sensitive information per PDPL",
-    prompt: "I want to scan my data for PII and sensitive information. Please help me understand what you can detect and how the privacy scan works.",
+    title: "Scan File for PII",
+    description: "Upload a file and detect all personally identifiable information across every column",
+    prompt: "Scan the uploaded file for PII and classify each detection",
     color: "text-red-600",
     bg: "bg-red-50",
     iconBg: "bg-red-100",
     agentMode: "pii-detection" as const,
   },
+  {
+    icon: Search,
+    title: "Scan Specific Fields",
+    description: "Enter column names with sample values to check for PII presence",
+    prompt: "Scan these fields for PII: [field1]: [sample], [field2]: [sample]",
+    color: "text-red-600",
+    bg: "bg-red-50",
+    iconBg: "bg-red-100",
+    agentMode: "pii-detection" as const,
+  },
+  {
+    icon: AlertTriangle,
+    title: "PII Risk Assessment",
+    description: "Generate a PII risk report with severity levels and recommended controls",
+    prompt: "Generate a PII risk assessment report for the uploaded dataset",
+    color: "text-red-600",
+    bg: "bg-red-50",
+    iconBg: "bg-red-100",
+    agentMode: "pii-detection" as const,
+  },
+  {
+    icon: ShieldCheck,
+    title: "Saudi PDPL Compliance Check",
+    description: "Check detected PII against Saudi Personal Data Protection Law requirements",
+    prompt: "Check PII findings against PDPL compliance requirements",
+    color: "text-red-600",
+    bg: "bg-red-50",
+    iconBg: "bg-red-100",
+    agentMode: "pii-detection" as const,
+  },
+  // ── Data Insights (1 card) ────────────────────────────────────────────────
   {
     icon: BarChart3,
     title: "Data Insights Report",
@@ -967,11 +1214,42 @@ const FEATURE_CARDS = [
     iconBg: "bg-[#1A4B8C]/10",
     agentMode: "insights" as const,
   },
+  // ── Informatica Output (4 cards) ──────────────────────────────────────────
   {
     icon: Cpu,
-    title: "Informatica Output",
-    description: "Generate Informatica-compatible metadata, SQL expressions & classifications",
-    prompt: "Generate an Informatica output for my data fields. Include field descriptions, data quality rules, Informatica Expression Language SQL, SDAIA data classifications, and format types. Return as the required JSON structure.",
+    title: "Generate Mapping Spec",
+    description: "Upload source and target schemas to generate an Informatica mapping specification",
+    prompt: "Generate an Informatica mapping specification from the uploaded source/target files",
+    color: "text-[#F57C00]",
+    bg: "bg-[#F57C00]/5",
+    iconBg: "bg-[#F57C00]/10",
+    agentMode: "informatica" as const,
+  },
+  {
+    icon: Download,
+    title: "Export DQ Rules to IDQ",
+    description: "Convert generated DQ rules into Informatica Data Quality importable format",
+    prompt: "Export DQ rules to Informatica Data Quality format",
+    color: "text-[#F57C00]",
+    bg: "bg-[#F57C00]/5",
+    iconBg: "bg-[#F57C00]/10",
+    agentMode: "informatica" as const,
+  },
+  {
+    icon: Code,
+    title: "Generate Transformation Logic",
+    description: "Describe a transformation and get it formatted as Informatica expression syntax",
+    prompt: "Generate Informatica transformation logic for: [describe transformation]",
+    color: "text-[#F57C00]",
+    bg: "bg-[#F57C00]/5",
+    iconBg: "bg-[#F57C00]/10",
+    agentMode: "informatica" as const,
+  },
+  {
+    icon: GitBranch,
+    title: "Data Lineage Documentation",
+    description: "Generate data lineage documentation from uploaded mapping files",
+    prompt: "Generate data lineage documentation from the uploaded mapping spec",
     color: "text-[#F57C00]",
     bg: "bg-[#F57C00]/5",
     iconBg: "bg-[#F57C00]/10",
@@ -1450,6 +1728,7 @@ function SidebarContent({
   agentMode,
   aiProvider,
   onAiProviderChange,
+  theme,
 }: {
   t: Translation;
   conversations: Conversation[];
@@ -1475,6 +1754,7 @@ function SidebarContent({
   agentMode: AgentMode;
   aiProvider: "claude" | "local";
   onAiProviderChange: (v: "claude" | "local") => void;
+  theme: BrandTheme;
 }) {
   const statusConfig = STATUS_COLORS[agentStatus];
   const statusLabel = agentStatus === "idle" ? t.agentIdle : agentStatus === "thinking" ? t.agentThinking : agentStatus === "executing" ? t.agentExecuting : t.agentDone;
@@ -1482,12 +1762,12 @@ function SidebarContent({
   return (
     <div
       className="h-full flex flex-col font-main"
-      style={{ backgroundColor: "#0D2E5C" }}
+      style={{ backgroundColor: theme.sidebarBg }}
       data-testid="sidebar"
     >
       <div className="p-4 pb-3">
         <div className="flex items-center gap-3 mb-2">
-          <img src={zatcaLogoPath} alt="ZATCA" className="h-7 flex-shrink-0 brightness-0 invert" />
+          <img src={theme.logo} alt="Logo" className={`h-7 flex-shrink-0 ${theme.logoInvert ? "brightness-0 invert" : ""}`} />
           <Button
             size="icon"
             variant="ghost"
@@ -1499,7 +1779,7 @@ function SidebarContent({
           </Button>
         </div>
         <div className="mb-3">
-          <h1 className="text-white font-bold text-sm" data-testid="text-app-title">Data & Analytics Agent</h1>
+          <h1 className="text-white font-bold text-sm" data-testid="text-app-title">{theme.appTitle}</h1>
         </div>
         <div
           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium ${statusConfig.pulse ? "animate-pulse-status" : ""}`}
@@ -1577,11 +1857,11 @@ function SidebarContent({
                   <div
                     className="group flex items-center gap-1 rounded-md px-2 py-2 cursor-pointer text-sm transition-colors"
                     style={{
-                      backgroundColor: activeConversationId === conv.id ? "#1A4B8C" : "transparent",
+                      backgroundColor: activeConversationId === conv.id ? theme.secondary : "transparent",
                       color: activeConversationId === conv.id ? "#ffffff" : "rgba(255,255,255,0.6)",
                     }}
                     onClick={() => editingConvId !== conv.id && setActiveConversationId(conv.id)}
-                    onMouseEnter={(e) => { if (activeConversationId !== conv.id) e.currentTarget.style.backgroundColor = "#1A4B8C50"; }}
+                    onMouseEnter={(e) => { if (activeConversationId !== conv.id) e.currentTarget.style.backgroundColor = theme.secondary + "50"; }}
                     onMouseLeave={(e) => { if (activeConversationId !== conv.id) e.currentTarget.style.backgroundColor = "transparent"; }}
                   >
                     <div className={`flex items-center gap-0.5 transition-opacity flex-shrink-0 ${activeConversationId === conv.id ? "opacity-80" : "opacity-50 group-hover:opacity-100"}`}>
@@ -1686,7 +1966,7 @@ function SidebarContent({
           onClick={handleNewChat}
           className="w-full justify-center gap-2 font-medium text-white ripple-button"
           size="sm"
-          style={{ backgroundColor: "#2563EB" }}
+          style={{ backgroundColor: theme.primary }}
           data-testid="button-new-chat"
         >
           <Plus className="w-4 h-4" />
@@ -1697,8 +1977,12 @@ function SidebarContent({
   );
 }
 
+
+
 export default function ChatPage() {
   const [, navigate] = useLocation();
+  const { currentEntity } = useEntity();
+  const theme = useBranding();
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -1766,14 +2050,35 @@ export default function ChatPage() {
   }>>([]);
   const [refDocError, setRefDocError] = useState<string | null>(null);
   const [aiProvider, setAiProvider] = useState<"claude" | "local">("local");
-  const [pageVisibility, setPageVisibility] = useState<PageVisibility>(loadPageVisibility);
+  const [pageVisibility, setPageVisibility] = useState<PageVisibility>({ ...DEFAULT_VISIBILITY });
 
-  // Re-read settings when window regains focus (user may have changed settings page)
+  // Fetch page visibility from DB when entity changes
   useEffect(() => {
-    const onFocus = () => setPageVisibility(loadPageVisibility());
+    if (currentEntity) {
+      fetch(`/api/entities/${currentEntity.id}/page-visibility`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => { if (data) setPageVisibility((prev) => ({ ...prev, ...data })); })
+        .catch(() => {});
+    } else {
+      setPageVisibility({ ...DEFAULT_VISIBILITY });
+    }
+  }, [currentEntity?.id]);
+
+  // Re-read settings when window regains focus
+  useEffect(() => {
+    const onFocus = () => {
+      if (currentEntity) {
+        fetch(`/api/entities/${currentEntity.id}/page-visibility`)
+          .then((res) => res.ok ? res.json() : null)
+          .then((data) => { if (data) setPageVisibility((prev) => ({ ...prev, ...data })); })
+          .catch(() => {});
+      } else {
+        setPageVisibility({ ...DEFAULT_VISIBILITY });
+      }
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, []);
+  }, [currentEntity?.id]);
   useEffect(() => { sessionStorage.setItem("ai-provider", aiProvider); }, [aiProvider]);
   const refDocInputRef = useRef<HTMLInputElement>(null);
   const refDocErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2522,6 +2827,7 @@ export default function ChatPage() {
       }
       formData.append("aiProvider", aiProvider);
       formData.append("agentMode", agentMode);
+      if (currentEntity) formData.append("entityId", String(currentEntity.id));
 
       const response = await fetch(`/api/conversations/${conversationId}/messages`, {
         method: "POST",
@@ -2984,6 +3290,7 @@ export default function ChatPage() {
     onAddDocument: handleAddDocument,
     onRemoveDocument: handleRemoveDocument,
     refDocInputRef,
+    theme,
   };
 
   return (
@@ -3030,7 +3337,7 @@ export default function ChatPage() {
                 }
                 setPageMismatch(null);
               }}
-              style={{ backgroundColor: "#2563EB" }}
+              style={{ backgroundColor: theme.primary }}
             >
               {lang === "ar" ? `انتقل إلى ${pageMismatch?.targetLabel}` : `Go to ${pageMismatch?.targetLabel}`}
             </AlertDialogAction>
@@ -3142,9 +3449,9 @@ export default function ChatPage() {
         <button
           onClick={() => setSidebarCollapsed(v => !v)}
           className="flex-shrink-0 self-center z-30 flex items-center justify-center rounded-r-md transition-colors"
-          style={{ width: 14, height: 48, backgroundColor: "#0D2E5C", color: "rgba(255,255,255,0.7)", borderTop: "1px solid #1A4B8C", borderRight: "1px solid #1A4B8C", borderBottom: "1px solid #1A4B8C" }}
-          onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#1A4B8C")}
-          onMouseLeave={e => (e.currentTarget.style.backgroundColor = "#0D2E5C")}
+          style={{ width: 14, height: 48, backgroundColor: theme.sidebarBg, color: "rgba(255,255,255,0.7)", borderTop: `1px solid ${theme.secondary}`, borderRight: `1px solid ${theme.secondary}`, borderBottom: `1px solid ${theme.secondary}` }}
+          onMouseEnter={e => (e.currentTarget.style.backgroundColor = theme.secondary)}
+          onMouseLeave={e => (e.currentTarget.style.backgroundColor = theme.sidebarBg)}
           data-testid="button-toggle-sidebar"
           title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
@@ -3166,7 +3473,7 @@ export default function ChatPage() {
             </Button>
           )}
           <div className="flex items-center gap-2 text-xs flex-1 min-w-0" style={{ color: "#1A1A2E" }}>
-            <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#2563EB" }} />
+            <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: theme.primary }} />
             <span className="truncate font-medium">
               {uploadedFileName ? `📁 ${uploadedFileName}` : t.noFileLoaded}
             </span>
@@ -3175,7 +3482,7 @@ export default function ChatPage() {
             )}
           </div>
           {sheetCount > 0 && (
-            <div className="flex items-center gap-1.5 text-xs" style={{ color: "#2E7D32" }}>
+            <div className="flex items-center gap-1.5 text-xs" style={{ color: theme.accent }}>
               <FileSpreadsheet className="w-3.5 h-3.5" />
               <span className="font-medium">📊 result.xlsx — {sheetCount} {t.sheetsInResult}</span>
             </div>
@@ -3225,22 +3532,13 @@ export default function ChatPage() {
             {t.userGuide}
           </Link>
           <Link
-            href="/system-prompts"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
-            style={{ color: "#6B7280" }}
-            data-testid="link-system-prompts"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            {lang === "ar" ? "مطالبات النظام" : "System Prompts"}
-          </Link>
-          <Link
-            href="/settings"
+            href="/entity-settings"
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
             style={{ color: "#6B7280" }}
             data-testid="link-settings"
           >
             <Settings className="w-3.5 h-3.5" />
-            {lang === "ar" ? "إعدادات" : "Settings"}
+            {lang === "ar" ? "الإعدادات" : "Settings"}
           </Link>
           <Button
             size="sm"
@@ -3251,6 +3549,15 @@ export default function ChatPage() {
           >
             <Globe className="w-3.5 h-3.5" />
             {lang === "en" ? "EN" : "AR"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 px-2.5 text-[11px] font-medium flex-shrink-0 text-gray-500 hover:text-red-600"
+            onClick={() => (window as any).__logout?.()}
+            data-testid="button-logout"
+          >
+            {lang === "ar" ? "خروج" : "Logout"}
           </Button>
           {isMobile && (
             <Button
@@ -3272,7 +3579,7 @@ export default function ChatPage() {
               { id: "data-model", icon: Layers, labelKey: "agentDataModel", descKey: "agentDataModelDesc", color: "#774896" },
               { id: "insights", icon: Brain, labelKey: "agentInsights", descKey: "agentInsightsDesc", color: "#067647" },
               { id: "nudge", icon: Target, labelKey: "agentNudge", descKey: "agentDataMgmtDesc", color: "#7C3AED" },
-              { id: "bi", icon: BarChart3, labelKey: "biAgent", descKey: "agentDataMgmtDesc", color: "#1A4B8C" },
+              { id: "bi", icon: BarChart3, labelKey: "biAgent", descKey: "agentDataMgmtDesc", color: theme.secondary },
             ]).filter(tab => {
               if (tab.id === "data-management") return DM_SUB_MODES.some(m => pageVisibility[m]);
               return pageVisibility[tab.id as keyof PageVisibility] !== false;
@@ -3298,7 +3605,7 @@ export default function ChatPage() {
                 }}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                 style={{
-                  backgroundColor: isActive ? "#0D2E5C" : "transparent",
+                  backgroundColor: isActive ? theme.sidebarBg : "transparent",
                   color: isActive ? "white" : "#6B7280",
                 }}
                 data-testid={`tab-agent-${tab.id}`}
@@ -3365,16 +3672,16 @@ export default function ChatPage() {
             <div className="max-w-4xl mx-auto w-full px-4 py-6">
               {!activeConversationId && messages.length === 0 && !isStreaming ? (
                 <div className="flex flex-col items-center justify-center pt-8">
-                  <h2 className="text-2xl font-bold mb-2 tracking-tight font-main" style={{ color: agentMode === "nudge" ? "#7C3AED" : agentMode === "bi" ? "#1A4B8C" : "#2563EB" }} data-testid="text-hero-title">
+                  <h2 className="text-2xl font-bold mb-2 tracking-tight font-main" style={{ color: agentMode === "nudge" ? "#7C3AED" : agentMode === "bi" ? theme.secondary : theme.primary }} data-testid="text-hero-title">
                     {agentMode === "nudge" ? t.nudgeHeroTitle as string : agentMode === "bi" ? t.biHeroTitle as string : t.whatToDo}
                   </h2>
                   <p className="text-center mb-8 max-w-md text-sm leading-relaxed" style={{ color: "#6B7280" }}>
-                    {agentMode === "nudge" ? t.nudgeHeroDesc as string : agentMode === "bi" ? t.biHeroDesc as string : agentMode === "insights" ? t.agentInsightsDesc : agentMode === "data-model" ? t.agentDataModelDesc : t.heroDescription}
+                    {agentMode === "nudge" ? t.nudgeHeroDesc as string : agentMode === "bi" ? t.biHeroDesc as string : agentMode === "insights" ? t.agentInsightsDesc : agentMode === "data-model" ? t.agentDataModelDesc : DM_HERO_DESCRIPTIONS[agentMode] || t.heroDescription}
                   </p>
                   {agentMode === "nudge" && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-3xl mb-8">
                       {([
-                        { icon: Search, title: t.nudgeInfoCard1 as string, desc: t.nudgeInfoCard1Desc as string, color: "#2563EB" },
+                        { icon: Search, title: t.nudgeInfoCard1 as string, desc: t.nudgeInfoCard1Desc as string, color: theme.primary },
                         { icon: Users, title: t.nudgeInfoCard2 as string, desc: t.nudgeInfoCard2Desc as string, color: "#067647" },
                         { icon: Target, title: t.nudgeInfoCard3 as string, desc: t.nudgeInfoCard3Desc as string, color: "#7C3AED" },
                       ]).map(({ icon: Icon, title, desc, color }, i) => (
@@ -3430,11 +3737,11 @@ export default function ChatPage() {
                       )}
                       <div className="hidden grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                         {([
-                          { icon: "🔍", titleKey: "biInfoCard1" as const, descKey: "biInfoCard1Desc" as const, color: "#1A4B8C" },
-                          { icon: "📐", titleKey: "biInfoCard2" as const, descKey: "biInfoCard2Desc" as const, color: "#2E7D32" },
+                          { icon: "🔍", titleKey: "biInfoCard1" as const, descKey: "biInfoCard1Desc" as const, color: theme.secondary },
+                          { icon: "📐", titleKey: "biInfoCard2" as const, descKey: "biInfoCard2Desc" as const, color: theme.accent },
                           { icon: "🔬", titleKey: "biInfoCard3" as const, descKey: "biInfoCard3Desc" as const, color: "#E65100" },
                           { icon: "📋", titleKey: "biInfoCard4" as const, descKey: "biInfoCard4Desc" as const, color: "#774896" },
-                          { icon: "🖥️", titleKey: "biInfoCard5" as const, descKey: "biInfoCard5Desc" as const, color: "#0D2E5C" },
+                          { icon: "🖥️", titleKey: "biInfoCard5" as const, descKey: "biInfoCard5Desc" as const, color: theme.sidebarBg },
                         ]).map(({ icon, titleKey, descKey, color }, i) => (
                           <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                             <div className="text-2xl mb-3">{icon}</div>
@@ -3450,7 +3757,7 @@ export default function ChatPage() {
                       )}
                     </div>
                   )}
-                  <div className={`grid grid-cols-2 ${isMobile ? "" : "lg:grid-cols-3"} gap-4 w-full max-w-4xl`}>
+                  <div className={`grid ${isMobile ? "grid-cols-1" : "grid-cols-2"} gap-4 w-full max-w-3xl`}>
                     {FEATURE_CARDS.filter(c => c.agentMode === agentMode && !c.hidden).map((card, cardIdx) => {
                       const globalIdx = FEATURE_CARDS.indexOf(card);
                       return (
@@ -3471,7 +3778,7 @@ export default function ChatPage() {
                         <p className="text-xs leading-relaxed mb-3" style={{ color: "#6B7280" }}>
                           {t[featureCardKeys[globalIdx].descKey] as string}
                         </p>
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium ripple-button rounded-md px-2.5 py-1" style={{ color: "#2563EB", backgroundColor: "#2563EB10" }}>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium ripple-button rounded-md px-2.5 py-1" style={{ color: theme.primary, backgroundColor: theme.primary + "10" }}>
                           <Play className="w-3 h-3" />
                           {t.startBtn}
                         </span>
@@ -3544,7 +3851,7 @@ export default function ChatPage() {
                             <div className="flex gap-2 mt-3">
                               <button
                                 onClick={() => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); }}
-                                style={{ backgroundColor: "#2563EB", color: "white", border: "none", borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                                style={{ backgroundColor: theme.primary, color: "white", border: "none", borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
                                 data-testid="button-cancelled-try-again"
                               >
                                 {t.tryAgain}
@@ -3592,7 +3899,7 @@ export default function ChatPage() {
                       textareaRef.current?.focus();
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all hover:opacity-90"
-                    style={{ backgroundColor: "#0D2E5C", color: "rgba(255,255,255,0.85)" }}
+                    style={{ backgroundColor: theme.sidebarBg, color: "rgba(255,255,255,0.85)" }}
                     data-testid={`pill-feature-${cardIdx}`}
                   >
                     <card.icon className="w-3 h-3" />
@@ -3603,7 +3910,7 @@ export default function ChatPage() {
               </div>
             </div>
           )}
-          <div className="p-3 flex-shrink-0" style={{ backgroundColor: "#0D2E5C" }}>
+          <div className="p-3 flex-shrink-0" style={{ backgroundColor: theme.sidebarBg }}>
             <div className="max-w-4xl mx-auto">
               {agentMode === "bi" ? (
                 <div data-testid="bi-input-panel">
@@ -3629,7 +3936,7 @@ export default function ChatPage() {
                         {BI_TABS.filter(tb => tb.key !== "dashboard" && tb.key !== "dashtest" && tb.key !== "testcases").map(tb => (
                           <button key={tb.key} onClick={() => setBiActiveTab(tb.key)}
                             className="px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all"
-                            style={{ backgroundColor: biActiveTab === tb.key ? "rgba(26,75,140,0.5)" : "transparent", color: biActiveTab === tb.key ? "#E8EDF5" : "rgba(255,255,255,0.5)", border: `1px solid ${biActiveTab === tb.key ? "#1A4B8C" : "transparent"}` }}
+                            style={{ backgroundColor: biActiveTab === tb.key ? "rgba(26,75,140,0.5)" : "transparent", color: biActiveTab === tb.key ? "#E8EDF5" : "rgba(255,255,255,0.5)", border: `1px solid ${biActiveTab === tb.key ? theme.secondary : "transparent"}` }}
                             data-testid={`bi-tab-${tb.key}`}
                           >{tb.icon} {lang === "ar" ? tb.labelAr : tb.label}</button>
                         ))}
@@ -3654,7 +3961,7 @@ export default function ChatPage() {
                             <Square className="w-3 h-3 fill-white" /> stop agent
                           </button>
                         ) : (
-                          <Button onClick={biRunAnalysis} className="h-9 px-4 flex-shrink-0 rounded-lg gap-1.5 text-xs font-medium text-white ripple-button" style={{ backgroundColor: "#2E7D32" }} disabled={!biFields.length || biLoading} data-testid="bi-run-btn">
+                          <Button onClick={biRunAnalysis} className="h-9 px-4 flex-shrink-0 rounded-lg gap-1.5 text-xs font-medium text-white ripple-button" style={{ backgroundColor: theme.accent }} disabled={!biFields.length || biLoading} data-testid="bi-run-btn">
                             {t.biRunBtn as string} <Play className="w-3.5 h-3.5" />
                           </Button>
                         )}
@@ -3822,7 +4129,7 @@ export default function ChatPage() {
                   <Button
                     type="submit"
                     className="h-9 px-4 flex-shrink-0 rounded-lg gap-1.5 text-xs font-medium text-white ripple-button"
-                    style={{ backgroundColor: "#2E7D32" }}
+                    style={{ backgroundColor: theme.accent }}
                     disabled={!inputValue.trim() && !selectedFile && !pastedText.trim()}
                     data-testid="button-send-message"
                   >
@@ -3843,7 +4150,7 @@ export default function ChatPage() {
           onClick={() => setOutputsPanelCollapsed(v => !v)}
           className="flex-shrink-0 self-center z-30 flex items-center justify-center rounded-l-md transition-colors"
           style={{ width: 14, height: 48, backgroundColor: "#F9FAFB", color: "#9CA3AF", borderTop: "1px solid #E5E7EB", borderLeft: "1px solid #E5E7EB", borderBottom: "1px solid #E5E7EB" }}
-          onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#EEF2FF"; e.currentTarget.style.color = "#2563EB"; }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#EEF2FF"; e.currentTarget.style.color = theme.primary; }}
           onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#F9FAFB"; e.currentTarget.style.color = "#9CA3AF"; }}
           data-testid="button-toggle-outputs"
           title={outputsPanelCollapsed ? t.expandOutputs : t.collapseOutputs}

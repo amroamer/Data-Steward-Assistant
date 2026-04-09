@@ -5,11 +5,11 @@ export interface CompletionParams {
   messages: Anthropic.MessageParam[];
   max_tokens: number;
   temperature: number;
-  /** Per-request override. "local" routes to the RAGFlow gateway. */
+  /** Per-request override. "local" routes to RAGFlow. */
   provider?: "claude" | "local";
   /**
-   * Per-request RAGFlow agent override.
-   * When provider="local", this takes precedence over the RAGFLOW_AGENT env var.
+   * Per-request RAGFlow agent override (short name).
+   * Maps to RAGFlow agent display names internally.
    * Available: ndmo-classification | pii-detection | business-definitions |
    *            report-tester | dq-rules-generator
    */
@@ -83,30 +83,94 @@ async function* claudeStream(params: CompletionParams): AsyncGenerator<string> {
   }
 }
 
-// ── RAGFlow ────────────────────────────────────────────────────────────────────
-// Calls POST /agent/run on the local RAGFlow gateway.
-// The gateway is synchronous JSON — no streaming. The full answer is emitted
-// as a single chunk when used from aiStream().
-//
-// Set RAGFLOW_AGENT to one of the gateway's agent names:
-//   ndmo-classification | pii-detection | business-definitions |
-//   report-tester | dq-rules-generator
+// ── RAGFlow (Native API v1) ───────────────────────────────────────────────────
 
-const RAGFLOW_BASE_URL = (process.env.RAGFLOW_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+const RAGFLOW_BASE_URL = (process.env.RAGFLOW_BASE_URL || "http://localhost:80").replace(/\/$/, "");
 const RAGFLOW_API_KEY = process.env.RAGFLOW_API_KEY || "";
-const RAGFLOW_AGENT = process.env.RAGFLOW_AGENT || process.env.RAGFLOW_MODEL || "dq-rules-generator";
+const RAGFLOW_AGENT = process.env.RAGFLOW_AGENT || "DNA-Agent-SuperVisor";
+
+// Short name (used in routes.ts) -> RAGFlow agent display name
+const AGENT_NAME_MAP: Record<string, string> = {
+  "dq-rules-generator":  "DQ-Rules-Generator",
+  "ndmo-classification":  "NDMO-Data-Classification",
+  "pii-detection":        "PII-Detection",
+  "business-definitions": "Business-Definitions",
+  "report-tester":        "Report-Tester",
+};
 
 function ragflowHeaders(): Record<string, string> {
-  const h: Record<string, string> = { "Content-Type": "application/json" };
-  if (RAGFLOW_API_KEY) h["X-API-Key"] = RAGFLOW_API_KEY;
-  return h;
+  return {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${RAGFLOW_API_KEY}`,
+  };
 }
 
-/**
- * Build the full input string for the RAGFlow agent.
- * Mirrors exactly what Claude receives: system prompt + full conversation history.
- * Image content blocks are stripped to text-only.
- */
+// ── Agent ID resolution (cached) ──────────────────────────────────────────────
+
+let agentIdCache: Map<string, string> | null = null;
+
+async function fetchAgentIds(): Promise<Map<string, string>> {
+  if (agentIdCache) return agentIdCache;
+
+  const url = `${RAGFLOW_BASE_URL}/api/v1/agents`;
+  const resp = await fetch(url, { method: "GET", headers: ragflowHeaders() });
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Failed to fetch RAGFlow agents: ${resp.status} ${body}`);
+  }
+  const data = await resp.json();
+  const agents: Array<{ id: string; title: string; name?: string }> = data.data || [];
+
+  agentIdCache = new Map();
+  for (const a of agents) {
+    const displayName = a.title || a.name || "";
+    agentIdCache.set(displayName, a.id);
+    // Also store lowercase for case-insensitive fallback
+    agentIdCache.set(displayName.toLowerCase(), a.id);
+  }
+  return agentIdCache;
+}
+
+async function resolveAgentId(shortName?: string): Promise<string> {
+  const cache = await fetchAgentIds();
+  const displayName = shortName
+    ? (AGENT_NAME_MAP[shortName] || shortName)
+    : RAGFLOW_AGENT;
+
+  const id = cache.get(displayName) || cache.get(displayName.toLowerCase());
+  if (!id) {
+    throw new Error(`RAGFlow agent not found: "${displayName}" (from "${shortName || "default"}")`);
+  }
+  return id;
+}
+
+// ── Session management ────────────────────────────────────────────────────────
+
+const sessionCache = new Map<string, string>();
+
+async function getOrCreateSession(agentId: string): Promise<string> {
+  if (sessionCache.has(agentId)) return sessionCache.get(agentId)!;
+
+  const url = `${RAGFLOW_BASE_URL}/api/v1/agents/${agentId}/sessions`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: ragflowHeaders(),
+    body: JSON.stringify({}),
+  });
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Failed to create RAGFlow session: ${resp.status} ${body}`);
+  }
+  const data = await resp.json();
+  const sessionId: string = data.data?.id;
+  if (!sessionId) throw new Error("No session ID returned from RAGFlow");
+
+  sessionCache.set(agentId, sessionId);
+  return sessionId;
+}
+
+// ── Build input ───────────────────────────────────────────────────────────────
+
 function buildInput(params: CompletionParams): string {
   const parts: string[] = [];
 
@@ -128,44 +192,46 @@ function buildInput(params: CompletionParams): string {
   return parts.join("\n\n");
 }
 
-interface AgentRunResponse {
-  request_id: string;
-  agent: string;
-  agent_title: string;
-  session_id: string;
-  answer: string;
-  output_format: string;
-}
+// ── RAGFlow completions ───────────────────────────────────────────────────────
 
-async function ragflowComplete(params: CompletionParams): Promise<string> {
-  const url = `${RAGFLOW_BASE_URL}/ragclient/agent/run`;
-  const agent = params.ragflowAgent || RAGFLOW_AGENT;
+async function ragflowComplete(params: CompletionParams, _retried = false): Promise<string> {
+  const agentId = await resolveAgentId(params.ragflowAgent);
+  const sessionId = await getOrCreateSession(agentId);
+  const question = buildInput(params);
+
+  const url = `${RAGFLOW_BASE_URL}/api/v1/agents/${agentId}/completions`;
   try {
     const resp = await fetch(url, {
       method: "POST",
       headers: ragflowHeaders(),
       body: JSON.stringify({
-        agent,
-        input: buildInput(params),
+        session_id: sessionId,
+        question,
+        stream: false,
       }),
     });
     if (!resp.ok) {
       const body = await resp.text();
+      // Session may be stale — clear and retry once
+      if (!_retried && (resp.status === 400 || resp.status === 404)) {
+        sessionCache.delete(agentId);
+        aiLog("ERROR", `ragflow session may be stale (${resp.status}), retrying`);
+        return ragflowComplete(params, true);
+      }
       aiLog("ERROR", `ragflow error ${resp.status} | body=${body}`);
       throw new Error(`RAGFlow error ${resp.status}: ${body}`);
     }
-    const data = (await resp.json()) as AgentRunResponse;
-    return data.answer ?? "";
+    const data = await resp.json();
+    return data.data?.answer ?? data.answer ?? "";
   } catch (err: any) {
     aiLog("ERROR", `ragflow exception | ${err.message}`);
-    if (err.stack) aiLog("ERROR", err.stack);
     throw err;
   }
 }
 
 async function* ragflowStream(params: CompletionParams): AsyncGenerator<string> {
-  // /agent/run is synchronous. Emit the answer in small chunks so the client's
-  // SSE reader and UI rendering behave identically to Claude streaming.
+  // Use non-streaming call + fake chunking for reliability.
+  // Can upgrade to stream: true + SSE parsing once verified.
   const answer = await ragflowComplete(params);
   const CHUNK = 16;
   for (let i = 0; i < answer.length; i += CHUNK) {

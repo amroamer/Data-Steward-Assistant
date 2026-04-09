@@ -17,7 +17,7 @@ import {
   Zap,
   TrendingUp,
 } from "lucide-react";
-import zatcaLogoPath from "@assets/zatca-logo.svg";
+import { useBranding } from "@/hooks/use-branding";
 
 type Lang = "en" | "ar";
 
@@ -68,9 +68,10 @@ interface NudgeReport {
   };
 }
 
-const ZATCA_BLUE = "#0D2E5C";
-const ZATCA_ACCENT = "#2563EB";
-const ZATCA_GREEN = "#2E7D32";
+// Brand colors are now provided by useBranding() hook inside the component
+const ZATCA_BLUE_FALLBACK = "#0D2E5C";
+const ZATCA_ACCENT_FALLBACK = "#2563EB";
+const ZATCA_GREEN_FALLBACK = "#2E7D32";
 
 const translations = {
   en: {
@@ -348,6 +349,7 @@ const LOAD_STEPS_AR = [
 ];
 
 export default function NudgePage() {
+  const theme = useBranding();
   const [lang, setLang] = useState<Lang>("en");
   const isRtl = lang === "ar";
   const t = translations[lang];
@@ -445,13 +447,13 @@ export default function NudgePage() {
   return (
     <div className="min-h-screen flex bg-gray-50 font-main" dir={isRtl ? "rtl" : "ltr"}>
       {/* Sidebar */}
-      <div className="hidden md:flex flex-col w-56 flex-shrink-0 shadow-xl z-20" style={{ backgroundColor: ZATCA_BLUE }}>
+      <div className="hidden md:flex flex-col w-56 flex-shrink-0 shadow-xl z-20" style={{ backgroundColor: theme.sidebarBg }}>
         <div className="p-4 pb-3">
           <div className="flex items-center gap-2 mb-3">
-            <img src={zatcaLogoPath} alt="ZATCA" className="h-7 flex-shrink-0 brightness-0 invert" />
+            <img src={theme.logo} alt="" className={`h-7 flex-shrink-0 ${theme.logoInvert ? "brightness-0 invert" : ""}`} />
           </div>
           <h1 className="text-white font-bold text-sm mb-3" data-testid="text-nudge-app-title">{t.appTitle}</h1>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium" style={{ backgroundColor: "#2563EB30", color: "#93C5FD" }}>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium" style={{ backgroundColor: theme.primary + "30", color: "#93C5FD" }}>
             <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
             {lang === "en" ? "Behavioural Economics" : "الاقتصاد السلوكي"}
           </div>
@@ -490,12 +492,12 @@ export default function NudgePage() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile header */}
-        <div className="md:hidden flex items-center justify-between px-4 py-3 shadow-sm" style={{ backgroundColor: ZATCA_BLUE }}>
+        <div className="md:hidden flex items-center justify-between px-4 py-3 shadow-sm" style={{ backgroundColor: theme.sidebarBg }}>
           <div className="flex items-center gap-3">
             <Link href="/" className="text-white/70 hover:text-white" data-testid="link-back-mobile">
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            <img src={zatcaLogoPath} alt="ZATCA" className="h-6 brightness-0 invert" />
+            <img src={theme.logo} alt="" className={`h-6 ${theme.logoInvert ? "brightness-0 invert" : ""}`} />
             <span className="text-white font-bold text-sm">{t.appTitle}</span>
           </div>
           <button
@@ -514,7 +516,7 @@ export default function NudgePage() {
               {/* Info cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 {[
-                  { icon: Search, title: t.infoCard1Title, desc: t.infoCard1Desc, color: ZATCA_ACCENT },
+                  { icon: Search, title: t.infoCard1Title, desc: t.infoCard1Desc, color: theme.primary },
                   { icon: Users, title: t.infoCard2Title, desc: t.infoCard2Desc, color: "#067647" },
                   { icon: Target, title: t.infoCard3Title, desc: t.infoCard3Desc, color: "#774896" },
                 ].map(({ icon: Icon, title, desc, color }, i) => (
@@ -548,16 +550,16 @@ export default function NudgePage() {
             <div className="max-w-2xl mx-auto px-4 py-16">
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
                 <div className="flex items-center gap-3 mb-6">
-                  <Loader2 className="w-6 h-6 animate-spin" style={{ color: ZATCA_ACCENT }} />
+                  <Loader2 className="w-6 h-6 animate-spin" style={{ color: theme.primary }} />
                   <span className="font-semibold text-gray-700">{lang === "en" ? "Analysing your scenario..." : "جارٍ تحليل السيناريو..."}</span>
                 </div>
                 <div className="space-y-3">
                   {steps.map((step, i) => (
                     <div key={i} className="flex items-center gap-3" data-testid={`load-step-${i + 1}`}>
                       {i < loadStep ? (
-                        <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: ZATCA_GREEN }} />
+                        <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: theme.accent }} />
                       ) : i === loadStep ? (
-                        <Loader2 className="w-5 h-5 flex-shrink-0 animate-spin" style={{ color: ZATCA_ACCENT }} />
+                        <Loader2 className="w-5 h-5 flex-shrink-0 animate-spin" style={{ color: theme.primary }} />
                       ) : (
                         <div className="w-5 h-5 flex-shrink-0 rounded-full border-2 border-gray-200" />
                       )}
@@ -581,7 +583,7 @@ export default function NudgePage() {
                     <div className="flex gap-2 mt-3">
                       <button
                         onClick={handleAnalyse}
-                        style={{ backgroundColor: "#2563EB", color: "white", border: "none", borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                        style={{ backgroundColor: theme.primary, color: "white", border: "none", borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
                         data-testid="button-cancelled-try-again"
                       >
                         {t.tryAgain}
@@ -623,7 +625,7 @@ export default function NudgePage() {
               {/* Summary Banner */}
               <div
                 className="rounded-xl p-4 grid grid-cols-2 md:grid-cols-5 gap-3"
-                style={{ backgroundColor: ZATCA_BLUE }}
+                style={{ backgroundColor: theme.sidebarBg }}
                 data-testid="summary-banner"
               >
                 {[
@@ -648,7 +650,7 @@ export default function NudgePage() {
                 <div className="p-5 space-y-4">
                   <div>
                     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{t.labelPrimaryRootCause}</p>
-                    <div className="px-4 py-3 rounded-lg font-semibold text-white text-sm" style={{ backgroundColor: ZATCA_ACCENT }}>
+                    <div className="px-4 py-3 rounded-lg font-semibold text-white text-sm" style={{ backgroundColor: theme.primary }}>
                       {report.diagnosis.primary_root_cause}
                     </div>
                   </div>
@@ -705,7 +707,7 @@ export default function NudgePage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr style={{ backgroundColor: ZATCA_BLUE }}>
+                      <tr style={{ backgroundColor: theme.sidebarBg }}>
                         {[t.colSegment, t.colArchetype, t.colPop, t.colRisk, t.colBarrier, t.colReceptiveness, t.colChannel, t.colTiming].map(h => (
                           <th key={h} className="px-3 py-3 text-[11px] font-semibold text-white/80 whitespace-nowrap">{h}</th>
                         ))}
@@ -800,7 +802,7 @@ export default function NudgePage() {
                         const lever = report.levers.find(l => l.id === id);
                         return (
                           <li key={i} className="flex items-center gap-2 text-sm text-gray-700">
-                            <span className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 text-white" style={{ backgroundColor: ZATCA_ACCENT }}>{i + 1}</span>
+                            <span className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 text-white" style={{ backgroundColor: theme.primary }}>{i + 1}</span>
                             <span>{lever ? `${id} — ${lever.name}` : id}</span>
                           </li>
                         );
@@ -843,7 +845,7 @@ export default function NudgePage() {
                 <button
                   onClick={() => generateNudgeExcel(report)}
                   className="flex items-center gap-2 px-6 py-3 rounded-lg text-white font-semibold text-sm hover:opacity-90 active:scale-95 transition-all shadow-md"
-                  style={{ backgroundColor: ZATCA_GREEN }}
+                  style={{ backgroundColor: theme.accent }}
                   data-testid="button-download-nudge-report"
                 >
                   <Download className="w-4 h-4" />
@@ -884,7 +886,7 @@ export default function NudgePage() {
                     onClick={handleAnalyse}
                     disabled={!scenario.trim()}
                     className="flex items-center gap-2 px-5 py-3 rounded-xl text-white text-sm font-semibold disabled:opacity-50 transition-all hover:opacity-90 active:scale-95 flex-shrink-0"
-                    style={{ backgroundColor: ZATCA_ACCENT }}
+                    style={{ backgroundColor: theme.primary }}
                     data-testid="button-analyse"
                   >
                     <Zap className="w-4 h-4" />

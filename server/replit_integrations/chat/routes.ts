@@ -1,6 +1,17 @@
 import type { Express, Request, Response } from "express";
 import { aiComplete, aiStream } from "../../ai-provider";
 import { initPrompts, getPrompt, getAllPrompts, updatePrompt, resetPromptToDefault } from "./prompts";
+import {
+  getEntities, getEntity, createEntity, updateEntity, deleteEntity,
+  getAllPromptsForEntity, getPromptForEntity, updateEntityPrompt, resetEntityPrompt,
+  getEntityPageVisibility, setEntityPageVisibility, bulkSetEntityPageVisibility,
+  exportEntityData, importEntityData, seedEntities,
+  type PromptExport,
+} from "./entities";
+import {
+  getUsers, getUser, createUser, updateUser, deleteUser,
+  setUserEntities, authenticateUser, seedAdminUser,
+} from "./users";
 import { chatStorage } from "./storage";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -97,8 +108,20 @@ If one or more reference documents have been provided at the start of this conve
 </reference_document_rule>
 `;
 
-function buildSystemPrompt(featurePrompt: string): string {
-  return getPrompt("zatca_base").trim() + "\n\n---\n\n" + featurePrompt.trim();
+async function buildSystemPrompt(featurePrompt: string, entityId?: number | null): Promise<string> {
+  const base = entityId
+    ? await getPromptForEntity(entityId, "zatca_base")
+    : getPrompt("zatca_base");
+  return base.trim() + "\n\n---\n\n" + featurePrompt.trim();
+}
+
+function resolveEntityId(req: Request): number | null {
+  const raw = req.body?.entityId ?? req.query.entityId ?? req.headers["x-entity-id"];
+  return raw ? parseInt(String(raw), 10) : null;
+}
+
+async function resolvePrompt(key: string, entityId: number | null): Promise<string> {
+  return entityId ? await getPromptForEntity(entityId, key) : getPrompt(key);
 }
 
 const SYSTEM_PROMPT = `You are the "ZATCA Data Owner Agent", an expert AI assistant specialized in data governance, data management, and data strategy for ZATCA (Zakat, Tax and Customs Authority). You help data owners, data stewards, and data governance professionals with their daily tasks.
@@ -603,7 +626,7 @@ function isBusinessDefRequest(message: string): boolean {
  */
 async function detectIntentViaSupervisor(message: string): Promise<string | null> {
   try {
-    const ragflowBaseUrl = (process.env.RAGFLOW_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+    const ragflowBaseUrl = (process.env.RAGFLOW_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
     const ragflowApiKey = process.env.RAGFLOW_API_KEY || "";
 
     const response = await fetch(`${ragflowBaseUrl}/ragclient/agent/run`, {
@@ -1860,14 +1883,321 @@ Return this exact structure:
     },
   ]);
 
-  // ── System Prompts API ───────────────────────────────────────────────────────
+  // Seed default entities
+  await seedEntities();
+  await seedAdminUser();
+
+  // ── Entity API ──────────────────────────────────────────────────────────────
+
+  app.get("/api/entities", async (_req: Request, res: Response) => {
+    try {
+      const list = await getEntities();
+      res.json(list);
+    } catch (err) {
+      console.error("Error fetching entities:", err);
+      res.status(500).json({ error: "Failed to fetch entities" });
+    }
+  });
+
+  app.post("/api/entities", async (req: Request, res: Response) => {
+    try {
+      const { slug, name } = req.body as { slug?: string; name?: string };
+      if (!slug || !name) return res.status(400).json({ error: "slug and name are required" });
+      const entity = await createEntity(slug.toLowerCase().trim(), name.trim());
+      res.status(201).json(entity);
+    } catch (err: any) {
+      if (err.message?.includes("unique") || err.code === "23505") {
+        return res.status(409).json({ error: "Entity slug already exists" });
+      }
+      console.error("Error creating entity:", err);
+      res.status(500).json({ error: "Failed to create entity" });
+    }
+  });
+
+  app.put("/api/entities/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const { name, isActive } = req.body as { name?: string; isActive?: boolean };
+      const entity = await updateEntity(id, { name, isActive });
+      res.json(entity);
+    } catch (err) {
+      console.error("Error updating entity:", err);
+      res.status(500).json({ error: "Failed to update entity" });
+    }
+  });
+
+  app.delete("/api/entities/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      await deleteEntity(id);
+      res.status(204).send();
+    } catch (err) {
+      console.error("Error deleting entity:", err);
+      res.status(500).json({ error: "Failed to delete entity" });
+    }
+  });
+
+  // ── Entity Prompts API ──────────────────────────────────────────────────────
+
+  app.get("/api/entities/:id/prompts", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const prompts = await getAllPromptsForEntity(id);
+      res.json(prompts);
+    } catch (err) {
+      console.error("Error fetching entity prompts:", err);
+      res.status(500).json({ error: "Failed to fetch entity prompts" });
+    }
+  });
+
+  app.put("/api/entities/:id/prompts/:key", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const key = req.params.key as string;
+      const { content } = req.body as { content?: string };
+      if (typeof content !== "string" || content.trim() === "") {
+        return res.status(400).json({ error: "content is required" });
+      }
+      await updateEntityPrompt(id, key, content);
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("Error updating entity prompt:", err);
+      return res.status(500).json({ error: "Failed to update entity prompt" });
+    }
+  });
+
+  app.post("/api/entities/:id/prompts/:key/reset", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const key = req.params.key as string;
+      await resetEntityPrompt(id, key);
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("Error resetting entity prompt:", err);
+      return res.status(500).json({ error: "Failed to reset entity prompt" });
+    }
+  });
+
+  app.post("/api/entities/:id/prompts/export", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const data = await exportEntityData(id);
+      res.json(data);
+    } catch (err) {
+      console.error("Error exporting entity data:", err);
+      res.status(500).json({ error: "Failed to export entity data" });
+    }
+  });
+
+  app.post("/api/entities/:id/prompts/import", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const data = req.body as PromptExport;
+      if (!data || !data.prompts) {
+        return res.status(400).json({ error: "Invalid import data" });
+      }
+      const result = await importEntityData(id, data);
+      return res.json({ ok: true, ...result });
+    } catch (err) {
+      console.error("Error importing entity data:", err);
+      return res.status(500).json({ error: "Failed to import entity data" });
+    }
+  });
+
+  // ── Entity Page Visibility API ──────────────────────────────────────────────
+
+  app.get("/api/entities/:id/page-visibility", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const visibility = await getEntityPageVisibility(id);
+      res.json(visibility);
+    } catch (err) {
+      console.error("Error fetching page visibility:", err);
+      res.status(500).json({ error: "Failed to fetch page visibility" });
+    }
+  });
+
+  app.put("/api/entities/:id/page-visibility", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const pages = req.body as Record<string, boolean>;
+      await bulkSetEntityPageVisibility(id, pages);
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Error updating page visibility:", err);
+      res.status(500).json({ error: "Failed to update page visibility" });
+    }
+  });
+
+  app.put("/api/entities/:id/page-visibility/:pageKey", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const pageKey = req.params.pageKey as string;
+      const { visible } = req.body as { visible?: boolean };
+      if (typeof visible !== "boolean") {
+        return res.status(400).json({ error: "visible (boolean) is required" });
+      }
+      await setEntityPageVisibility(id, pageKey, visible);
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("Error updating page visibility:", err);
+      return res.status(500).json({ error: "Failed to update page visibility" });
+    }
+  });
+
+  // ── Entity Branding API ──────────────────────────────────────────────────────
+
+  app.put("/api/entities/:id/branding", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const { logoBase64, appTitle, colorSidebar, colorPrimary, colorSecondary, colorAccent, logoInvert } = req.body as {
+        logoBase64?: string | null;
+        appTitle?: string | null;
+        colorSidebar?: string | null;
+        colorPrimary?: string | null;
+        colorSecondary?: string | null;
+        colorAccent?: string | null;
+        logoInvert?: boolean | null;
+      };
+      const hexRegex = /^#[0-9A-Fa-f]{6}$/;
+      for (const [name, val] of Object.entries({ colorSidebar, colorPrimary, colorSecondary, colorAccent })) {
+        if (val && !hexRegex.test(val)) {
+          return res.status(400).json({ error: `Invalid hex color for ${name}: ${val}` });
+        }
+      }
+      if (logoBase64 && logoBase64.length > 500000) {
+        return res.status(400).json({ error: "Logo too large (max ~375KB)" });
+      }
+      const entity = await updateEntity(id, { logoBase64, appTitle, colorSidebar, colorPrimary, colorSecondary, colorAccent, logoInvert });
+      return res.json(entity);
+    } catch (err) {
+      console.error("Error updating entity branding:", err);
+      return res.status(500).json({ error: "Failed to update branding" });
+    }
+  });
+
+  // ── Users API ────────────────────────────────────────────────────────────────
+
+  app.get("/api/users", async (_req: Request, res: Response) => {
+    try {
+      const list = await getUsers();
+      res.json(list.map((u) => ({ ...u, passwordHash: undefined })));
+    } catch (err) {
+      console.error("Error fetching users:", err);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/users", async (req: Request, res: Response) => {
+    try {
+      const { name, email, password, entityIds } = req.body as {
+        name?: string; email?: string; password?: string; entityIds?: number[];
+      };
+      if (!name || !email || !password) {
+        return res.status(400).json({ error: "name, email, and password are required" });
+      }
+      const user = await createUser(name, email, password, entityIds || []);
+      return res.status(201).json({ ...user, passwordHash: undefined });
+    } catch (err: any) {
+      if (err.message?.includes("unique") || err.code === "23505") {
+        return res.status(409).json({ error: "Email already exists" });
+      }
+      console.error("Error creating user:", err);
+      return res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  app.put("/api/users/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const { name, email, isActive, password } = req.body as {
+        name?: string; email?: string; isActive?: boolean; password?: string;
+      };
+      const user = await updateUser(id, { name, email, isActive, password });
+      res.json({ ...user, passwordHash: undefined });
+    } catch (err: any) {
+      if (err.message?.includes("unique") || err.code === "23505") {
+        return res.status(409).json({ error: "Email already exists" });
+      }
+      console.error("Error updating user:", err);
+      return res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/users/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      await deleteUser(id);
+      res.status(204).send();
+    } catch (err) {
+      console.error("Error deleting user:", err);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  app.put("/api/users/:id/entities", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const { entityIds } = req.body as { entityIds?: number[] };
+      if (!Array.isArray(entityIds)) {
+        return res.status(400).json({ error: "entityIds array is required" });
+      }
+      await setUserEntities(id, entityIds);
+      const user = await getUser(id);
+      return res.json(user ? { ...user, passwordHash: undefined } : {});
+    } catch (err) {
+      console.error("Error updating user entities:", err);
+      return res.status(500).json({ error: "Failed to update user entities" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body as { email?: string; password?: string };
+      if (!email || !password) {
+        return res.status(400).json({ error: "email and password are required" });
+      }
+      const user = await authenticateUser(email, password);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+      return res.json({ ok: true, user: { id: user.id, name: user.name, email: user.email } });
+    } catch (err) {
+      console.error("Error during login:", err);
+      return res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    try {
+      const { email, newPassword } = req.body as { email?: string; newPassword?: string };
+      if (!email || !newPassword) {
+        return res.status(400).json({ error: "email and newPassword are required" });
+      }
+      if (newPassword.length < 4) {
+        return res.status(400).json({ error: "Password must be at least 4 characters" });
+      }
+      const { getUserByEmail, updateUser: updateUserFn } = await import("./users");
+      const user = await getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "No account found with this email" });
+      }
+      await updateUserFn(user.id, { password: newPassword });
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("Error resetting password:", err);
+      return res.status(500).json({ error: "Password reset failed" });
+    }
+  });
+
+  // ── System Prompts API (global defaults) ────────────────────────────────────
   app.get("/api/system-prompts", (_req: Request, res: Response) => {
     res.json(getAllPrompts());
   });
 
   app.put("/api/system-prompts/:key", async (req: Request, res: Response) => {
     try {
-      const { key } = req.params;
+      const key = req.params.key as string;
       const { content } = req.body as { content?: string };
       if (typeof content !== "string" || content.trim() === "") {
         return res.status(400).json({ error: "content is required" });
@@ -1882,7 +2212,7 @@ Return this exact structure:
 
   app.post("/api/system-prompts/:key/reset", async (req: Request, res: Response) => {
     try {
-      const { key } = req.params;
+      const key = req.params.key as string;
       await resetPromptToDefault(key);
       return res.json({ ok: true });
     } catch (err) {
@@ -1906,7 +2236,7 @@ Return this exact structure:
 
   app.get("/api/conversations/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       const conversation = await chatStorage.getConversation(id);
       if (!conversation) {
         return res.status(404).json({ error: "Conversation not found" });
@@ -1947,7 +2277,7 @@ Return this exact structure:
 
   app.patch("/api/conversations/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       const { title } = req.body;
       if (!title?.trim()) return res.status(400).json({ error: "Title required" });
       await chatStorage.updateConversationTitle(id, title.trim());
@@ -1960,7 +2290,7 @@ Return this exact structure:
 
   app.delete("/api/conversations/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id as string);
       await chatStorage.deleteConversation(id);
       res.status(204).send();
     } catch (error) {
@@ -1971,10 +2301,11 @@ Return this exact structure:
 
   app.post("/api/conversations/:id/messages", upload.single("file"), async (req: Request, res: Response) => {
     try {
-      const conversationId = parseInt(req.params.id);
+      const conversationId = parseInt(req.params.id as string);
       let userContent = req.body.content || "";
       const requestProvider = (req.body.aiProvider as "claude" | "local" | undefined) ?? undefined;
       const requestAgentMode = (req.body.agentMode as string | undefined) ?? undefined;
+      const entityId = resolveEntityId(req);
       let extractedFieldNames: string[] = [];
       let extractedRowCount = 0;
       let insightsMode = false;
@@ -2240,7 +2571,7 @@ Return this exact structure:
         const part1Text = await aiComplete({
           max_tokens: 16000,
           temperature: 0,
-          system: buildSystemPrompt(getPrompt("dq_dimensions")),
+          system: await buildSystemPrompt(await resolvePrompt("dq_dimensions", entityId), entityId),
           messages: chatMessages,
           provider: requestProvider,
           ragflowAgent: "dq-rules-generator",
@@ -2254,7 +2585,7 @@ Return this exact structure:
         const part2Text = await aiComplete({
           max_tokens: 16000,
           temperature: 0,
-          system: buildSystemPrompt(getPrompt("dq_business_logic")),
+          system: await buildSystemPrompt(await resolvePrompt("dq_business_logic", entityId), entityId),
           messages: chatMessages,
           provider: requestProvider,
           ragflowAgent: "dq-rules-generator",
@@ -2280,14 +2611,15 @@ Return this exact structure:
           fullResponse += chunk;
         }
       } else {
-        const systemPrompt =
-          insightsMode    ? getPrompt("insights") :
-          informaticaMode ? getPrompt("informatica") :
-          detectedIntent === "classification"        ? getPrompt("classification") :
-          detectedIntent === "business_definitions"  ? getPrompt("business_definitions") :
-          detectedIntent === "pii"                   ? getPrompt("pii_detection") :
-          detectedIntent === "dq_rules"              ? getPrompt("dq_dimensions") :
-          getPrompt("main");
+        const promptKey =
+          insightsMode    ? "insights" :
+          informaticaMode ? "informatica" :
+          detectedIntent === "classification"        ? "classification" :
+          detectedIntent === "business_definitions"  ? "business_definitions" :
+          detectedIntent === "pii"                   ? "pii_detection" :
+          detectedIntent === "dq_rules"              ? "dq_dimensions" :
+          "main";
+        const systemPrompt = await resolvePrompt(promptKey, entityId);
 
         if (imageContent) {
           const lastMsg = chatMessages[chatMessages.length - 1];
@@ -2312,7 +2644,7 @@ Return this exact structure:
         for await (const content of aiStream({
           max_tokens: 16000,
           temperature: 0,
-          system: buildSystemPrompt(systemPrompt),
+          system: await buildSystemPrompt(systemPrompt, entityId),
           messages: chatMessages,
           provider: requestProvider,
           ragflowAgent:
@@ -2350,6 +2682,7 @@ Return this exact structure:
 
   app.post("/api/nudge", async (req: Request, res: Response) => {
     try {
+      const nudgeEntityId = resolveEntityId(req);
       const { scenario, followUpQuestion, previousJson } = req.body as {
         scenario?: string;
         followUpQuestion?: string;
@@ -2366,7 +2699,7 @@ Return this exact structure:
         const followUpText = await aiComplete({
           max_tokens: 2000,
           temperature: 0,
-          system: buildSystemPrompt(getPrompt("nudge")),
+          system: await buildSystemPrompt(await resolvePrompt("nudge", nudgeEntityId), nudgeEntityId),
           messages: followUpMessages,
         });
         return res.json({ ok: true, followUp: followUpText });
@@ -2386,7 +2719,7 @@ Return this exact structure:
       const rawText = await aiComplete({
         max_tokens: 8000,
         temperature: 0,
-        system: buildSystemPrompt(getPrompt("nudge")),
+        system: await buildSystemPrompt(await resolvePrompt("nudge", nudgeEntityId), nudgeEntityId),
         messages,
       });
 
@@ -2408,6 +2741,7 @@ Return this exact structure:
 
   app.post("/api/sharing-eligibility", async (req: Request, res: Response) => {
     try {
+      const seEntityId = resolveEntityId(req);
       const { fields, sampleRows } = req.body as {
         fields?: string[];
         sampleRows?: Record<string, unknown>[];
@@ -2476,7 +2810,7 @@ Respond with ONLY valid JSON matching this exact schema:
       const rawText = await aiComplete({
         max_tokens: 4000,
         temperature: 0,
-        system: buildSystemPrompt(getPrompt("sharing_eligibility")),
+        system: await buildSystemPrompt(await resolvePrompt("sharing_eligibility", seEntityId), seEntityId),
         messages: [{ role: "user" as const, content: sharingPrompt }],
       });
 
@@ -2500,6 +2834,7 @@ Respond with ONLY valid JSON matching this exact schema:
 
   app.post("/api/bi/sharing-eligibility", async (req: Request, res: Response) => {
     try {
+      const biSeEntityId = resolveEntityId(req);
       const { fields, sampleRows, stakeholder } = req.body as {
         fields?: string[];
         sampleRows?: Record<string, unknown>[];
@@ -2585,7 +2920,7 @@ Overall verdict: CLEARED / CLEARED WITH CONDITIONS / CLEARED AFTER REMEDIATION /
       const rawText = await aiComplete({
         max_tokens: 8000,
         temperature: 0,
-        system: buildSystemPrompt(getPrompt("bi_sharing_eligibility")),
+        system: await buildSystemPrompt(await resolvePrompt("bi_sharing_eligibility", biSeEntityId), biSeEntityId),
         messages: [{ role: "user" as const, content: userMsg }],
       });
       const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
@@ -2605,6 +2940,7 @@ Overall verdict: CLEARED / CLEARED WITH CONDITIONS / CLEARED AFTER REMEDIATION /
 
   app.post("/api/bi/dashboard-designer", async (req: Request, res: Response) => {
     try {
+      const biDdEntityId = resolveEntityId(req);
       const { fields, sampleRows, businessQuestion, audience, dashboardType } = req.body as {
         fields?: string[];
         sampleRows?: Record<string, unknown>[];
@@ -2718,7 +3054,7 @@ Design a complete Power BI dashboard with the following:
       const rawText = await aiComplete({
         max_tokens: 8000,
         temperature: 0,
-        system: buildSystemPrompt(getPrompt("bi_dashboard_designer")),
+        system: await buildSystemPrompt(await resolvePrompt("bi_dashboard_designer", biDdEntityId), biDdEntityId),
         messages: [{ role: "user" as const, content: userMsg }],
       });
       const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
@@ -2738,6 +3074,7 @@ Design a complete Power BI dashboard with the following:
 
   app.post("/api/bi/report-tester", async (req: Request, res: Response) => {
     try {
+      const biRtEntityId = resolveEntityId(req);
       const { fields, sampleRows, stakeholder, reportPurpose, reportFormat } = req.body as {
         fields?: string[];
         sampleRows?: Record<string, unknown>[];
@@ -2859,7 +3196,7 @@ DIMENSION 4 — PRESENTATION QUALITY
       const rawText = await aiComplete({
         max_tokens: 8000,
         temperature: 0,
-        system: buildSystemPrompt(getPrompt("bi_report_tester")),
+        system: await buildSystemPrompt(await resolvePrompt("bi_report_tester", biRtEntityId), biRtEntityId),
         messages: [{ role: "user" as const, content: userMsg }],
       });
       const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
@@ -2879,6 +3216,7 @@ DIMENSION 4 — PRESENTATION QUALITY
 
   app.post("/api/bi/test-case-generator", async (req: Request, res: Response) => {
     try {
+      const biTcEntityId = resolveEntityId(req);
       const { fields, sampleRows, reportPurpose, testDepth, testCategories } = req.body as {
         fields?: string[];
         sampleRows?: Record<string, unknown>[];
@@ -2987,7 +3325,7 @@ FORMATTING: Are dates in DD/MM/YYYY format? Are currency values showing SAR symb
       const rawText = await aiComplete({
         max_tokens: 8000,
         temperature: 0,
-        system: buildSystemPrompt(getPrompt("bi_test_case_generator")),
+        system: await buildSystemPrompt(await resolvePrompt("bi_test_case_generator", biTcEntityId), biTcEntityId),
         messages: [{ role: "user" as const, content: userMsg }],
       });
       const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
@@ -3007,6 +3345,7 @@ FORMATTING: Are dates in DD/MM/YYYY format? Are currency values showing SAR symb
 
   app.post("/api/bi/dashboard-tester", async (req: Request, res: Response) => {
     try {
+      const biDtEntityId = resolveEntityId(req);
       const { fields, sampleRows, dashboardDescription, visualsList, audience, testDepth } = req.body as {
         fields?: string[];
         sampleRows?: Record<string, unknown>[];
@@ -3108,7 +3447,7 @@ Each test case must reference the actual fields and visuals described by the ana
       const rawText = await aiComplete({
         max_tokens: 8000,
         temperature: 0,
-        system: buildSystemPrompt(getPrompt("bi_dashboard_tester")),
+        system: await buildSystemPrompt(await resolvePrompt("bi_dashboard_tester", biDtEntityId), biDtEntityId),
         messages: [{ role: "user" as const, content: userMsg }],
       });
       const cleaned = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
