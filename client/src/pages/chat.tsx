@@ -2224,8 +2224,10 @@ export default function ChatPage() {
     let accumulatedRows: ResultRow[] = [];
     const accumulatedAnalyses = new Set<AnalysisType>();
     let restoredFileName: string | null = null;
+    let lastUserContent: string | null = null;
     for (const msg of activeConversation.messages) {
       if (msg.role === "user") {
+        lastUserContent = msg.content.replace(/\n\nUploaded:.*$/, "").replace(/\n\n--- Pasted Data ---[\s\S]*$/, "").trim();
         const uploadMatch = msg.content.match(/Uploaded:\s*(.+)/);
         if (uploadMatch) restoredFileName = uploadMatch[1].trim();
         continue;
@@ -2324,6 +2326,9 @@ export default function ChatPage() {
     }
     if (restoredFileName) {
       setUploadedFileName(restoredFileName);
+    }
+    if (lastUserContent) {
+      lastRequestRef.current = { content: lastUserContent };
     }
     if (Object.keys(modelMap).length > 0) {
       setDataModels(prev => ({ ...prev, ...modelMap }));
