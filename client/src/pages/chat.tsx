@@ -1777,46 +1777,39 @@ function SidebarContent({
       data-testid="sidebar"
     >
       <div className="p-4 pb-3">
-        <div className="flex items-center gap-3 mb-2">
-          <img src={theme.logo} alt="Logo" className={`h-7 flex-shrink-0 ${theme.logoInvert ? "brightness-0 invert" : ""}`} />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex-1" />
           <Button
             size="icon"
             variant="ghost"
             onClick={onCollapse}
-            className="h-7 w-7 flex-shrink-0 text-white/60 hover:text-white hover:bg-white/10"
+            className="h-7 w-7 flex-shrink-0 text-white/40 hover:text-white hover:bg-white/10"
             data-testid="button-collapse-sidebar"
           >
             <PanelLeftClose className="w-4 h-4" />
           </Button>
         </div>
-        <div className="mb-3">
-          <h1 className="text-white font-bold text-sm" data-testid="text-app-title">{theme.appTitle}</h1>
+        <div className="flex flex-col items-center mb-4">
+          <img
+            src={theme.logo}
+            alt="Logo"
+            className={`h-14 mb-3 ${theme.logoInvert ? "brightness-0 invert" : ""}`}
+            style={{ filter: theme.logoInvert ? undefined : "brightness(0) invert(1)" }}
+          />
+          <h1 className="text-white font-bold text-sm text-center" data-testid="text-app-title">{theme.appTitle}</h1>
         </div>
-        <div
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium ${statusConfig.pulse ? "animate-pulse-status" : ""}`}
-          style={{ backgroundColor: statusConfig.bg + "30", color: statusConfig.text }}
-          data-testid="status-agent"
-        >
-          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusConfig.bg }} />
-          {statusLabel}
+        <div className="flex justify-center">
+          <div
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium ${statusConfig.pulse ? "animate-pulse-status" : ""}`}
+            style={{ backgroundColor: statusConfig.bg + "30", color: statusConfig.text }}
+            data-testid="status-agent"
+          >
+            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusConfig.bg }} />
+            {statusLabel}
+          </div>
         </div>
       </div>
       <div className="border-t border-white/10" />
-
-      <div className="px-3 pt-3 pb-2 border-b border-white/10">
-        <div className="mb-2">
-          <p className="text-[9px] text-white/40 uppercase tracking-wide mb-1">{t.aiProviderLabel}</p>
-          <select
-            value={aiProvider}
-            onChange={(e) => onAiProviderChange(e.target.value as "claude" | "local")}
-            className="w-full text-[11px] py-1 px-2 rounded border border-white/20 bg-white/10 text-white/80 focus:outline-none focus:border-white/40 cursor-pointer"
-            data-testid="select-ai-provider"
-          >
-            <option value="claude" className="bg-[#1a1a2e] text-white">{t.aiProviderClaude}</option>
-            <option value="local" className="bg-[#1a1a2e] text-white">{t.aiProviderLocal}</option>
-          </select>
-        </div>
-      </div>
 
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-0.5">
@@ -3551,16 +3544,6 @@ export default function ChatPage() {
             <Settings className="w-3.5 h-3.5" />
             {lang === "ar" ? "الإعدادات" : "Settings"}
           </Link>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 px-2.5 gap-1.5 text-[11px] font-medium flex-shrink-0"
-            onClick={() => setLang(lang === "en" ? "ar" : "en")}
-            data-testid="button-lang-toggle"
-          >
-            <Globe className="w-3.5 h-3.5" />
-            {lang === "en" ? "EN" : "AR"}
-          </Button>
           <Button
             size="sm"
             variant="ghost"

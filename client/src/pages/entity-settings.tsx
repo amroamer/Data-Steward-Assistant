@@ -24,7 +24,7 @@ interface EntityPrompt {
   isOverridden: boolean;
 }
 
-type Section = "entities" | "users";
+type Section = "entities" | "users" | "general";
 type Tab = "prompts" | "pages" | "branding";
 
 interface UserRecord {
@@ -426,6 +426,14 @@ export default function EntitySettingsPage() {
             }`}
           >
             <Users className="w-3.5 h-3.5 inline mr-1" /> Users
+          </button>
+          <button
+            onClick={() => setSection("general")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              section === "general" ? "bg-blue-50 text-blue-700" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            <Settings2 className="w-3.5 h-3.5 inline mr-1" /> General
           </button>
         </div>
         {section === "entities" && selectedEntity && (
@@ -1114,6 +1122,82 @@ export default function EntitySettingsPage() {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {section === "general" && (
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-2xl space-y-8">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900 mb-1">General Settings</h2>
+                <p className="text-xs text-gray-500">Configure AI provider and language preferences</p>
+              </div>
+
+              {/* AI Provider */}
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <h3 className="text-sm font-semibold text-gray-800 mb-3">AI Provider</h3>
+                <p className="text-xs text-gray-500 mb-4">Choose which AI backend to use for processing requests.</p>
+                <div className="flex gap-3">
+                  {[
+                    { value: "local", label: "Local (RAGFlow)", desc: "Uses the local RAGFlow agents" },
+                    { value: "claude", label: "Claude (Anthropic)", desc: "Uses Anthropic Claude API" },
+                  ].map((opt) => {
+                    const selected = (sessionStorage.getItem("ai-provider") || "local") === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          sessionStorage.setItem("ai-provider", opt.value);
+                          window.location.reload();
+                        }}
+                        className={`flex-1 p-4 rounded-lg border-2 text-left transition-all ${
+                          selected
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <span className={`text-sm font-semibold ${selected ? "text-blue-700" : "text-gray-700"}`}>
+                          {opt.label}
+                        </span>
+                        <p className="text-[11px] text-gray-500 mt-1">{opt.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Language */}
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <h3 className="text-sm font-semibold text-gray-800 mb-3">Language</h3>
+                <p className="text-xs text-gray-500 mb-4">Choose the interface language.</p>
+                <div className="flex gap-3">
+                  {[
+                    { value: "en", label: "English", flag: "EN" },
+                    { value: "ar", label: "Arabic", flag: "AR" },
+                  ].map((opt) => {
+                    const selected = (localStorage.getItem("zatca-lang") || "en") === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          localStorage.setItem("zatca-lang", opt.value);
+                          window.location.reload();
+                        }}
+                        className={`flex-1 p-4 rounded-lg border-2 text-left transition-all ${
+                          selected
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <span className={`text-sm font-semibold ${selected ? "text-blue-700" : "text-gray-700"}`}>
+                          {opt.flag} — {opt.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         )}
