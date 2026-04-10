@@ -520,6 +520,11 @@ const translations = {
     agentInsightsDesc: "Generate data insights reports from uploaded data",
     agentDataMgmt: "Data Management",
     agentDataMgmtDesc: "Classify, define, quality rules & PII detection",
+    tabDataClassification: "Data Classification",
+    tabBusinessDefs: "Business Definitions",
+    tabDqRules: "Data Quality Rules",
+    tabPiiDetection: "PII Detection",
+    tabInformatica: "Informatica Output",
     agentDataModel: "Analytical Model",
     agentDataModelDesc: "Design star schema & generate DDL scripts",
     previewFile: "Preview file",
@@ -825,6 +830,11 @@ const translations = {
     agentInsightsDesc: "إنشاء تقارير رؤى البيانات من الملفات المحملة",
     agentDataMgmt: "إدارة البيانات",
     agentDataMgmtDesc: "تصنيف، تعريف، قواعد الجودة وكشف البيانات الشخصية",
+    tabDataClassification: "تصنيف البيانات",
+    tabBusinessDefs: "تعريفات الأعمال",
+    tabDqRules: "قواعد جودة البيانات",
+    tabPiiDetection: "كشف البيانات الشخصية",
+    tabInformatica: "مخرجات إنفورماتيكا",
     agentDataModel: "النموذج التحليلي",
     agentDataModelDesc: "تصميم مخطط نجمي وإنشاء سكريبتات DDL",
     previewFile: "معاينة الملف",
@@ -3622,11 +3632,11 @@ export default function ChatPage() {
         {isDmSubMode(agentMode) && (
           <div className="flex items-center gap-1 px-4 py-1.5 border-b flex-shrink-0" style={{ borderColor: "#E5E7EB", backgroundColor: "#F8FAFC" }} data-testid="dm-sub-tabs">
             {([
-              { id: "data-classification" as AgentMode, icon: ShieldCheck, label: t.cardDataClassification || "Data Classification", color: "#067647" },
-              { id: "business-definitions" as AgentMode, icon: BookOpen, label: t.cardBusinessDefs || "Business Definitions", color: "#51BAB4" },
-              { id: "dq-rules" as AgentMode, icon: CheckCircle, label: t.cardDataQuality || "DQ Rules", color: "#774896" },
-              { id: "pii-detection" as AgentMode, icon: ScanEye, label: t.cardPiiDetection || "PII Detection", color: "#E53935" },
-              { id: "informatica" as AgentMode, icon: Cpu, label: t.cardInformatica || "Informatica", color: "#F57C00" },
+              { id: "data-classification" as AgentMode, icon: ShieldCheck, label: t.tabDataClassification || "Data Classification", color: "#067647" },
+              { id: "business-definitions" as AgentMode, icon: BookOpen, label: t.tabBusinessDefs || "Business Definitions", color: "#51BAB4" },
+              { id: "dq-rules" as AgentMode, icon: CheckCircle, label: t.tabDqRules || "Data Quality Rules", color: "#774896" },
+              { id: "pii-detection" as AgentMode, icon: ScanEye, label: t.tabPiiDetection || "PII Detection", color: "#E53935" },
+              { id: "informatica" as AgentMode, icon: Cpu, label: t.tabInformatica || "Informatica Output", color: "#F57C00" },
             ]).filter(sub => pageVisibility[sub.id as keyof PageVisibility] !== false).map(sub => (
               <button
                 key={sub.id}
