@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorPopup } from "@/components/error-popup";
 import { EntityProvider } from "@/context/entity-context";
+import { ThemeProvider } from "@/context/theme-context";
 import ChatPage from "@/pages/chat";
 import UseCasesPage from "@/pages/use-cases";
 import UserGuidePage from "@/pages/user-guide";
@@ -61,6 +62,7 @@ function App() {
   }, []);
 
   return (
+    <ThemeProvider>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <EntityProvider>
@@ -76,6 +78,7 @@ function App() {
         </EntityProvider>
       </TooltipProvider>
     </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

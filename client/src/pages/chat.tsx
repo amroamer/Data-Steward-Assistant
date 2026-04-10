@@ -84,6 +84,8 @@ import {
   RotateCcw,
   Code,
   GitBranch,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -149,6 +151,7 @@ import {
   generateInsightsExcel,
 } from "@/lib/insights-store";
 import { useBranding, type BrandTheme } from "@/hooks/use-branding";
+import { useTheme } from "@/context/theme-context";
 import * as XLSX from "xlsx";
 import {
   Panel,
@@ -1773,7 +1776,7 @@ function SidebarContent({
   return (
     <div
       className="h-full flex flex-col font-main"
-      style={{ backgroundColor: theme.sidebarBg }}
+      style={{ backgroundColor: "var(--bg-sidebar)" }}
       data-testid="sidebar"
     >
       <div className="p-4 pb-3">
@@ -1860,11 +1863,11 @@ function SidebarContent({
                   <div
                     className="group flex items-center gap-1 rounded-md px-2 py-2 cursor-pointer text-sm transition-colors"
                     style={{
-                      backgroundColor: activeConversationId === conv.id ? theme.secondary : "transparent",
+                      backgroundColor: activeConversationId === conv.id ? "var(--accent-blue)" : "transparent",
                       color: activeConversationId === conv.id ? "#ffffff" : "rgba(255,255,255,0.6)",
                     }}
                     onClick={() => editingConvId !== conv.id && setActiveConversationId(conv.id)}
-                    onMouseEnter={(e) => { if (activeConversationId !== conv.id) e.currentTarget.style.backgroundColor = theme.secondary + "50"; }}
+                    onMouseEnter={(e) => { if (activeConversationId !== conv.id) e.currentTarget.style.backgroundColor = "var(--accent-blue)" + "50"; }}
                     onMouseLeave={(e) => { if (activeConversationId !== conv.id) e.currentTarget.style.backgroundColor = "transparent"; }}
                   >
                     <div className={`flex items-center gap-0.5 transition-opacity flex-shrink-0 ${activeConversationId === conv.id ? "opacity-80" : "opacity-50 group-hover:opacity-100"}`}>
@@ -1969,7 +1972,7 @@ function SidebarContent({
           onClick={handleNewChat}
           className="w-full justify-center gap-2 font-medium text-white ripple-button"
           size="sm"
-          style={{ backgroundColor: theme.primary }}
+          style={{ backgroundColor: "var(--accent-blue)" }}
           data-testid="button-new-chat"
         >
           <Plus className="w-4 h-4" />
@@ -1986,6 +1989,7 @@ export default function ChatPage() {
   const [, navigate] = useLocation();
   const { currentEntity } = useEntity();
   const theme = useBranding();
+  const { theme: colorTheme, toggleTheme } = useTheme();
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -3352,7 +3356,7 @@ export default function ChatPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>
               <span className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5" style={{ color: "#D97706" }} />
+                <AlertCircle className="w-5 h-5" style={{ color: "var(--accent-amber)" }} />
                 {lang === "ar" ? "صفحة غير صحيحة" : "Wrong Page"}
               </span>
             </AlertDialogTitle>
@@ -3374,7 +3378,7 @@ export default function ChatPage() {
                 }
                 setPageMismatch(null);
               }}
-              style={{ backgroundColor: theme.primary }}
+              style={{ backgroundColor: "var(--accent-blue)" }}
             >
               {lang === "ar" ? `انتقل إلى ${pageMismatch?.targetLabel}` : `Go to ${pageMismatch?.targetLabel}`}
             </AlertDialogAction>
@@ -3486,8 +3490,8 @@ export default function ChatPage() {
         <button
           onClick={() => setSidebarCollapsed(v => !v)}
           className="flex-shrink-0 self-center z-30 flex items-center justify-center rounded-r-md transition-colors"
-          style={{ width: 14, height: 48, backgroundColor: theme.sidebarBg, color: "rgba(255,255,255,0.7)", borderTop: `1px solid ${theme.secondary}`, borderRight: `1px solid ${theme.secondary}`, borderBottom: `1px solid ${theme.secondary}` }}
-          onMouseEnter={e => (e.currentTarget.style.backgroundColor = theme.secondary)}
+          style={{ width: 14, height: 48, backgroundColor: "var(--bg-sidebar)", color: "var(--text-secondary)", borderTop: `1px solid ${"var(--accent-blue)"}`, borderRight: `1px solid ${"var(--accent-blue)"}`, borderBottom: `1px solid ${"var(--accent-blue)"}` }}
+          onMouseEnter={e => (e.currentTarget.style.backgroundColor = "var(--accent-blue)")}
           onMouseLeave={e => (e.currentTarget.style.backgroundColor = theme.sidebarBg)}
           data-testid="button-toggle-sidebar"
           title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -3497,7 +3501,7 @@ export default function ChatPage() {
       )}
 
       <div className="flex-1 min-w-0 flex flex-col command-center-bg">
-        <div className="h-12 flex items-center gap-3 px-4 flex-shrink-0 border-b" style={{ borderColor: "#E5E7EB", backgroundColor: "#FFFFFF" }}>
+        <div className="h-12 flex items-center gap-3 px-4 flex-shrink-0 border-b" style={{ borderColor: "var(--border-default)", backgroundColor: "var(--bg-panel)" }}>
           {isMobile && (
             <Button
               size="icon"
@@ -3509,17 +3513,17 @@ export default function ChatPage() {
               <Menu className="w-4 h-4" />
             </Button>
           )}
-          <div className="flex items-center gap-2 text-xs flex-1 min-w-0" style={{ color: "#1A1A2E" }}>
-            <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: theme.primary }} />
+          <div className="flex items-center gap-2 text-xs flex-1 min-w-0" style={{ color: "var(--text-primary)" }}>
+            <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--accent-blue)" }} />
             <span className="truncate font-medium">
               {uploadedFileName ? `📁 ${uploadedFileName}` : t.noFileLoaded}
             </span>
             {sessionFieldNames && (
-              <span className="text-[10px]" style={{ color: "#6B7280" }}> — {sessionFieldNames.length} columns{sessionRowCount > 0 ? `, ${sessionRowCount} rows` : ""}</span>
+              <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}> — {sessionFieldNames.length} columns{sessionRowCount > 0 ? `, ${sessionRowCount} rows` : ""}</span>
             )}
           </div>
           {sheetCount > 0 && (
-            <div className="flex items-center gap-1.5 text-xs" style={{ color: theme.accent }}>
+            <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--accent-blue)" }}>
               <FileSpreadsheet className="w-3.5 h-3.5" />
               <span className="font-medium">📊 result.xlsx — {sheetCount} {t.sheetsInResult}</span>
             </div>
@@ -3530,7 +3534,7 @@ export default function ChatPage() {
                 size="sm"
                 variant="ghost"
                 className="h-7 text-[11px] gap-1 px-2"
-                style={{ color: "#6B7280" }}
+                style={{ color: "var(--text-secondary)" }}
                 onClick={() => collapseAll(threads)}
                 data-testid="button-collapse-all"
               >
@@ -3541,7 +3545,7 @@ export default function ChatPage() {
                 size="sm"
                 variant="ghost"
                 className="h-7 text-[11px] gap-1 px-2"
-                style={{ color: "#6B7280" }}
+                style={{ color: "var(--text-secondary)" }}
                 onClick={expandAll}
                 data-testid="button-expand-all"
               >
@@ -3553,7 +3557,7 @@ export default function ChatPage() {
           <Link
             href="/use-cases"
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
-            style={{ color: "#6B7280" }}
+            style={{ color: "var(--text-secondary)" }}
             data-testid="link-use-cases"
           >
             <LayoutGrid className="w-3.5 h-3.5" />
@@ -3562,16 +3566,25 @@ export default function ChatPage() {
           <Link
             href="/user-guide"
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
-            style={{ color: "#6B7280" }}
+            style={{ color: "var(--text-secondary)" }}
             data-testid="link-user-guide"
           >
             <BookOpen className="w-3.5 h-3.5" />
             {t.userGuide}
           </Link>
+          <button
+            onClick={toggleTheme}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium flex-shrink-0"
+            style={{ color: "var(--text-secondary)", backgroundColor: "var(--bg-card)", border: "1px solid var(--border-default)" }}
+            data-testid="button-theme-toggle"
+          >
+            {colorTheme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            {colorTheme === "dark" ? (lang === "ar" ? "فاتح" : "Light") : (lang === "ar" ? "داكن" : "Dark")}
+          </button>
           <Link
             href="/entity-settings"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-gray-100 flex-shrink-0"
-            style={{ color: "#6B7280" }}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium flex-shrink-0"
+            style={{ color: "var(--text-secondary)" }}
             data-testid="link-settings"
           >
             <Settings className="w-3.5 h-3.5" />
@@ -3600,13 +3613,13 @@ export default function ChatPage() {
         </div>
 
         {!isMobile && (
-          <div className="flex items-center gap-1 px-4 py-2 border-b flex-shrink-0 bg-white" style={{ borderColor: "#E5E7EB" }} data-testid="agent-mode-tabs">
+          <div className="flex items-center gap-1 px-4 py-2 border-b flex-shrink-0" style={{ borderColor: "var(--border-default)" }} data-testid="agent-mode-tabs">
             {([
               { id: "data-management", icon: Database, labelKey: "agentDataMgmt", descKey: "agentDataMgmtDesc", color: "#0094D3" },
               { id: "data-model", icon: Layers, labelKey: "agentDataModel", descKey: "agentDataModelDesc", color: "#774896" },
               { id: "insights", icon: Brain, labelKey: "agentInsights", descKey: "agentInsightsDesc", color: "#067647" },
               { id: "nudge", icon: Target, labelKey: "agentNudge", descKey: "agentDataMgmtDesc", color: "#7C3AED" },
-              { id: "bi", icon: BarChart3, labelKey: "biAgent", descKey: "agentDataMgmtDesc", color: theme.secondary },
+              { id: "bi", icon: BarChart3, labelKey: "biAgent", descKey: "agentDataMgmtDesc", color: "var(--accent-blue)" },
             ]).filter(tab => {
               if (tab.id === "data-management") return DM_SUB_MODES.some(m => pageVisibility[m]);
               return pageVisibility[tab.id as keyof PageVisibility] !== false;
@@ -3646,7 +3659,7 @@ export default function ChatPage() {
         )}
 
         {isDmSubMode(agentMode) && (
-          <div className="flex items-center gap-1 px-4 py-1.5 border-b flex-shrink-0" style={{ borderColor: "#E5E7EB", backgroundColor: "#F8FAFC" }} data-testid="dm-sub-tabs">
+          <div className="flex items-center gap-1 px-4 py-1.5 border-b flex-shrink-0" style={{ borderColor: "var(--border-default)", backgroundColor: "var(--bg-sidebar)" }} data-testid="dm-sub-tabs">
             {([
               { id: "data-classification" as AgentMode, icon: ShieldCheck, label: t.tabDataClassification || "Data Classification", color: "#067647" },
               { id: "business-definitions" as AgentMode, icon: BookOpen, label: t.tabBusinessDefs || "Business Definitions", color: "#51BAB4" },
@@ -3699,20 +3712,20 @@ export default function ChatPage() {
             <div className="max-w-4xl mx-auto w-full px-4 py-6">
               {!activeConversationId && messages.length === 0 && !isStreaming ? (
                 <div className="flex flex-col items-center justify-center pt-8">
-                  <h2 className="text-2xl font-bold mb-2 tracking-tight font-main" style={{ color: agentMode === "nudge" ? "#7C3AED" : agentMode === "bi" ? theme.secondary : theme.primary }} data-testid="text-hero-title">
+                  <h2 className="text-2xl font-bold mb-2 tracking-tight font-main" style={{ color: agentMode === "nudge" ? "#7C3AED" : agentMode === "bi" ? "var(--accent-blue)" : "var(--accent-blue)" }} data-testid="text-hero-title">
                     {agentMode === "nudge" ? t.nudgeHeroTitle as string : agentMode === "bi" ? t.biHeroTitle as string : t.whatToDo}
                   </h2>
-                  <p className="text-center mb-8 max-w-md text-sm leading-relaxed" style={{ color: "#6B7280" }}>
+                  <p className="text-center mb-8 max-w-md text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
                     {agentMode === "nudge" ? t.nudgeHeroDesc as string : agentMode === "bi" ? t.biHeroDesc as string : agentMode === "insights" ? t.agentInsightsDesc : agentMode === "data-model" ? t.agentDataModelDesc : DM_HERO_DESCRIPTIONS[agentMode] || t.heroDescription}
                   </p>
                   {agentMode === "nudge" && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-3xl mb-8">
                       {([
-                        { icon: Search, title: t.nudgeInfoCard1 as string, desc: t.nudgeInfoCard1Desc as string, color: theme.primary },
+                        { icon: Search, title: t.nudgeInfoCard1 as string, desc: t.nudgeInfoCard1Desc as string, color: "var(--accent-blue)" },
                         { icon: Users, title: t.nudgeInfoCard2 as string, desc: t.nudgeInfoCard2Desc as string, color: "#067647" },
                         { icon: Target, title: t.nudgeInfoCard3 as string, desc: t.nudgeInfoCard3Desc as string, color: "#7C3AED" },
                       ]).map(({ icon: Icon, title, desc, color }, i) => (
-                        <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+                        <div key={i} className="rounded-xl border p-5 shadow-sm hover:shadow-md transition-shadow">
                           <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-3" style={{ backgroundColor: color + "18" }}>
                             <Icon className="w-5 h-5" style={{ color }} />
                           </div>
@@ -3723,7 +3736,7 @@ export default function ChatPage() {
                     </div>
                   )}
                   {agentMode === "nudge" && (
-                    <div className="bg-white rounded-xl border border-gray-200 p-5 mb-8 shadow-sm w-full max-w-3xl">
+                    <div className="rounded-xl border p-5 mb-8 shadow-sm w-full max-w-3xl">
                       <p className="text-sm font-semibold text-gray-600 mb-3">{t.nudgeExamplesTitle as string}</p>
                       <ul className="space-y-1.5">
                         {(t.nudgeExamples as string[]).map((ex, i) => (
@@ -3751,7 +3764,7 @@ export default function ChatPage() {
                           <div className="text-sm text-gray-500">.xlsx · .xls · .csv</div>
                         </div>
                       ) : (
-                        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <div className="rounded-xl border p-4 shadow-sm">
                           <div className="flex items-center gap-3">
                             <span className="text-xl">📊</span>
                             <div className="flex-1 min-w-0">
@@ -3764,13 +3777,13 @@ export default function ChatPage() {
                       )}
                       <div className="hidden grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                         {([
-                          { icon: "🔍", titleKey: "biInfoCard1" as const, descKey: "biInfoCard1Desc" as const, color: theme.secondary },
-                          { icon: "📐", titleKey: "biInfoCard2" as const, descKey: "biInfoCard2Desc" as const, color: theme.accent },
+                          { icon: "🔍", titleKey: "biInfoCard1" as const, descKey: "biInfoCard1Desc" as const, color: "var(--accent-blue)" },
+                          { icon: "📐", titleKey: "biInfoCard2" as const, descKey: "biInfoCard2Desc" as const, color: "var(--accent-blue)" },
                           { icon: "🔬", titleKey: "biInfoCard3" as const, descKey: "biInfoCard3Desc" as const, color: "#E65100" },
                           { icon: "📋", titleKey: "biInfoCard4" as const, descKey: "biInfoCard4Desc" as const, color: "#774896" },
                           { icon: "🖥️", titleKey: "biInfoCard5" as const, descKey: "biInfoCard5Desc" as const, color: theme.sidebarBg },
                         ]).map(({ icon, titleKey, descKey, color }, i) => (
-                          <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                          <div key={i} className="rounded-xl border p-5 shadow-sm">
                             <div className="text-2xl mb-3">{icon}</div>
                             <h3 className="font-bold text-sm mb-1" style={{ color }}>{t[titleKey] as string}</h3>
                             <p className="text-xs text-gray-500 leading-relaxed">{t[descKey] as string}</p>
@@ -3795,17 +3808,17 @@ export default function ChatPage() {
                           textareaRef.current?.focus();
                         }}
                         className="bg-white rounded-xl p-5 text-left transition-all border hover:shadow-md animate-slide-up group"
-                        style={{ borderColor: "#E5E7EB", animationDelay: `${cardIdx * 50}ms` }}
+                        style={{ borderColor: "var(--border-default)", animationDelay: `${cardIdx * 50}ms` }}
                         data-testid={`card-feature-${card.title.toLowerCase().replace(/\s+/g, "-")}`}
                       >
                         <div className={`w-10 h-10 mb-3 rounded-lg ${card.iconBg} flex items-center justify-center`}>
                           <card.icon className={`w-5 h-5 ${card.color}`} />
                         </div>
-                        <h3 className="text-sm font-semibold mb-1" style={{ color: "#1A1A2E" }}>{t[featureCardKeys[globalIdx].titleKey] as string}</h3>
-                        <p className="text-xs leading-relaxed mb-3" style={{ color: "#6B7280" }}>
+                        <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--text-primary)" }}>{t[featureCardKeys[globalIdx].titleKey] as string}</h3>
+                        <p className="text-xs leading-relaxed mb-3" style={{ color: "var(--text-secondary)" }}>
                           {t[featureCardKeys[globalIdx].descKey] as string}
                         </p>
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium ripple-button rounded-md px-2.5 py-1" style={{ color: theme.primary, backgroundColor: theme.primary + "10" }}>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium ripple-button rounded-md px-2.5 py-1" style={{ color: "var(--accent-blue)", backgroundColor: "var(--accent-blue)" + "10" }}>
                           <Play className="w-3 h-3" />
                           {t.startBtn}
                         </span>
@@ -3869,23 +3882,23 @@ export default function ChatPage() {
                   })}
                   {wasCancelled && !isStreaming && !chatError && (
                     <div className="px-4 py-4 max-w-4xl mx-auto w-full">
-                      <div style={{ borderLeft: "4px solid #E65100", backgroundColor: "#FFF3E0", borderRadius: "8px", padding: "16px 20px" }}>
+                      <div style={{ borderLeft: "4px solid #E65100", backgroundColor: "var(--bg-card)", borderRadius: "8px", padding: "16px 20px" }}>
                         <div className="flex items-start gap-3">
                           <span style={{ color: "#E65100", fontSize: "18px", flexShrink: 0 }}>⏹</span>
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm" style={{ color: "#BF360C" }}>{t.generationStopped}</p>
-                            <p className="text-sm mt-1" style={{ color: "#6D4C41" }}>{t.stoppedMessage}</p>
+                            <p className="font-semibold text-sm" style={{ color: "var(--accent-orange)" }}>{t.generationStopped}</p>
+                            <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>{t.stoppedMessage}</p>
                             <div className="flex gap-2 mt-3">
                               <button
                                 onClick={() => { const r = lastRequestRef.current; if (r) sendMessage(r.content, r.file, r.extraText); }}
-                                style={{ backgroundColor: theme.primary, color: "white", border: "none", borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                                style={{ backgroundColor: "var(--accent-blue)", color: "white", border: "none", borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
                                 data-testid="button-cancelled-try-again"
                               >
                                 {t.tryAgain}
                               </button>
                               <button
                                 onClick={() => { setWasCancelled(false); setInputValue(""); setSelectedFile(null); setPastedText(""); }}
-                                style={{ backgroundColor: "#9E9E9E", color: "white", border: "none", borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                                style={{ backgroundColor: "var(--text-muted)", color: "white", border: "none", borderRadius: "6px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
                                 data-testid="button-cancelled-clear"
                               >
                                 {t.clearInput}
@@ -3926,7 +3939,7 @@ export default function ChatPage() {
                       textareaRef.current?.focus();
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all hover:opacity-90"
-                    style={{ backgroundColor: theme.sidebarBg, color: "rgba(255,255,255,0.85)" }}
+                    style={{ backgroundColor: "var(--bg-sidebar)", color: "var(--text-primary)" }}
                     data-testid={`pill-feature-${cardIdx}`}
                   >
                     <card.icon className="w-3 h-3" />
@@ -3937,25 +3950,25 @@ export default function ChatPage() {
               </div>
             </div>
           )}
-          <div className="p-3 flex-shrink-0" style={{ backgroundColor: theme.sidebarBg }}>
+          <div className="p-3 flex-shrink-0" style={{ backgroundColor: "var(--bg-sidebar)" }}>
             <div className="max-w-4xl mx-auto">
               {agentMode === "bi" ? (
                 <div data-testid="bi-input-panel">
                   {!biFile ? (
                     <div className="flex items-center gap-3 rounded-lg px-4 py-3 cursor-pointer border border-dashed transition-all"
-                      style={{ borderColor: "rgba(255,255,255,0.3)", backgroundColor: "rgba(255,255,255,0.05)" }}
+                      style={{ borderColor: "var(--border-default)", backgroundColor: "var(--bg-card)" }}
                       onClick={() => biFileInputRef.current?.click()}
                       data-testid="bi-bottom-upload"
                     >
                       <input ref={biFileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => handleBiFile(e.target.files?.[0] ?? null)} />
-                      <Upload className="w-4 h-4" style={{ color: "rgba(255,255,255,0.5)" }} />
-                      <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.6)" }}>{t.biUploadPrompt as string}</span>
+                      <Upload className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
+                      <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{t.biUploadPrompt as string}</span>
                     </div>
                   ) : (
                     <>
-                      <div className="flex items-center gap-2 mb-2 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
+                      <div className="flex items-center gap-2 mb-2 text-xs" style={{ color: "var(--text-secondary)" }}>
                         <span>📊</span>
-                        <span className="font-medium" style={{ color: "rgba(255,255,255,0.8)" }}>{biFile.name}</span>
+                        <span className="font-medium" style={{ color: "var(--text-primary)" }}>{biFile.name}</span>
                         <span>· {biRows.length} rows · {biFields.length} fields</span>
                         <button onClick={() => { setBiFile(null); setBiRows([]); setBiFields([]); }} className="ml-auto text-white/40 hover:text-white/70 text-sm" data-testid="bi-clear-file-btn">✕</button>
                       </div>
@@ -3963,7 +3976,7 @@ export default function ChatPage() {
                         {BI_TABS.filter(tb => tb.key !== "dashboard" && tb.key !== "dashtest" && tb.key !== "testcases").map(tb => (
                           <button key={tb.key} onClick={() => setBiActiveTab(tb.key)}
                             className="px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all"
-                            style={{ backgroundColor: biActiveTab === tb.key ? "rgba(26,75,140,0.5)" : "transparent", color: biActiveTab === tb.key ? "#E8EDF5" : "rgba(255,255,255,0.5)", border: `1px solid ${biActiveTab === tb.key ? theme.secondary : "transparent"}` }}
+                            style={{ backgroundColor: biActiveTab === tb.key ? "rgba(26,75,140,0.5)" : "transparent", color: biActiveTab === tb.key ? "#E8EDF5" : "rgba(255,255,255,0.5)", border: `1px solid ${biActiveTab === tb.key ? "var(--accent-blue)" : "transparent"}` }}
                             data-testid={`bi-tab-${tb.key}`}
                           >{tb.icon} {lang === "ar" ? tb.labelAr : tb.label}</button>
                         ))}
@@ -3971,16 +3984,16 @@ export default function ChatPage() {
                       <div className="flex items-end gap-2">
                         <div className="flex-1 flex gap-2 flex-wrap">
                           {(biActiveTab === "sharing" || biActiveTab === "report") && (
-                            <input value={biStakeholder} onChange={e => setBiStakeholder(e.target.value)} placeholder={lang === "ar" ? "الجهة المستلمة..." : "Stakeholder..."} className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg text-xs border-0" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#fff" }} data-testid="bi-input-stakeholder" />
+                            <input value={biStakeholder} onChange={e => setBiStakeholder(e.target.value)} placeholder={lang === "ar" ? "الجهة المستلمة..." : "Stakeholder..."} className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg text-xs border-0" style={{ backgroundColor: "var(--bg-input)", color: "var(--text-primary)" }} data-testid="bi-input-stakeholder" />
                           )}
                           {biActiveTab === "dashboard" && (
-                            <input value={biBusinessQuestion} onChange={e => setBiBusinessQuestion(e.target.value)} placeholder={lang === "ar" ? "سؤال الأعمال..." : "Business question..."} className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg text-xs border-0" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#fff" }} data-testid="bi-input-bq" />
+                            <input value={biBusinessQuestion} onChange={e => setBiBusinessQuestion(e.target.value)} placeholder={lang === "ar" ? "سؤال الأعمال..." : "Business question..."} className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg text-xs border-0" style={{ backgroundColor: "var(--bg-input)", color: "var(--text-primary)" }} data-testid="bi-input-bq" />
                           )}
                           {(biActiveTab === "report" || biActiveTab === "testcases") && (
-                            <input value={biReportPurpose} onChange={e => setBiReportPurpose(e.target.value)} placeholder={lang === "ar" ? "غرض التقرير..." : "Report purpose..."} className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg text-xs border-0" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#fff" }} data-testid="bi-input-purpose" />
+                            <input value={biReportPurpose} onChange={e => setBiReportPurpose(e.target.value)} placeholder={lang === "ar" ? "غرض التقرير..." : "Report purpose..."} className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg text-xs border-0" style={{ backgroundColor: "var(--bg-input)", color: "var(--text-primary)" }} data-testid="bi-input-purpose" />
                           )}
                           {biActiveTab === "dashtest" && (
-                            <input value={biDashDesc} onChange={e => setBiDashDesc(e.target.value)} placeholder={lang === "ar" ? "وصف لوحة المعلومات..." : "Dashboard description..."} className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg text-xs border-0" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#fff" }} data-testid="bi-input-dashdesc" />
+                            <input value={biDashDesc} onChange={e => setBiDashDesc(e.target.value)} placeholder={lang === "ar" ? "وصف لوحة المعلومات..." : "Dashboard description..."} className="flex-1 min-w-[120px] px-3 py-1.5 rounded-lg text-xs border-0" style={{ backgroundColor: "var(--bg-input)", color: "var(--text-primary)" }} data-testid="bi-input-dashdesc" />
                           )}
                         </div>
                         {biLoading ? (
@@ -3988,7 +4001,7 @@ export default function ChatPage() {
                             <Square className="w-3 h-3 fill-white" /> stop agent
                           </button>
                         ) : (
-                          <Button onClick={biRunAnalysis} className="h-9 px-4 flex-shrink-0 rounded-lg gap-1.5 text-xs font-medium text-white ripple-button" style={{ backgroundColor: theme.accent }} disabled={!biFields.length || biLoading} data-testid="bi-run-btn">
+                          <Button onClick={biRunAnalysis} className="h-9 px-4 flex-shrink-0 rounded-lg gap-1.5 text-xs font-medium text-white ripple-button" style={{ backgroundColor: "var(--accent-blue)" }} disabled={!biFields.length || biLoading} data-testid="bi-run-btn">
                             {t.biRunBtn as string} <Play className="w-3.5 h-3.5" />
                           </Button>
                         )}
@@ -3999,7 +4012,7 @@ export default function ChatPage() {
               ) : (
               <>
               {selectedFile && (
-                <div className="flex items-center gap-2 mb-2 rounded-lg px-3 py-1.5" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}>
+                <div className="flex items-center gap-2 mb-2 rounded-lg px-3 py-1.5" style={{ backgroundColor: "var(--bg-active)" }}>
                   {selectedFile.type.startsWith("image/") ? (
                     <ImagePreview file={selectedFile} />
                   ) : (
@@ -4037,20 +4050,20 @@ export default function ChatPage() {
               {!selectedFile && !textInputMode && (
                 <div
                   className="mb-2 flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer border border-dashed transition-all"
-                  style={{ borderColor: "rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.04)" }}
+                  style={{ borderColor: "var(--border-default)", backgroundColor: "var(--bg-card)" }}
                   onClick={() => fileInputRef.current?.click()}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.4)"; (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.08)"; }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "var(--border-accent)"; (e.currentTarget as HTMLElement).style.backgroundColor = "var(--bg-hover)"; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.2)"; (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(255,255,255,0.04)"; }}
                   data-testid="dropzone-upload"
                 >
-                  <Upload className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "rgba(255,255,255,0.4)" }} />
-                  <span className="text-xs font-medium flex-1" style={{ color: "rgba(255,255,255,0.5)" }}>{t.dragDropUpload}</span>
-                  <span className="text-[10px] hidden sm:block" style={{ color: "rgba(255,255,255,0.3)" }}>{t.uploadFooter}</span>
+                  <Upload className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--text-muted)" }} />
+                  <span className="text-xs font-medium flex-1" style={{ color: "var(--text-muted)" }}>{t.dragDropUpload}</span>
+                  <span className="text-[10px] hidden sm:block" style={{ color: "var(--text-muted)" }}>{t.uploadFooter}</span>
                 </div>
               )}
               {textInputMode && (
-                <div className="mb-2 rounded-lg overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-                  <div className="flex items-center justify-between px-3 py-1.5 border-b" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+                <div className="mb-2 rounded-lg overflow-hidden" style={{ backgroundColor: "var(--bg-input)" }}>
+                  <div className="flex items-center justify-between px-3 py-1.5 border-b" style={{ borderColor: "var(--border-default)" }}>
                     <span className="text-xs text-white/60 font-medium">{t.pasteTextMode}</span>
                     <Button
                       type="button"
@@ -4138,7 +4151,7 @@ export default function ChatPage() {
                   onKeyDown={handleKeyDown}
                   placeholder={t.enterCommand}
                   className="min-h-[36px] max-h-24 resize-none flex-1 rounded-lg text-sm border-0 font-mono-cmd"
-                  style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#ffffff" }}
+                  style={{ backgroundColor: "var(--bg-input)", color: "var(--text-primary)" }}
                   disabled={isStreaming}
                   data-testid="input-message"
                 />
@@ -4147,7 +4160,7 @@ export default function ChatPage() {
                     type="button"
                     onClick={() => { if (abortControllerRef.current) abortControllerRef.current.abort(); }}
                     className="h-9 px-4 flex-shrink-0 rounded-lg text-xs font-bold text-white flex items-center gap-1.5"
-                    style={{ backgroundColor: "#C62828", border: "none", cursor: "pointer", letterSpacing: "0.5px" }}
+                    style={{ backgroundColor: "var(--accent-red)", border: "none", cursor: "pointer", letterSpacing: "0.5px" }}
                     data-testid="button-stop-generation"
                   >
                     {t.stopButton}
@@ -4156,7 +4169,7 @@ export default function ChatPage() {
                   <Button
                     type="submit"
                     className="h-9 px-4 flex-shrink-0 rounded-lg gap-1.5 text-xs font-medium text-white ripple-button"
-                    style={{ backgroundColor: theme.accent }}
+                    style={{ backgroundColor: "var(--accent-blue)" }}
                     disabled={!inputValue.trim() && !selectedFile && !pastedText.trim()}
                     data-testid="button-send-message"
                   >
@@ -4176,8 +4189,8 @@ export default function ChatPage() {
         <button
           onClick={() => setOutputsPanelCollapsed(v => !v)}
           className="flex-shrink-0 self-center z-30 flex items-center justify-center rounded-l-md transition-colors"
-          style={{ width: 14, height: 48, backgroundColor: "#F9FAFB", color: "#9CA3AF", borderTop: "1px solid #E5E7EB", borderLeft: "1px solid #E5E7EB", borderBottom: "1px solid #E5E7EB" }}
-          onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#EEF2FF"; e.currentTarget.style.color = theme.primary; }}
+          style={{ width: 14, height: 48, backgroundColor: "var(--bg-card)", color: "var(--text-muted)", borderTop: "1px solid var(--border-default)", borderLeft: "1px solid var(--border-default)", borderBottom: "1px solid var(--border-default)" }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = "var(--bg-hover)"; e.currentTarget.style.color = "var(--accent-blue)"; }}
           onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#F9FAFB"; e.currentTarget.style.color = "#9CA3AF"; }}
           data-testid="button-toggle-outputs"
           title={outputsPanelCollapsed ? t.expandOutputs : t.collapseOutputs}
@@ -4192,7 +4205,7 @@ export default function ChatPage() {
           style={{ width: outputsPanelCollapsed ? 0 : 300, maxHeight: "100vh" }}
           data-testid="outputs-panel-wrapper"
         >
-          <div className="w-[300px] h-full overflow-hidden border-l" style={{ borderColor: "#E5E7EB" }} data-testid="outputs-panel">
+          <div className="w-[300px] h-full overflow-hidden border-l" style={{ borderColor: "var(--border-default)" }} data-testid="outputs-panel">
             <OutputsPanel
               t={t}
               isRtl={isRtl}
@@ -4244,7 +4257,7 @@ function OutputsPanel({
   if (latestInformaticaOutput) sheetTags.push({ label: "Informatica", color: SHEET_TAG_COLORS.informatica });
 
   return (
-    <div className="h-full bg-white flex flex-col font-main overflow-hidden" style={{ borderLeft: isRtl ? "none" : "1px solid #E5E7EB", borderRight: isRtl ? "1px solid #E5E7EB" : "none", maxWidth: 300 }} data-testid="outputs-panel-content">
+    <div className="h-full flex flex-col font-main overflow-hidden" style={{ borderLeft: isRtl ? "none" : "1px solid var(--border-default)", borderRight: isRtl ? "1px solid var(--border-default)" : "none", maxWidth: 300 }} data-testid="outputs-panel-content">
       <div className="p-4 pb-3 flex-shrink-0">
         <h2 className="text-sm font-bold" style={{ color: "#2563EB" }}>{t.outputsActivity}</h2>
       </div>
@@ -4254,7 +4267,7 @@ function OutputsPanel({
           <div className="border-b pb-2" style={{ borderColor: "#F3F4F6" }}>
             <h3 
               className="text-[11px] font-semibold mb-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors" 
-              style={{ color: "#1A1A2E", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}
+              style={{ color: "var(--text-primary)", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}
               onClick={() => setOutputsExpanded(prev => ({ ...prev, live: !prev.live }))}
             >
               <div className="flex items-center gap-1.5">
@@ -4270,47 +4283,47 @@ function OutputsPanel({
                     {hasResultXlsx && (
                       <div
                         className="rounded-lg border p-3 cursor-pointer hover:shadow-sm transition-shadow bg-white"
-                        style={{ borderColor: "#E5E7EB" }}
+                        style={{ borderColor: "var(--border-default)" }}
                         onClick={onDownloadResult}
                         data-testid="output-card-result"
                       >
                         <div className="flex items-center gap-2 overflow-hidden">
                           <FileSpreadsheet className="w-5 h-5 flex-shrink-0" style={{ color: "#2E7D32" }} />
                           <div className="flex-1 min-w-0 overflow-hidden">
-                            <p className="text-xs font-semibold truncate" style={{ color: "#1A1A2E" }}>result.xlsx</p>
-                            <p className="text-[10px] truncate" style={{ color: "#6B7280" }}>{sheetCount} {t.sheetsInResult}{uploadedFileName ? ` — ${uploadedFileName}` : ""}</p>
+                            <p className="text-xs font-semibold truncate" style={{ color: "var(--text-primary)" }}>result.xlsx</p>
+                            <p className="text-[10px] truncate" style={{ color: "var(--text-secondary)" }}>{sheetCount} {t.sheetsInResult}{uploadedFileName ? ` — ${uploadedFileName}` : ""}</p>
                           </div>
                           <Button size="sm" className="h-7 w-7 p-0 flex-shrink-0 text-white" style={{ backgroundColor: "#2563EB" }} onClick={(e) => { e.stopPropagation(); onPreviewResult(); }} data-testid="button-preview-result">
                             <Eye className="w-3 h-3" />
                           </Button>
-                          <Button size="sm" className="h-7 w-7 p-0 flex-shrink-0 text-white" style={{ backgroundColor: "#2E7D32" }} onClick={(e) => { e.stopPropagation(); onDownloadResult(); }} data-testid="button-download-result">
+                          <Button size="sm" className="h-7 w-7 p-0 flex-shrink-0 text-white" style={{ backgroundColor: "var(--accent-green)" }} onClick={(e) => { e.stopPropagation(); onDownloadResult(); }} data-testid="button-download-result">
                             <Download className="w-3 h-3" />
                           </Button>
                         </div>
                       </div>
                     )}
                     {insightsReports.map((rpt, i) => (
-                      <div key={i} className="rounded-lg border p-2.5 bg-white" style={{ borderColor: "#E5E7EB" }}>
+                      <div key={i} className="rounded-lg border p-2.5 bg-white" style={{ borderColor: "var(--border-default)" }}>
                         <div className="flex items-center gap-2">
                           <BarChart3 className="w-4 h-4" style={{ color: "#E65100" }} />
-                          <span className="text-[10px] truncate flex-1" style={{ color: "#1A1A2E" }}>{rpt.excelFileName}</span>
+                          <span className="text-[10px] truncate flex-1" style={{ color: "var(--text-primary)" }}>{rpt.excelFileName}</span>
                         </div>
                       </div>
                     ))}
                     {hasBiSheets() && (
                       <div
                         className="rounded-lg border p-3 cursor-pointer hover:shadow-sm transition-shadow bg-white"
-                        style={{ borderColor: "#E5E7EB" }}
+                        style={{ borderColor: "var(--border-default)" }}
                         onClick={() => downloadBiReport()}
                         data-testid="output-card-bi-report"
                       >
                         <div className="flex items-center gap-2">
                           <FileSpreadsheet className="w-5 h-5" style={{ color: "#1A4B8C" }} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold" style={{ color: "#1A1A2E" }}>bi_agent_report.xlsx</p>
-                            <p className="text-[10px]" style={{ color: "#6B7280" }}>{t.biSidebarDownload}</p>
+                            <p className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>bi_agent_report.xlsx</p>
+                            <p className="text-[10px]" style={{ color: "var(--text-secondary)" }}>{t.biSidebarDownload}</p>
                           </div>
-                          <Button size="sm" className="h-7 px-2 text-[10px] text-white" style={{ backgroundColor: "#1A4B8C" }} onClick={(e) => { e.stopPropagation(); downloadBiReport(); }} data-testid="button-sidebar-bi-download">
+                          <Button size="sm" className="h-7 px-2 text-[10px] text-white" style={{ backgroundColor: "var(--accent-blue)" }} onClick={(e) => { e.stopPropagation(); downloadBiReport(); }} data-testid="button-sidebar-bi-download">
                             <Download className="w-3 h-3" />
                           </Button>
                         </div>
@@ -4318,7 +4331,7 @@ function OutputsPanel({
                     )}
                   </div>
                 ) : (
-                  <p className="text-[10px] py-3 text-center" style={{ color: "#9CA3AF" }}>{t.noOutputsYet}</p>
+                  <p className="text-[10px] py-3 text-center" style={{ color: "var(--text-muted)" }}>{t.noOutputsYet}</p>
                 )}
               </div>
             )}
@@ -4327,7 +4340,7 @@ function OutputsPanel({
           <div className="border-b pb-2" style={{ borderColor: "#F3F4F6" }}>
             <h3 
               className="text-[11px] font-semibold mb-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors" 
-              style={{ color: "#1A1A2E", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}
+              style={{ color: "var(--text-primary)", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}
               onClick={() => setOutputsExpanded(prev => ({ ...prev, sheets: !prev.sheets }))}
             >
               <div className="flex items-center gap-1.5">
@@ -4352,7 +4365,7 @@ function OutputsPanel({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[10px] py-2" style={{ color: "#9CA3AF" }}>—</p>
+                  <p className="text-[10px] py-2" style={{ color: "var(--text-muted)" }}>—</p>
                 )}
               </div>
             )}
@@ -4361,7 +4374,7 @@ function OutputsPanel({
           <div className="pb-4">
             <h3 
               className="text-[11px] font-semibold mb-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors" 
-              style={{ color: "#1A1A2E", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}
+              style={{ color: "var(--text-primary)", borderLeft: isRtl ? "none" : "3px solid #2563EB", borderRight: isRtl ? "3px solid #2563EB" : "none", paddingLeft: isRtl ? 0 : 8, paddingRight: isRtl ? 8 : 0 }}
               onClick={() => setOutputsExpanded(prev => ({ ...prev, activity: !prev.activity }))}
             >
               <div className="flex items-center gap-1.5">
@@ -4375,17 +4388,17 @@ function OutputsPanel({
                 {activityLog.length > 0 ? (
                   <div className="space-y-0">
                     {activityLog.slice(-20).reverse().map((entry, i) => (
-                      <div key={i} className="flex items-start gap-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 transition-colors" style={{ borderLeft: isRtl ? "none" : "2px solid #E5E7EB", borderRight: isRtl ? "2px solid #E5E7EB" : "none", paddingLeft: isRtl ? 0 : 10, paddingRight: isRtl ? 10 : 0 }} onClick={() => { const target = entry.messageId ? document.querySelector(`[data-message-id="${entry.messageId}"]`) : document.querySelector("[data-message-id]"); target?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>
+                      <div key={i} className="flex items-start gap-2 py-1.5 rounded cursor-pointer hover:bg-gray-50 transition-colors" style={{ borderLeft: isRtl ? "none" : "2px solid var(--border-default)", borderRight: isRtl ? "2px solid var(--border-default)" : "none", paddingLeft: isRtl ? 0 : 10, paddingRight: isRtl ? 10 : 0 }} onClick={() => { const target = entry.messageId ? document.querySelector(`[data-message-id="${entry.messageId}"]`) : document.querySelector("[data-message-id]"); target?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>
                         <span className="text-[11px] flex-shrink-0">{entry.icon}</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[10px] truncate" style={{ color: "#1A1A2E" }}>{entry.text}</p>
-                          <p className="text-[9px]" style={{ color: "#9CA3AF" }}>{entry.timestamp}</p>
+                          <p className="text-[10px] truncate" style={{ color: "var(--text-primary)" }}>{entry.text}</p>
+                          <p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{entry.timestamp}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[10px] py-2" style={{ color: "#9CA3AF" }}>{t.noActivityYet}</p>
+                  <p className="text-[10px] py-2" style={{ color: "var(--text-muted)" }}>{t.noActivityYet}</p>
                 )}
               </div>
             )}
@@ -4418,7 +4431,7 @@ function InsightsReportCard({ report, onDownload }: { report: InsightsReport; on
     <button
       onClick={() => toggle(section)}
       className="w-full flex items-center justify-between px-4 py-3 text-left font-bold text-sm text-white rounded-t-xl"
-      style={{ backgroundColor: "#1A4B8C" }}
+      style={{ backgroundColor: "var(--accent-blue)" }}
     >
       <span>{title}</span>
       <ChevronDown className={`w-4 h-4 transition-transform ${openSections[section] ? "rotate-180" : ""}`} />
@@ -4426,7 +4439,7 @@ function InsightsReportCard({ report, onDownload }: { report: InsightsReport; on
   );
 
   const SubHeader = ({ title }: { title: string }) => (
-    <div className="px-4 py-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: "#6B7280", backgroundColor: "#F8FAFF", borderBottom: "1px solid #E5E7EB" }}>{title}</div>
+    <div className="px-4 py-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)", backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border-default)" }}>{title}</div>
   );
 
   const Tbl = ({ headers, rows, className }: { headers: string[]; rows: React.ReactNode[][]; className?: string }) => (
@@ -4497,7 +4510,7 @@ function InsightsReportCard({ report, onDownload }: { report: InsightsReport; on
                 { label: "Duplicate Rows", value: s.duplicate_rows.toLocaleString(), icon: "🔁" },
                 { label: "Completeness", value: `${s.overall_completeness_pct}%`, icon: "✅" },
               ].map((tile, i) => (
-                <div key={i} className="rounded-lg p-3 text-center" style={{ backgroundColor: "#F8FAFF", border: "1px solid #E5E7EB" }}>
+                <div key={i} className="rounded-lg p-3 text-center" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-default)" }}>
                   <div className="text-lg">{tile.icon}</div>
                   <div className="text-base font-bold" style={{ color: "#0D2E5C" }}>{tile.value}</div>
                   <div className="text-[10px] text-gray-500 mt-0.5">{tile.label}</div>
@@ -4662,7 +4675,7 @@ function InsightsReportCard({ report, onDownload }: { report: InsightsReport; on
                         <span className={`font-bold ${stage.dropoff_pct > 20 ? "text-red-600" : "text-gray-600"}`}>{stage.dropoff_pct}% drop</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="h-5 rounded flex items-center justify-center text-[10px] font-bold text-white" style={{ width: "100%", backgroundColor: "#1A4B8C", opacity: Math.max(0.3, 1 - i * 0.15) }}>
+                        <div className="h-5 rounded flex items-center justify-center text-[10px] font-bold text-white" style={{ width: "100%", backgroundColor: "var(--accent-blue)", opacity: Math.max(0.3, 1 - i * 0.15) }}>
                           {stage.records_in.toLocaleString()} in → {stage.records_out.toLocaleString()} out
                         </div>
                       </div>
@@ -4718,14 +4731,14 @@ function InsightsReportCard({ report, onDownload }: { report: InsightsReport; on
                 <SubHeader title="Segments" />
                 <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                   {report.analytical.segments.map((seg, i) => (
-                    <div key={i} className="rounded-xl border border-gray-100 p-4 space-y-2" style={{ backgroundColor: "#F8FAFF" }}>
+                    <div key={i} className="rounded-xl border border-gray-100 p-4 space-y-2" style={{ backgroundColor: "var(--bg-card)" }}>
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <p className="font-bold text-sm" style={{ color: "#0D2E5C" }}>{seg.segment_name}</p>
                         <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#DBEAFE", color: "#1E3A8A" }}>{seg.estimated_size_pct}%</span>
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {seg.defining_characteristics.map((ch, j) => (
-                          <span key={j} className="text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: "#E5E7EB", color: "#374151" }}>{ch}</span>
+                          <span key={j} className="text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: "var(--border-default)", color: "var(--text-primary)" }}>{ch}</span>
                         ))}
                       </div>
                       <p className="text-xs text-gray-600 leading-relaxed">{seg.business_meaning}</p>
@@ -4744,8 +4757,8 @@ function InsightsReportCard({ report, onDownload }: { report: InsightsReport; on
                     c.field_name,
                     c.top_contributors.join(", "),
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-3 rounded-full" style={{ backgroundColor: "#E5E7EB" }}>
-                        <div className="h-full rounded-full" style={{ width: `${Math.min(c.contribution_pct, 100)}%`, backgroundColor: "#1A4B8C" }} />
+                      <div className="flex-1 h-3 rounded-full" style={{ backgroundColor: "var(--border-default)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(c.contribution_pct, 100)}%`, backgroundColor: "var(--accent-blue)" }} />
                       </div>
                       <span className="text-[10px] font-bold" style={{ color: "#1A4B8C" }}>{c.contribution_pct}%</span>
                     </div>,
@@ -4791,7 +4804,7 @@ function InsightsReportCard({ report, onDownload }: { report: InsightsReport; on
       <button
         onClick={onDownload}
         className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
-        style={{ backgroundColor: "#2E7D32" }}
+        style={{ backgroundColor: "var(--accent-green)" }}
         data-testid="button-download-insights-report"
       >
         <Download className="w-4 h-4" />
@@ -4831,8 +4844,8 @@ function NudgeResultCard({ report, t }: { report: NudgeReport; t: Translation })
       </div>
 
       {/* Section A — Diagnosis */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="nudge-section-diagnosis">
-        <div className="px-5 py-3 border-b border-gray-100" style={{ backgroundColor: "#F8FAFF" }}>
+      <div className="rounded-xl border shadow-sm overflow-hidden" data-testid="nudge-section-diagnosis">
+        <div className="px-5 py-3 border-b border-gray-100" style={{ backgroundColor: "var(--bg-card)" }}>
           <h2 className="font-bold text-gray-800 text-sm">{t.nudgeSectionDiagnosis as string}</h2>
         </div>
         <div className="p-5 space-y-4">
@@ -4891,14 +4904,14 @@ function NudgeResultCard({ report, t }: { report: NudgeReport; t: Translation })
 
       {/* Section B — Segments */}
       {report.segments?.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="nudge-section-segments">
-          <div className="px-5 py-3 border-b border-gray-100" style={{ backgroundColor: "#F8FAFF" }}>
+        <div className="rounded-xl border shadow-sm overflow-hidden" data-testid="nudge-section-segments">
+          <div className="px-5 py-3 border-b border-gray-100" style={{ backgroundColor: "var(--bg-card)" }}>
             <h2 className="font-bold text-gray-800 text-sm">{t.nudgeSectionSegments as string}</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-gray-100" style={{ backgroundColor: "#F8FAFF" }}>
+                <tr className="border-b border-gray-100" style={{ backgroundColor: "var(--bg-card)" }}>
                   {[t.nudgeColSegment, t.nudgeColArchetype, t.nudgeColPop, t.nudgeColRisk, t.nudgeColBarrier, t.nudgeColRec, t.nudgeColChannel, t.nudgeColTiming].map((h, i) => (
                     <th key={i} className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wider text-[10px]">{h as string}</th>
                   ))}
@@ -4925,8 +4938,8 @@ function NudgeResultCard({ report, t }: { report: NudgeReport; t: Translation })
 
       {/* Section C — Levers */}
       {report.levers?.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="nudge-section-levers">
-          <div className="px-5 py-3 border-b border-gray-100" style={{ backgroundColor: "#F8FAFF" }}>
+        <div className="rounded-xl border shadow-sm overflow-hidden" data-testid="nudge-section-levers">
+          <div className="px-5 py-3 border-b border-gray-100" style={{ backgroundColor: "var(--bg-card)" }}>
             <h2 className="font-bold text-gray-800 text-sm">{t.nudgeSectionLevers as string}</h2>
           </div>
           <div className="p-5 space-y-4">
@@ -4957,8 +4970,8 @@ function NudgeResultCard({ report, t }: { report: NudgeReport; t: Translation })
       )}
 
       {/* Section D — Intervention Plan */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" data-testid="nudge-section-plan">
-        <div className="px-5 py-3 border-b border-gray-100" style={{ backgroundColor: "#F8FAFF" }}>
+      <div className="rounded-xl border shadow-sm overflow-hidden" data-testid="nudge-section-plan">
+        <div className="px-5 py-3 border-b border-gray-100" style={{ backgroundColor: "var(--bg-card)" }}>
           <h2 className="font-bold text-gray-800 text-sm">{t.nudgeSectionPlan as string}</h2>
         </div>
         <div className="p-5 space-y-4">
@@ -5011,7 +5024,7 @@ function NudgeResultCard({ report, t }: { report: NudgeReport; t: Translation })
       <button
         onClick={() => generateNudgeExcel(report)}
         className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
-        style={{ backgroundColor: "#2E7D32" }}
+        style={{ backgroundColor: "var(--accent-green)" }}
         data-testid="button-download-nudge-report"
       >
         <Download className="w-4 h-4" />
@@ -5028,7 +5041,7 @@ function BiResultCard({ biReport, isRtl, lang }: { biReport: BiReport; isRtl: bo
   return (
     <div className="space-y-3 mt-2" data-testid="bi-result-card">
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "#1A4B8C", color: "#ffffff" }}>BI {BI_TABS.find(tb => tb.key === tab)?.label || tab}</span>
+        <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: "var(--accent-blue)", color: "var(--text-primary)" }}>BI {BI_TABS.find(tb => tb.key === tab)?.label || tab}</span>
       </div>
       {tab === "sharing" && <BiSharingResult data={data} t={t} />}
       {tab === "dashboard" && <BiDashboardResult data={data} t={t} />}
@@ -5051,10 +5064,10 @@ function BiSharingResult({ data, t }: { data: Record<string, unknown>; t: Transl
     <>
       <div className="rounded-xl p-4 mb-3" style={{ backgroundColor: `${vc.bg}`, border: `2px solid ${vc.border}55`, borderLeft: `6px solid ${vc.border}` }} data-testid="bi-verdict-banner">
         <div className="text-lg font-extrabold mb-1" style={{ color: vc.fg }}>{verdict}</div>
-        <div className="text-xs mb-2" style={{ color: "#6B7280" }}>{String(data.verdict_rationale || "")}</div>
+        <div className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>{String(data.verdict_rationale || "")}</div>
         <div className="flex gap-4 flex-wrap text-xs">
-          <span style={{ color: "#6B7280" }}>{t.biClassification as string} <strong style={{ color: "#1A1A2E" }}>{String(data.overall_classification || "")}</strong></span>
-          <span style={{ color: "#6B7280" }}>{t.biGoverning as string} <strong style={{ color: "#E65100" }}>{String(data.governing_field || "")}</strong></span>
+          <span style={{ color: "var(--text-secondary)" }}>{t.biClassification as string} <strong style={{ color: "var(--text-primary)" }}>{String(data.overall_classification || "")}</strong></span>
+          <span style={{ color: "var(--text-secondary)" }}>{t.biGoverning as string} <strong style={{ color: "#E65100" }}>{String(data.governing_field || "")}</strong></span>
         </div>
       </div>
 
@@ -5087,10 +5100,10 @@ function BiSharingResult({ data, t }: { data: Record<string, unknown>; t: Transl
       </div>
 
       {checklist.length > 0 && (
-        <div className="rounded-lg p-3 mb-3 border" style={{ borderColor: "#E6510044", backgroundColor: "#FFF3E0" }} data-testid="approval-checklist">
+        <div className="rounded-lg p-3 mb-3 border" style={{ borderColor: "#E6510044", backgroundColor: "var(--bg-card)" }} data-testid="approval-checklist">
           <div className="text-xs font-bold mb-2" style={{ color: "#E65100" }}>📋 {t.biApprovalChecklist as string}</div>
           {checklist.map((item, i) => (
-            <label key={i} className="flex items-start gap-2 py-1 text-[11px] cursor-pointer" style={{ color: "#374151" }}>
+            <label key={i} className="flex items-start gap-2 py-1 text-[11px] cursor-pointer" style={{ color: "var(--text-primary)" }}>
               <input type="checkbox" checked={checkedItems.has(i)} onChange={() => setCheckedItems(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; })} style={{ accentColor: "#2E7D32", marginTop: 2 }} />
               <span>{String(item.item || "")}</span>
             </label>
@@ -5099,12 +5112,12 @@ function BiSharingResult({ data, t }: { data: Record<string, unknown>; t: Transl
       )}
 
       {assessments.length > 0 && (
-        <div className="rounded-lg overflow-hidden border" style={{ borderColor: "#E5E7EB" }} data-testid="bi-field-table">
+        <div className="rounded-lg overflow-hidden border" style={{ borderColor: "var(--border-default)" }} data-testid="bi-field-table">
           <table className="w-full text-[10px]">
             <thead>
-              <tr style={{ backgroundColor: "#F3F4F6" }}>
+              <tr style={{ backgroundColor: "var(--bg-card)" }}>
                 {[t.biField as string, t.biClass as string, "PII", t.biVerdict as string].map(h => (
-                  <th key={h} className="px-2 py-1.5 text-left font-semibold" style={{ color: "#6B7280", borderBottom: "1px solid #E5E7EB" }}>{h}</th>
+                  <th key={h} className="px-2 py-1.5 text-left font-semibold" style={{ color: "var(--text-secondary)", borderBottom: "1px solid var(--border-default)" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -5112,17 +5125,17 @@ function BiSharingResult({ data, t }: { data: Record<string, unknown>; t: Transl
               {assessments.slice(0, 10).map((f, idx) => (
                 <Fragment key={String(f.field_name)}>
                   <tr onClick={() => setExpandedField(expandedField === String(f.field_name) ? null : String(f.field_name))} className="cursor-pointer hover:bg-gray-50" style={{ backgroundColor: idx % 2 === 0 ? "#fff" : "#F9FAFB" }} data-testid={`row-bi-field-${f.field_name}`}>
-                    <td className="px-2 py-1.5 font-medium" style={{ color: "#1A1A2E" }}>{String(f.field_name)}</td>
+                    <td className="px-2 py-1.5 font-medium" style={{ color: "var(--text-primary)" }}>{String(f.field_name)}</td>
                     <td className="px-2 py-1.5">
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-bold text-white" style={{ backgroundColor: f.classification_code === "TS" ? "#1A1A2E" : f.classification_code === "S" ? "#C0392B" : f.classification_code === "C" ? "#E65100" : "#1B5E20" }}>{String(f.classification_code)}</span>
                     </td>
-                    <td className="px-2 py-1.5">{f.is_pii ? <span className="font-bold" style={{ color: "#DC2626" }}>YES</span> : <span style={{ color: "#9CA3AF" }}>NO</span>}</td>
+                    <td className="px-2 py-1.5">{f.is_pii ? <span className="font-bold" style={{ color: "#DC2626" }}>YES</span> : <span style={{ color: "var(--text-muted)" }}>NO</span>}</td>
                     <td className="px-2 py-1.5">
                       <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ color: f.stakeholder_verdict === "SEND" ? "#2E7D32" : f.stakeholder_verdict === "BLOCK" ? "#B71C1C" : "#E65100", backgroundColor: f.stakeholder_verdict === "SEND" ? "#DCFCE7" : f.stakeholder_verdict === "BLOCK" ? "#FEE2E2" : "#FEF3C7" }}>{String(f.stakeholder_verdict)}</span>
                     </td>
                   </tr>
                   {expandedField === String(f.field_name) && (
-                    <tr><td colSpan={4} className="px-3 py-2 text-[10px]" style={{ backgroundColor: "#F0F9FF", color: "#374151" }}>
+                    <tr><td colSpan={4} className="px-3 py-2 text-[10px]" style={{ backgroundColor: "#F0F9FF", color: "var(--text-primary)" }}>
                       <div><strong>{t.biDetail as string}</strong> {String(f.remediation_detail || "—")}</div>
                     </td></tr>
                   )}
@@ -5130,7 +5143,7 @@ function BiSharingResult({ data, t }: { data: Record<string, unknown>; t: Transl
               ))}
             </tbody>
           </table>
-          {assessments.length > 10 && <div className="text-[10px] text-center py-1.5" style={{ color: "#9CA3AF" }}>+ {assessments.length - 10} more fields</div>}
+          {assessments.length > 10 && <div className="text-[10px] text-center py-1.5" style={{ color: "var(--text-muted)" }}>+ {assessments.length - 10} more fields</div>}
         </div>
       )}
     </>
@@ -5146,9 +5159,9 @@ function BiDashboardResult({ data, t }: { data: Record<string, unknown>; t: Tran
   return (
     <>
       <div className="mb-3">
-        <div className="text-base font-extrabold mb-1" style={{ color: "#1A1A2E" }}>{String(data.dashboard_title || "")}</div>
+        <div className="text-base font-extrabold mb-1" style={{ color: "var(--text-primary)" }}>{String(data.dashboard_title || "")}</div>
         <div className="flex gap-2 text-[11px]">
-          <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: "#EFF6FF", color: "#1A4B8C", border: "1px solid #BFDBFE" }}>{String(data.dashboard_type || "")}</span>
+          <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-hover)", color: "#1A4B8C", border: "1px solid var(--border-accent)" }}>{String(data.dashboard_type || "")}</span>
           <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: "#F0FDF4", color: "#2E7D32", border: "1px solid #BBF7D0" }}>{String(data.audience || "")}</span>
         </div>
       </div>
@@ -5156,9 +5169,9 @@ function BiDashboardResult({ data, t }: { data: Record<string, unknown>; t: Tran
       {kpis.length > 0 && (
         <div className="grid gap-2 mb-3" style={{ gridTemplateColumns: `repeat(${Math.min(kpis.length, 4)}, 1fr)` }}>
           {kpis.map((k, i) => (
-            <div key={i} className="rounded-lg p-3 border" style={{ borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }} data-testid={`kpi-card-${i}`}>
+            <div key={i} className="rounded-lg p-3 border" style={{ borderColor: "var(--border-accent)", backgroundColor: "var(--bg-hover)" }} data-testid={`kpi-card-${i}`}>
               <div className="text-[11px] font-bold mb-1" style={{ color: "#1A4B8C" }}>{String(k.kpi_name || "")}</div>
-              <div className="text-[9px] font-mono" style={{ color: "#6B7280" }}>{String(k.dax_formula || "").substring(0, 50)}</div>
+              <div className="text-[9px] font-mono" style={{ color: "var(--text-secondary)" }}>{String(k.dax_formula || "").substring(0, 50)}</div>
             </div>
           ))}
         </div>
@@ -5167,7 +5180,7 @@ function BiDashboardResult({ data, t }: { data: Record<string, unknown>; t: Tran
       {pages.length > 1 && (
         <div className="flex gap-1 mb-3">
           {pages.map((p, i) => (
-            <button key={i} onClick={() => setActivePage(i)} className="px-3 py-1 rounded-lg text-[11px]" style={{ backgroundColor: i === activePage ? "#EFF6FF" : "transparent", color: i === activePage ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${i === activePage ? "#BFDBFE" : "#E5E7EB"}`, fontWeight: i === activePage ? 700 : 400 }} data-testid={`page-tab-${i}`}>
+            <button key={i} onClick={() => setActivePage(i)} className="px-3 py-1 rounded-lg text-[11px]" style={{ backgroundColor: i === activePage ? "var(--bg-hover)" : "transparent", color: i === activePage ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${i === activePage ? "var(--border-accent)" : "var(--border-default)"}`, fontWeight: i === activePage ? 700 : 400 }} data-testid={`page-tab-${i}`}>
               {String(p.page_title || `Page ${i + 1}`)}
             </button>
           ))}
@@ -5184,8 +5197,8 @@ function BiDashboardResult({ data, t }: { data: Record<string, unknown>; t: Tran
                 <div className="flex items-center gap-1 mb-1">
                   <span className="text-[9px] font-bold px-1.5 rounded" style={{ backgroundColor: `${bc}15`, color: bc }}>{vType}</span>
                 </div>
-                <div className="text-[11px] font-bold mb-1" style={{ color: "#1A1A2E" }}>{String(v.title || "")}</div>
-                <div className="text-[9px]" style={{ color: "#6B7280" }}>{String(v.insight_purpose || "")}</div>
+                <div className="text-[11px] font-bold mb-1" style={{ color: "var(--text-primary)" }}>{String(v.title || "")}</div>
+                <div className="text-[9px]" style={{ color: "var(--text-secondary)" }}>{String(v.insight_purpose || "")}</div>
               </div>
             );
           })}
@@ -5228,15 +5241,15 @@ function BiReportResult({ data, t }: { data: Record<string, unknown>; t: Transla
         </div>
         <div>
           <div className="text-base font-extrabold" style={{ color: sendColor }}>{sendRec}</div>
-          <div className="text-[11px]" style={{ color: "#6B7280" }}>{t.biGovernance as string}: <strong style={{ color: vc.fg }}>{verdict}</strong> · {t.biGrade as string}: <strong>{grade}</strong></div>
+          <div className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{t.biGovernance as string}: <strong style={{ color: vc.fg }}>{verdict}</strong> · {t.biGrade as string}: <strong>{grade}</strong></div>
         </div>
       </div>
 
       <div className="grid grid-cols-4 gap-2 mb-3">
         {Object.entries(dims).map(([k, v]) => (
-          <div key={k} className="rounded-lg p-2 border" style={{ borderColor: "#E5E7EB" }} data-testid={`dim-${k}`}>
-            <div className="text-[10px] mb-1" style={{ color: "#6B7280" }}>{k.replace(/_/g, " ")}</div>
-            <div className="rounded-full h-1.5 overflow-hidden" style={{ backgroundColor: "#E5E7EB" }}>
+          <div key={k} className="rounded-lg p-2 border" style={{ borderColor: "var(--border-default)" }} data-testid={`dim-${k}`}>
+            <div className="text-[10px] mb-1" style={{ color: "var(--text-secondary)" }}>{k.replace(/_/g, " ")}</div>
+            <div className="rounded-full h-1.5 overflow-hidden" style={{ backgroundColor: "var(--border-default)" }}>
               <div style={{ width: `${v}%`, height: "100%", backgroundColor: scoreColor(v), borderRadius: 6 }} />
             </div>
             <div className="text-[10px] font-bold mt-0.5" style={{ color: scoreColor(v) }}>{v}/100</div>
@@ -5246,12 +5259,12 @@ function BiReportResult({ data, t }: { data: Record<string, unknown>; t: Transla
 
       {sections.map(sec => (
         <div key={sec.key} className="mb-2">
-          <div onClick={() => setExpandedSection(expandedSection === sec.key ? null : sec.key)} className="px-3 py-2 rounded-lg cursor-pointer flex justify-between items-center" style={{ backgroundColor: "#F3F4F6", border: "1px solid #E5E7EB" }} data-testid={`section-${sec.key}`}>
-            <span className="text-xs font-semibold" style={{ color: "#374151" }}>{sec.label} ({sec.issues.length})</span>
-            <span className="text-[10px]" style={{ color: "#9CA3AF" }}>{expandedSection === sec.key ? "▲" : "▼"}</span>
+          <div onClick={() => setExpandedSection(expandedSection === sec.key ? null : sec.key)} className="px-3 py-2 rounded-lg cursor-pointer flex justify-between items-center" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-default)" }} data-testid={`section-${sec.key}`}>
+            <span className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>{sec.label} ({sec.issues.length})</span>
+            <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{expandedSection === sec.key ? "▲" : "▼"}</span>
           </div>
           {expandedSection === sec.key && sec.issues.length > 0 && (
-            <div className="border border-t-0 rounded-b-lg overflow-hidden" style={{ borderColor: "#E5E7EB" }}>
+            <div className="border border-t-0 rounded-b-lg overflow-hidden" style={{ borderColor: "var(--border-default)" }}>
               {sec.issues.map((issue, i) => {
                 const sev = String((issue as Record<string, unknown>).severity || "Medium");
                 const sc = BI_SEVERITY_COLORS[sev] || BI_SEVERITY_COLORS.Medium;
@@ -5259,9 +5272,9 @@ function BiReportResult({ data, t }: { data: Record<string, unknown>; t: Transla
                   <div key={i} className="px-3 py-2 text-[11px]" style={{ borderBottom: "1px solid #F3F4F6", borderLeft: sev === "Critical" ? "3px solid #B71C1C" : "3px solid transparent", backgroundColor: i % 2 === 0 ? "#fff" : "#F9FAFB" }}>
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: sc.bg, color: sc.fg }}>{sev}</span>
-                      <span className="font-semibold" style={{ color: "#374151" }}>{String((issue as Record<string, unknown>).issue_id || (issue as Record<string, unknown>).field_name || "")}</span>
+                      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{String((issue as Record<string, unknown>).issue_id || (issue as Record<string, unknown>).field_name || "")}</span>
                     </div>
-                    <div style={{ color: "#6B7280" }}>{String((issue as Record<string, unknown>).description || (issue as Record<string, unknown>).remediation || "")}</div>
+                    <div style={{ color: "var(--text-secondary)" }}>{String((issue as Record<string, unknown>).description || (issue as Record<string, unknown>).remediation || "")}</div>
                   </div>
                 );
               })}
@@ -5271,10 +5284,10 @@ function BiReportResult({ data, t }: { data: Record<string, unknown>; t: Transla
       ))}
 
       {checklist.length > 0 && (
-        <div className="rounded-lg p-3 mt-2 border" style={{ borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }} data-testid="pre-send-checklist">
+        <div className="rounded-lg p-3 mt-2 border" style={{ borderColor: "var(--border-accent)", backgroundColor: "var(--bg-hover)" }} data-testid="pre-send-checklist">
           <div className="text-xs font-bold mb-2" style={{ color: "#1A4B8C" }}>✅ {t.biPreSendChecklist as string}</div>
           {checklist.map((item, i) => (
-            <label key={i} className="flex items-center gap-2 py-0.5 text-[11px] cursor-pointer" style={{ color: "#374151" }}>
+            <label key={i} className="flex items-center gap-2 py-0.5 text-[11px] cursor-pointer" style={{ color: "var(--text-primary)" }}>
               <input type="checkbox" checked={checkedItems.has(i)} onChange={() => setCheckedItems(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; })} style={{ accentColor: "#2E7D32" }} />
               {item}
             </label>
@@ -5300,36 +5313,36 @@ function BiTestCaseResult({ data, t, testStatus, setTestStatus }: { data: Record
   return (
     <>
       <div className="flex gap-3 mb-3 flex-wrap">
-        <div className="rounded-lg p-3 text-center border" style={{ borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }}>
-          <div className="text-lg font-extrabold" style={{ color: "#1A1A2E" }}>{totalCases}</div>
-          <div className="text-[10px]" style={{ color: "#6B7280" }}>{t.biTotal as string}</div>
+        <div className="rounded-lg p-3 text-center border" style={{ borderColor: "var(--border-accent)", backgroundColor: "var(--bg-hover)" }}>
+          <div className="text-lg font-extrabold" style={{ color: "var(--text-primary)" }}>{totalCases}</div>
+          <div className="text-[10px]" style={{ color: "var(--text-secondary)" }}>{t.biTotal as string}</div>
         </div>
         <div className="rounded-lg p-3 text-center border" style={{ borderColor: "#FECACA", backgroundColor: "#FEF2F2" }}>
           <div className="text-lg font-extrabold" style={{ color: "#DC2626" }}>{Number(data.critical_test_count || 0)}</div>
-          <div className="text-[10px]" style={{ color: "#6B7280" }}>{t.biCritical as string}</div>
+          <div className="text-[10px]" style={{ color: "var(--text-secondary)" }}>{t.biCritical as string}</div>
         </div>
       </div>
 
-      <div className="rounded-lg p-2.5 mb-3 flex items-center gap-3 border" style={{ borderColor: "#E5E7EB" }} data-testid="test-progress">
-        <div className="text-[10px]" style={{ color: "#6B7280" }}>{t.biProgress as string}</div>
-        <div className="flex-1 rounded-full h-2.5 overflow-hidden flex" style={{ backgroundColor: "#E5E7EB" }}>
-          {passed > 0 && <div style={{ width: `${(passed / totalCases) * 100}%`, backgroundColor: "#2E7D32", height: "100%" }} />}
+      <div className="rounded-lg p-2.5 mb-3 flex items-center gap-3 border" style={{ borderColor: "var(--border-default)" }} data-testid="test-progress">
+        <div className="text-[10px]" style={{ color: "var(--text-secondary)" }}>{t.biProgress as string}</div>
+        <div className="flex-1 rounded-full h-2.5 overflow-hidden flex" style={{ backgroundColor: "var(--border-default)" }}>
+          {passed > 0 && <div style={{ width: `${(passed / totalCases) * 100}%`, backgroundColor: "var(--accent-green)", height: "100%" }} />}
           {failed > 0 && <div style={{ width: `${(failed / totalCases) * 100}%`, backgroundColor: "#DC2626", height: "100%" }} />}
         </div>
-        <div className="text-[10px] whitespace-nowrap" style={{ color: "#6B7280" }}>
+        <div className="text-[10px] whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
           <span style={{ color: "#2E7D32" }}>{passed}✓</span> / <span style={{ color: "#DC2626" }}>{failed}✕</span> / {notRun}○
         </div>
       </div>
 
       <div className="flex gap-1 mb-3 flex-wrap">
-        <button onClick={() => setActiveCategory(null)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === null ? "#EFF6FF" : "transparent", color: activeCategory === null ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === null ? "#BFDBFE" : "#E5E7EB"}` }}>{t.biAll as string}</button>
+        <button onClick={() => setActiveCategory(null)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === null ? "var(--bg-hover)" : "transparent", color: activeCategory === null ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === null ? "var(--border-accent)" : "var(--border-default)"}` }}>{t.biAll as string}</button>
         {categories.map(cat => (
-          <button key={cat} onClick={() => setActiveCategory(cat)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === cat ? "#EFF6FF" : "transparent", color: activeCategory === cat ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === cat ? "#BFDBFE" : "#E5E7EB"}` }} data-testid={`cat-filter-${cat}`}>{cat}</button>
+          <button key={cat} onClick={() => setActiveCategory(cat)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === cat ? "var(--bg-hover)" : "transparent", color: activeCategory === cat ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === cat ? "var(--border-accent)" : "var(--border-default)"}` }} data-testid={`cat-filter-${cat}`}>{cat}</button>
         ))}
       </div>
 
       <div className="flex justify-end mb-2">
-        <button onClick={() => { exportTestRunSheet(cases, testStatus); downloadBiReport(); }} className="text-[10px] font-semibold px-3 py-1 rounded-lg" style={{ background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff" }} data-testid="button-export-test-run">
+        <button onClick={() => { exportTestRunSheet(cases, testStatus); downloadBiReport(); }} className="text-[10px] font-semibold px-3 py-1 rounded-lg" style={{ background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "var(--text-primary)" }} data-testid="button-export-test-run">
           ⬇ {t.biExportTestRun as string}
         </button>
       </div>
@@ -5341,15 +5354,15 @@ function BiTestCaseResult({ data, t, testStatus, setTestStatus }: { data: Record
         const expanded = expandedCase === tcId;
         const status = testStatus[tcId];
         return (
-          <div key={i} className="mb-2 rounded-lg overflow-hidden border" style={{ borderColor: "#E5E7EB", borderLeft: sev === "Critical" ? "3px solid #B71C1C" : "3px solid transparent" }} data-testid={`tc-${tcId}`}>
-            <div onClick={() => setExpandedCase(expanded ? null : tcId)} className="px-3 py-2 flex items-center gap-2 cursor-pointer" style={{ backgroundColor: "#F9FAFB" }}>
-              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: "#1A4B8C", color: "#fff" }}>{tcId}</span>
+          <div key={i} className="mb-2 rounded-lg overflow-hidden border" style={{ borderColor: "var(--border-default)", borderLeft: sev === "Critical" ? "3px solid #B71C1C" : "3px solid transparent" }} data-testid={`tc-${tcId}`}>
+            <div onClick={() => setExpandedCase(expanded ? null : tcId)} className="px-3 py-2 flex items-center gap-2 cursor-pointer" style={{ backgroundColor: "var(--bg-card)" }}>
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: "var(--accent-blue)", color: "var(--text-primary)" }}>{tcId}</span>
               <span className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: sc.bg, color: sc.fg }}>{sev}</span>
-              <span className="flex-1 text-[11px] font-semibold" style={{ color: "#1A1A2E" }}>{String(tc.test_name || "")}</span>
-              <span className="text-[10px]" style={{ color: "#9CA3AF" }}>{expanded ? "▲" : "▼"}</span>
+              <span className="flex-1 text-[11px] font-semibold" style={{ color: "var(--text-primary)" }}>{String(tc.test_name || "")}</span>
+              <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{expanded ? "▲" : "▼"}</span>
             </div>
             {expanded && (
-              <div className="px-3 py-2 space-y-1.5 text-[11px]" style={{ backgroundColor: "#fff", color: "#374151" }}>
+              <div className="px-3 py-2 space-y-1.5 text-[11px]" style={{ backgroundColor: "#fff", color: "var(--text-primary)" }}>
                 <div><strong>{t.biObjective as string}</strong> {String(tc.objective || "")}</div>
                 <div><strong>{t.biSteps as string}</strong></div>
                 <ol className="pl-4 list-decimal space-y-0.5">
@@ -5365,7 +5378,7 @@ function BiTestCaseResult({ data, t, testStatus, setTestStatus }: { data: Record
           </div>
         );
       })}
-      {filtered.length > 20 && <div className="text-[10px] text-center py-1" style={{ color: "#9CA3AF" }}>+ {filtered.length - 20} {t.biMoreTestCases as string}</div>}
+      {filtered.length > 20 && <div className="text-[10px] text-center py-1" style={{ color: "var(--text-muted)" }}>+ {filtered.length - 20} {t.biMoreTestCases as string}</div>}
     </>
   );
 }
@@ -5387,39 +5400,39 @@ function BiDashboardTestResult({ data, t, testStatus, setTestStatus }: { data: R
   return (
     <>
       <div className="flex gap-3 mb-3 flex-wrap items-center">
-        <div className="rounded-lg p-3 text-center border" style={{ borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }}>
-          <div className="text-lg font-extrabold" style={{ color: "#1A1A2E" }}>{totalCases}</div>
-          <div className="text-[10px]" style={{ color: "#6B7280" }}>{t.biTotal as string}</div>
+        <div className="rounded-lg p-3 text-center border" style={{ borderColor: "var(--border-accent)", backgroundColor: "var(--bg-hover)" }}>
+          <div className="text-lg font-extrabold" style={{ color: "var(--text-primary)" }}>{totalCases}</div>
+          <div className="text-[10px]" style={{ color: "var(--text-secondary)" }}>{t.biTotal as string}</div>
         </div>
         <div className="rounded-lg p-3 text-center border" style={{ borderColor: "#FECACA", backgroundColor: "#FEF2F2" }}>
           <div className="text-lg font-extrabold" style={{ color: "#DC2626" }}>{Number(data.critical_test_count || 0)}</div>
-          <div className="text-[10px]" style={{ color: "#6B7280" }}>{t.biCritical as string}</div>
+          <div className="text-[10px]" style={{ color: "var(--text-secondary)" }}>{t.biCritical as string}</div>
         </div>
         <div className="rounded-lg p-2.5 border" style={{ borderColor: `${govRiskColor}44`, backgroundColor: `${govRiskColor}08` }}>
           <div className="text-[11px] font-bold" style={{ color: govRiskColor }}>{t.biGovRisk as string}: {govRisk}</div>
         </div>
       </div>
 
-      <div className="rounded-lg p-2.5 mb-3 flex items-center gap-3 border" style={{ borderColor: "#E5E7EB" }} data-testid="dashtest-progress">
-        <div className="text-[10px]" style={{ color: "#6B7280" }}>{t.biProgress as string}</div>
-        <div className="flex-1 rounded-full h-2.5 overflow-hidden flex" style={{ backgroundColor: "#E5E7EB" }}>
-          {passed > 0 && <div style={{ width: `${(passed / totalCases) * 100}%`, backgroundColor: "#2E7D32", height: "100%" }} />}
+      <div className="rounded-lg p-2.5 mb-3 flex items-center gap-3 border" style={{ borderColor: "var(--border-default)" }} data-testid="dashtest-progress">
+        <div className="text-[10px]" style={{ color: "var(--text-secondary)" }}>{t.biProgress as string}</div>
+        <div className="flex-1 rounded-full h-2.5 overflow-hidden flex" style={{ backgroundColor: "var(--border-default)" }}>
+          {passed > 0 && <div style={{ width: `${(passed / totalCases) * 100}%`, backgroundColor: "var(--accent-green)", height: "100%" }} />}
           {failed > 0 && <div style={{ width: `${(failed / totalCases) * 100}%`, backgroundColor: "#DC2626", height: "100%" }} />}
         </div>
-        <div className="text-[10px] whitespace-nowrap" style={{ color: "#6B7280" }}>
+        <div className="text-[10px] whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
           <span style={{ color: "#2E7D32" }}>{passed}✓</span> / <span style={{ color: "#DC2626" }}>{failed}✕</span> / {notRun}○
         </div>
       </div>
 
       <div className="flex gap-1 mb-3 flex-wrap">
-        <button onClick={() => setActiveCategory(null)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === null ? "#EFF6FF" : "transparent", color: activeCategory === null ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === null ? "#BFDBFE" : "#E5E7EB"}` }}>{t.biAll as string}</button>
+        <button onClick={() => setActiveCategory(null)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === null ? "var(--bg-hover)" : "transparent", color: activeCategory === null ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === null ? "var(--border-accent)" : "var(--border-default)"}` }}>{t.biAll as string}</button>
         {DASHBOARD_CATEGORIES_EN.map(cat => (
-          <button key={cat} onClick={() => setActiveCategory(cat)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === cat ? "#EFF6FF" : "transparent", color: activeCategory === cat ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === cat ? "#BFDBFE" : "#E5E7EB"}` }} data-testid={`dashcat-filter-${cat}`}>{cat}</button>
+          <button key={cat} onClick={() => setActiveCategory(cat)} className="px-2 py-1 rounded-lg text-[10px]" style={{ backgroundColor: activeCategory === cat ? "var(--bg-hover)" : "transparent", color: activeCategory === cat ? "#1A4B8C" : "#9CA3AF", border: `1px solid ${activeCategory === cat ? "var(--border-accent)" : "var(--border-default)"}` }} data-testid={`dashcat-filter-${cat}`}>{cat}</button>
         ))}
       </div>
 
       <div className="flex justify-end mb-2">
-        <button onClick={() => { exportDashboardTestRunSheet(cases, testStatus); downloadBiReport(); }} className="text-[10px] font-semibold px-3 py-1 rounded-lg" style={{ background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "#fff" }} data-testid="button-export-dashtest-run">
+        <button onClick={() => { exportDashboardTestRunSheet(cases, testStatus); downloadBiReport(); }} className="text-[10px] font-semibold px-3 py-1 rounded-lg" style={{ background: "linear-gradient(135deg, #1B5E20, #2E7D32)", color: "var(--text-primary)" }} data-testid="button-export-dashtest-run">
           ⬇ {t.biExportTestRun as string}
         </button>
       </div>
@@ -5431,23 +5444,23 @@ function BiDashboardTestResult({ data, t, testStatus, setTestStatus }: { data: R
         const expanded = expandedCase === tcId;
         const status = testStatus[tcId];
         return (
-          <div key={i} className="mb-2 rounded-lg overflow-hidden border" style={{ borderColor: "#E5E7EB", borderLeft: sev === "Critical" ? "3px solid #B71C1C" : "3px solid transparent" }} data-testid={`dbt-${tcId}`}>
-            <div onClick={() => setExpandedCase(expanded ? null : tcId)} className="px-3 py-2 flex items-center gap-2 cursor-pointer" style={{ backgroundColor: "#F9FAFB" }}>
-              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: "#0D2E5C", color: "#fff" }}>{tcId}</span>
+          <div key={i} className="mb-2 rounded-lg overflow-hidden border" style={{ borderColor: "var(--border-default)", borderLeft: sev === "Critical" ? "3px solid #B71C1C" : "3px solid transparent" }} data-testid={`dbt-${tcId}`}>
+            <div onClick={() => setExpandedCase(expanded ? null : tcId)} className="px-3 py-2 flex items-center gap-2 cursor-pointer" style={{ backgroundColor: "var(--bg-card)" }}>
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: "#0D2E5C", color: "var(--text-primary)" }}>{tcId}</span>
               <span className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ backgroundColor: sc.bg, color: sc.fg }}>{sev}</span>
-              {tc.visual_tested && <span className="px-1.5 py-0.5 rounded text-[8px]" style={{ backgroundColor: "#EFF6FF", color: "#1A4B8C", border: "1px solid #BFDBFE" }}>{String(tc.visual_tested)}</span>}
-              <span className="flex-1 text-[11px] font-semibold" style={{ color: "#1A1A2E" }}>{String(tc.test_name || "")}</span>
-              <span className="text-[10px]" style={{ color: "#9CA3AF" }}>{expanded ? "▲" : "▼"}</span>
+              {tc.visual_tested && <span className="px-1.5 py-0.5 rounded text-[8px]" style={{ backgroundColor: "var(--bg-hover)", color: "#1A4B8C", border: "1px solid var(--border-accent)" }}>{String(tc.visual_tested)}</span>}
+              <span className="flex-1 text-[11px] font-semibold" style={{ color: "var(--text-primary)" }}>{String(tc.test_name || "")}</span>
+              <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{expanded ? "▲" : "▼"}</span>
             </div>
             {expanded && (
-              <div className="px-3 py-2 space-y-1.5 text-[11px]" style={{ backgroundColor: "#fff", color: "#374151" }}>
+              <div className="px-3 py-2 space-y-1.5 text-[11px]" style={{ backgroundColor: "#fff", color: "var(--text-primary)" }}>
                 <div><strong>{t.biObjective as string}</strong> {String(tc.objective || "")}</div>
                 <div><strong>{t.biSteps as string}</strong></div>
                 <ol className="pl-4 list-decimal space-y-0.5">
                   {((tc.test_steps || []) as string[]).map((s, j) => <li key={j}>{s}</li>)}
                 </ol>
                 <div style={{ color: "#2E7D32" }}><strong>{t.biExpected as string}</strong> {String(tc.expected_result || "")}</div>
-                {tc.power_bi_specific_note && <div className="p-2 rounded-lg text-[10px]" style={{ backgroundColor: "#EFF6FF", color: "#1A4B8C" }}>💡 {String(tc.power_bi_specific_note)}</div>}
+                {tc.power_bi_specific_note && <div className="p-2 rounded-lg text-[10px]" style={{ backgroundColor: "var(--bg-hover)", color: "#1A4B8C" }}>💡 {String(tc.power_bi_specific_note)}</div>}
                 <div className="flex gap-2 mt-2">
                   <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "pass" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "pass" ? "#2E7D32" : "#D1D5DB"}`, backgroundColor: status === "pass" ? "#F0FDF4" : "transparent", color: status === "pass" ? "#2E7D32" : "#6B7280" }} data-testid={`btn-pass-${tcId}`}>{t.biPass as string}</button>
                   <button onClick={() => setTestStatus(prev => ({ ...prev, [tcId]: "fail" }))} className="px-3 py-1 rounded-lg text-[11px] font-semibold" style={{ border: `1px solid ${status === "fail" ? "#DC2626" : "#D1D5DB"}`, backgroundColor: status === "fail" ? "#FEF2F2" : "transparent", color: status === "fail" ? "#DC2626" : "#6B7280" }} data-testid={`btn-fail-${tcId}`}>{t.biFail as string}</button>
@@ -5457,7 +5470,7 @@ function BiDashboardTestResult({ data, t, testStatus, setTestStatus }: { data: R
           </div>
         );
       })}
-      {filtered.length > 20 && <div className="text-[10px] text-center py-1" style={{ color: "#9CA3AF" }}>+ {filtered.length - 20} {t.biMoreTestCases as string}</div>}
+      {filtered.length > 20 && <div className="text-[10px] text-center py-1" style={{ color: "var(--text-muted)" }}>+ {filtered.length - 20} {t.biMoreTestCases as string}</div>}
     </>
   );
 }
@@ -5548,7 +5561,7 @@ function ThreadCard({
         data-testid={`user-command-${userMsg.id}`}
       >
         <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-          <User className="w-3.5 h-3.5" style={{ color: "#6B7280" }} />
+          <User className="w-3.5 h-3.5" style={{ color: "var(--text-secondary)" }} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -5557,16 +5570,16 @@ function ThreadCard({
               <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#2563EB15", color: "#2563EB" }}>{tag}</span>
             )}
           </div>
-          <p className="text-xs truncate" style={{ color: "#1A1A2E" }}>{preview}</p>
+          <p className="text-xs truncate" style={{ color: "var(--text-primary)" }}>{preview}</p>
           {excelName && (
             <div className="flex items-center gap-1 mt-0.5">
-              <Paperclip className="w-2.5 h-2.5" style={{ color: "#9CA3AF" }} />
-              <span className="text-[9px]" style={{ color: "#9CA3AF" }}>{excelName}</span>
+              <Paperclip className="w-2.5 h-2.5" style={{ color: "var(--text-muted)" }} />
+              <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>{excelName}</span>
             </div>
           )}
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <span className="text-[9px] tabular-nums" style={{ color: "#9CA3AF" }}>{userTimestamp}</span>
+          <span className="text-[9px] tabular-nums" style={{ color: "var(--text-muted)" }}>{userTimestamp}</span>
           {isActiveStreaming ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "#E65100" }} />
           ) : assistantMsg ? (
@@ -5575,20 +5588,20 @@ function ThreadCard({
             <Circle className="w-3.5 h-3.5" style={{ color: "#D1D5DB" }} />
           )}
           {isCollapsed
-            ? <ChevronRight className="w-3.5 h-3.5" style={{ color: "#9CA3AF" }} />
-            : <ChevronDown className="w-3.5 h-3.5" style={{ color: "#9CA3AF" }} />}
+            ? <ChevronRight className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} />
+            : <ChevronDown className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} />}
         </div>
       </div>
 
       {/* Expanded body */}
       {!isCollapsed && (
-        <div className="border-t" style={{ borderColor: "#E5E7EB" }}>
+        <div className="border-t" style={{ borderColor: "var(--border-default)" }}>
 
           {/* Full user command */}
-          <div className="px-4 py-2.5" style={{ backgroundColor: "#F8FAFC" }}>
+          <div className="px-4 py-2.5" style={{ backgroundColor: "var(--bg-sidebar)" }}>
             <div className="flex items-start gap-2">
               <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <User className="w-3 h-3" style={{ color: "#6B7280" }} />
+                <User className="w-3 h-3" style={{ color: "var(--text-secondary)" }} />
               </div>
               <div className="flex-1 min-w-0">
                 {(() => {
@@ -5602,14 +5615,14 @@ function ThreadCard({
                     return (
                       <>
                         {cmdPart.trim() && (
-                          <p className="text-xs leading-relaxed whitespace-pre-wrap break-words mb-1.5" style={{ color: "#374151" }}>
+                          <p className="text-xs leading-relaxed whitespace-pre-wrap break-words mb-1.5" style={{ color: "var(--text-primary)" }}>
                             {cmdPart.trim()}
                           </p>
                         )}
                         <div>
                           <button
                             className="text-[10px] font-medium px-2 py-0.5 rounded border"
-                            style={{ color: "#2563EB", borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }}
+                            style={{ color: "#2563EB", borderColor: "var(--border-accent)", backgroundColor: "var(--bg-hover)" }}
                             onClick={(e) => { e.stopPropagation(); setIsDataExpanded(v => !v); }}
                           >
                             {isDataExpanded ? "Hide data" : `Show data (${dataLines.length} lines)`}
@@ -5640,12 +5653,12 @@ function ThreadCard({
                     const lines = rawText.split("\n");
                     return (
                       <div>
-                        <p className="text-xs leading-relaxed break-words mb-1.5" style={{ color: "#374151" }}>
+                        <p className="text-xs leading-relaxed break-words mb-1.5" style={{ color: "var(--text-primary)" }}>
                           {lines[0]}
                         </p>
                         <button
                           className="text-[10px] font-medium px-2 py-0.5 rounded border"
-                          style={{ color: "#2563EB", borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }}
+                          style={{ color: "#2563EB", borderColor: "var(--border-accent)", backgroundColor: "var(--bg-hover)" }}
                           onClick={(e) => { e.stopPropagation(); setIsDataExpanded(v => !v); }}
                         >
                           {isDataExpanded ? "Hide data" : `Show data (${lines.length} lines)`}
@@ -5672,7 +5685,7 @@ function ThreadCard({
                   }
 
                   return (
-                    <p className="text-xs leading-relaxed whitespace-pre-wrap break-words" style={{ color: "#374151" }}>
+                    <p className="text-xs leading-relaxed whitespace-pre-wrap break-words" style={{ color: "var(--text-primary)" }}>
                       {rawText}
                     </p>
                   );
@@ -5689,7 +5702,7 @@ function ThreadCard({
 
           {/* Agent steps */}
           {stepsToShow.length > 0 && (
-            <div className="px-4 py-2.5 border-t" style={{ borderColor: "#E5E7EB" }}>
+            <div className="px-4 py-2.5 border-t" style={{ borderColor: "var(--border-default)" }}>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   {isDone ? (
@@ -5708,7 +5721,7 @@ function ThreadCard({
                   }, 0);
                   if (totalMs > 0) {
                     return (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ color: "#0D2E5C", backgroundColor: "#EFF6FF" }}>
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ color: "#0D2E5C", backgroundColor: "var(--bg-hover)" }}>
                         Total: {Math.round(totalMs / 1000)}s
                       </span>
                     );
@@ -5721,7 +5734,7 @@ function ThreadCard({
                 const doneCount = stepsToShow.filter(s => s.status === "done" || isDone).length;
                 const pct = isDone ? 100 : Math.round((doneCount / stepsToShow.length) * 100);
                 return (
-                  <div style={{ height: "3px", backgroundColor: "#E5E7EB" }} className="w-full rounded-full mb-2.5 overflow-hidden">
+                  <div style={{ height: "3px", backgroundColor: "var(--border-default)" }} className="w-full rounded-full mb-2.5 overflow-hidden">
                     <div
                       className="h-full rounded-full animate-progress-fill"
                       style={{ "--progress-target": `${pct}%`, width: `${pct}%`, backgroundColor: isDone ? "#2E7D32" : "#E65100" } as React.CSSProperties}
@@ -5758,7 +5771,7 @@ function ThreadCard({
                         <span className="mr-1">{getStepIcon(step.label)}</span>{step.label}
                       </span>
                       {effectivelyDone && doneSec !== null && (
-                        <span className="text-[10px] font-medium" style={{ color: "#6B7280" }}>
+                        <span className="text-[10px] font-medium" style={{ color: "var(--text-secondary)" }}>
                           {doneSec === 0 ? "<1s" : `${doneSec}s`}
                         </span>
                       )}
@@ -5786,7 +5799,7 @@ function ThreadCard({
 
           {/* Streaming content preview */}
           {isActiveStreaming && streamingContent && (
-            <div className="px-4 py-2.5 border-t" style={{ borderColor: "#E5E7EB" }}>
+            <div className="px-4 py-2.5 border-t" style={{ borderColor: "var(--border-default)" }}>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: "#067647" }}>
                   <Bot className="w-3 h-3 text-white" />
@@ -5794,12 +5807,12 @@ function ThreadCard({
                 <Loader2 className="w-3 h-3 animate-spin" style={{ color: "#E65100" }} />
               </div>
               {(/^\s*```(?:json)?\s*\{[\s\S]*"(?:analysis_summary|scan_summary|fact_tables|report_title|informatica_sql)"/.test(streamingContent) || /\|\s*Business Term/i.test(streamingContent)) ? (
-                <div className="flex items-center gap-2 text-[11px]" style={{ color: "#6B7280" }}>
+                <div className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-secondary)" }}>
                   <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" style={{ color: "#2563EB" }} />
                   <span>Generating analysis — results will appear in the Outputs panel when complete...</span>
                 </div>
               ) : (
-                <div className="prose prose-sm max-w-none break-words" style={{ color: "#1A1A2E" }}>
+                <div className="prose prose-sm max-w-none break-words" style={{ color: "var(--text-primary)" }}>
                   <ReactMarkdown>{streamingContent}</ReactMarkdown>
                   <span className={`inline-block w-1.5 h-3.5 bg-primary animate-pulse ${isRtl ? "mr-0.5" : "ml-0.5"} align-text-bottom`} />
                 </div>
@@ -5809,13 +5822,13 @@ function ThreadCard({
 
           {/* Agent response body */}
           {assistantMsg && (
-            <div className="px-4 py-2.5 border-t space-y-3" style={{ borderColor: "#E5E7EB" }}>
+            <div className="px-4 py-2.5 border-t space-y-3" style={{ borderColor: "var(--border-default)" }}>
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: "#067647" }}>
                   <Bot className="w-3 h-3 text-white" />
                 </div>
                 {/* Agent name badge — always shows, never shows provider name */}
-                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#0D2E5C", color: "#ffffff" }}>
+                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#0D2E5C", color: "var(--text-primary)" }}>
                   {tag || "Data Agent"}
                 </span>
                 {/* Status chip */}
@@ -5830,7 +5843,7 @@ function ThreadCard({
                 )}
                 <div className="flex-1" />
                 {agentTimestamp && (
-                  <span className="text-[9px] tabular-nums" style={{ color: "#9CA3AF" }}>{agentTimestamp}</span>
+                  <span className="text-[9px] tabular-nums" style={{ color: "var(--text-muted)" }}>{agentTimestamp}</span>
                 )}
               </div>
               {/* Metric pills row — hidden when empty */}
@@ -5869,7 +5882,7 @@ function ThreadCard({
               })()}
 
               {hasSummary && (
-                <div className="text-xs leading-relaxed whitespace-pre-wrap break-words" style={{ color: "#1A1A2E" }}>{summaryOverride}</div>
+                <div className="text-xs leading-relaxed whitespace-pre-wrap break-words" style={{ color: "var(--text-primary)" }}>{summaryOverride}</div>
               )}
 
               {hasDataModel && (
@@ -5879,7 +5892,7 @@ function ThreadCard({
               {hasDqAnalysis && dqAnalysis && (
                 <div className="space-y-2" data-testid={`dq-scorecard-${assistantMsg.id}`}>
                   <DqDonutChart dqAnalysis={dqAnalysis} lang={lang} />
-                  <div className="text-[11px]" style={{ color: "#6B7280" }}>
+                  <div className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
                     {lang === "ar"
                       ? `تم تحليل ${dqAnalysis.analysis_summary.total_fields_analyzed} حقل — ${dqAnalysis.analysis_summary.total_rules_generated} قاعدة جودة`
                       : `${dqAnalysis.analysis_summary.total_fields_analyzed} fields analyzed — ${dqAnalysis.analysis_summary.total_rules_generated} quality rules generated`}
@@ -5902,7 +5915,7 @@ function ThreadCard({
                     <span className="text-[11px] font-semibold" style={{ color: "#F57C00" }}>
                       {lang === "ar" ? "مخرجات إنفورماتيكا" : "Informatica Output"}
                     </span>
-                    <span className="text-[10px]" style={{ color: "#9CA3AF" }}>
+                    <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                       — {Object.keys(informaticaOutput.descriptions).length} {lang === "ar" ? "حقل" : "fields"}
                     </span>
                   </div>
@@ -5918,11 +5931,11 @@ function ThreadCard({
                       <tbody>
                         {Object.keys(informaticaOutput.descriptions).slice(0, 5).map((field, i) => (
                           <tr key={field} style={{ backgroundColor: i % 2 === 0 ? "#ffffff" : "#FFF7ED" }}>
-                            <td className="px-2 py-1 font-mono" style={{ color: "#374151", borderBottom: "1px solid #FEE2C5" }}>{field}</td>
-                            <td className="px-2 py-1" style={{ color: "#6B7280", borderBottom: "1px solid #FEE2C5" }}>
+                            <td className="px-2 py-1 font-mono" style={{ color: "var(--text-primary)", borderBottom: "1px solid #FEE2C5" }}>{field}</td>
+                            <td className="px-2 py-1" style={{ color: "var(--text-secondary)", borderBottom: "1px solid #FEE2C5" }}>
                               {informaticaOutput.data_classification[field]?.classification_level || "—"}
                             </td>
-                            <td className="px-2 py-1" style={{ color: "#6B7280", borderBottom: "1px solid #FEE2C5" }}>
+                            <td className="px-2 py-1" style={{ color: "var(--text-secondary)", borderBottom: "1px solid #FEE2C5" }}>
                               {informaticaOutput.format_types[field] || "—"}
                             </td>
                           </tr>
@@ -5931,7 +5944,7 @@ function ThreadCard({
                     </table>
                   </div>
                   {Object.keys(informaticaOutput.descriptions).length > 5 && (
-                    <div className="text-[10px]" style={{ color: "#9CA3AF" }}>
+                    <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                       {lang === "ar"
                         ? `+ ${Object.keys(informaticaOutput.descriptions).length - 5} حقل آخر في ملف النتائج`
                         : `+ ${Object.keys(informaticaOutput.descriptions).length - 5} more fields in result file`}
@@ -5975,12 +5988,12 @@ function ThreadCard({
                 if (hasStructuredJson) {
                   return (
                     <div className="flex items-start gap-2 p-3 rounded-lg" style={{ backgroundColor: "#F0F9F4", border: "1px solid #BBF7D0" }}>
-                      <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: "#2E7D32" }}>
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: "var(--accent-green)" }}>
                         <span className="text-white text-[8px] font-bold">✓</span>
                       </div>
                       <div>
                         <p className="text-xs font-medium" style={{ color: "#2E7D32" }}>Analysis complete</p>
-                        <p className="text-[11px]" style={{ color: "#6B7280" }}>Results are displayed in the Outputs panel. Download the Excel file to view the full report.</p>
+                        <p className="text-[11px]" style={{ color: "var(--text-secondary)" }}>Results are displayed in the Outputs panel. Download the Excel file to view the full report.</p>
                       </div>
                     </div>
                   );
@@ -6001,7 +6014,7 @@ function ThreadCard({
                   );
                 }
                 return (
-                  <div className="prose prose-sm max-w-none break-words" style={{ color: "#1A1A2E" }}>
+                  <div className="prose prose-sm max-w-none break-words" style={{ color: "var(--text-primary)" }}>
                     <ReactMarkdown>{assistantMsg.content}</ReactMarkdown>
                   </div>
                 );
@@ -6010,20 +6023,20 @@ function ThreadCard({
           )}
 
           {/* Footer: timestamps + download + follow-up */}
-          <div className="px-4 py-2 border-t flex items-center gap-3 flex-wrap" style={{ borderColor: "#E5E7EB", backgroundColor: "#F8FAFC" }}>
+          <div className="px-4 py-2 border-t flex items-center gap-3 flex-wrap" style={{ borderColor: "var(--border-default)", backgroundColor: "var(--bg-sidebar)" }}>
             <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
               <div className="flex items-center gap-1">
-                <Clock className="w-3 h-3" style={{ color: "#9CA3AF" }} />
-                <span className="text-[9px]" style={{ color: "#9CA3AF" }}>{t.sentAt}</span>
-                <span className="text-[9px] font-medium tabular-nums" style={{ color: "#6B7280" }}>{userTimestamp}</span>
+                <Clock className="w-3 h-3" style={{ color: "var(--text-muted)" }} />
+                <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>{t.sentAt}</span>
+                <span className="text-[9px] font-medium tabular-nums" style={{ color: "var(--text-secondary)" }}>{userTimestamp}</span>
               </div>
               {agentTimestamp && (
                 <>
                   <span className="text-[9px]" style={{ color: "#D1D5DB" }}>→</span>
                   <div className="flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3" style={{ color: "#2E7D32" }} />
-                    <span className="text-[9px]" style={{ color: "#9CA3AF" }}>{t.completedAt}</span>
-                    <span className="text-[9px] font-medium tabular-nums" style={{ color: "#6B7280" }}>{agentTimestamp}</span>
+                    <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>{t.completedAt}</span>
+                    <span className="text-[9px] font-medium tabular-nums" style={{ color: "var(--text-secondary)" }}>{agentTimestamp}</span>
                   </div>
                 </>
               )}
@@ -6041,7 +6054,7 @@ function ThreadCard({
                   variant="outline"
                   onClick={() => { navigator.clipboard.writeText(assistantMsg.content); }}
                   className="gap-1 text-[10px] font-medium h-6 px-2 rounded-md"
-                  style={{ color: "#6B7280", borderColor: "#D1D5DB" }}
+                  style={{ color: "var(--text-secondary)", borderColor: "var(--border-default)" }}
                 >
                   <Square className="w-2.5 h-2.5" />
                   {lang === "ar" ? "نسخ" : "Copy"}
@@ -6053,7 +6066,7 @@ function ThreadCard({
                   variant="outline"
                   onClick={onRetry}
                   className="gap-1 text-[10px] font-medium h-6 px-2 rounded-md"
-                  style={{ color: "#6B7280", borderColor: "#D1D5DB" }}
+                  style={{ color: "var(--text-secondary)", borderColor: "var(--border-default)" }}
                 >
                   <Play className="w-2.5 h-2.5" />
                   {lang === "ar" ? "إعادة" : "Retry"}
@@ -6093,7 +6106,7 @@ function DqDonutChart({ dqAnalysis, lang }: { dqAnalysis: DqAnalysisResult; lang
     { name: "Logical", value: logical, color: "#51BAB4" },
     { name: "Business", value: business, color: "#774896" },
     { name: "Cross-Field", value: crossField, color: "#067647" },
-    { name: "Warnings", value: warnings, color: "#D97706" },
+    { name: "Warnings", value: warnings, color: "var(--accent-amber)" },
   ].filter(d => d.value > 0);
 
   const score = total > 0 ? Math.min(100, Math.round((total / Math.max(dqAnalysis.analysis_summary.total_fields_analyzed * 3, 1)) * 100)) : 0;
@@ -6121,11 +6134,11 @@ function DqDonutChart({ dqAnalysis, lang }: { dqAnalysis: DqAnalysisResult; lang
           { label: lang === "ar" ? "منطقية" : "Logical", value: logical, color: "#51BAB4" },
           { label: lang === "ar" ? "أعمال" : "Business", value: business, color: "#774896" },
           { label: lang === "ar" ? "عبر الحقول" : "Cross-Field", value: crossField, color: "#067647" },
-          { label: lang === "ar" ? "تحذيرات" : "Warnings", value: warnings, color: "#D97706" },
+          { label: lang === "ar" ? "تحذيرات" : "Warnings", value: warnings, color: "var(--accent-amber)" },
         ].map((item, i) => (
           <div key={i} className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-            <span className="text-[10px]" style={{ color: "#6B7280" }}>{item.label}</span>
+            <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>{item.label}</span>
             <span className="text-[10px] font-bold" style={{ color: item.color }}>{item.value}</span>
           </div>
         ))}
