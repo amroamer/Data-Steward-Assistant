@@ -2221,7 +2221,15 @@ export default function ChatPage() {
     let lastPii: PiiScanResult | null = null;
     let lastDq: DqAnalysisResult | null = null;
     let lastInformatica: InformaticaOutput | null = null;
+    let accumulatedRows: ResultRow[] = [];
+    const accumulatedAnalyses = new Set<AnalysisType>();
+    let restoredFileName: string | null = null;
     for (const msg of activeConversation.messages) {
+      if (msg.role === "user") {
+        const uploadMatch = msg.content.match(/Uploaded:\s*(.+)/);
+        if (uploadMatch) restoredFileName = uploadMatch[1].trim();
+        continue;
+      }
       if (msg.role !== "assistant") continue;
       const insights = detectInsightsJSON(msg.content);
       const msgParts: string[] = [];
@@ -2275,16 +2283,28 @@ export default function ChatPage() {
           human_override_level: "",
         }));
         classificationMap[msg.id] = classItems;
+        accumulatedRows = mergeResults(accumulatedRows, [msgClassification]);
+        accumulatedAnalyses.add("data_classification");
       }
       const msgBusinessDef = detectBusinessDefJSON(msg.content);
       if (msgBusinessDef && Object.keys(msgBusinessDef.fieldData).length > 0) {
         msgParts.push(`✅ Business definitions generated for ${Object.keys(msgBusinessDef.fieldData).length} fields.\n\nResults saved to result.xlsx — Sheet: business_definitions`);
+        accumulatedRows = mergeResults(accumulatedRows, [msgBusinessDef]);
+        accumulatedAnalyses.add("business_definitions");
       }
       const rawResults = detectAndExtractAllAnalyses(msg.content);
       const results = (dqResult ? rawResults.filter(r => r.analysisType !== "data_quality") : rawResults)
         .filter(r => !(msgBusinessDef && r.analysisType === "business_definitions"))
         .filter(r => !(msgClassification && r.analysisType === "data_classification"));
       if (results.length > 0) {
+        for (const result of results) {
+          if (result.analysisType === "data_quality" && result.dqMultiRows && result.dqMultiRows.length > 0) {
+            accumulatedRows = mergeDqResults(accumulatedRows, result.dqMultiRows);
+          } else if (Object.keys(result.fieldData).length > 0) {
+            accumulatedRows = mergeResults(accumulatedRows, [result]);
+          }
+          accumulatedAnalyses.add(result.analysisType);
+        }
         const totalFields = new Set(
           results.flatMap(r => [
             ...Object.keys(r.fieldData),
@@ -2295,6 +2315,15 @@ export default function ChatPage() {
       }
       if (msgParts.length === 0) continue;
       overrides[msg.id] = msgParts.join("\n\n");
+    }
+    if (accumulatedRows.length > 0) {
+      setResultRows(accumulatedRows);
+    }
+    if (accumulatedAnalyses.size > 0) {
+      setIncludedAnalyses(Array.from(accumulatedAnalyses));
+    }
+    if (restoredFileName) {
+      setUploadedFileName(restoredFileName);
     }
     if (Object.keys(modelMap).length > 0) {
       setDataModels(prev => ({ ...prev, ...modelMap }));
