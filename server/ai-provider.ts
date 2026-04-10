@@ -216,7 +216,8 @@ async function ragflowComplete(params: CompletionParams, _retried = false): Prom
       throw new Error(`RAGFlow error ${resp.status}: ${body}`);
     }
     const data = await resp.json();
-    return data.data?.answer ?? data.answer ?? "";
+    // RAGFlow response format varies: data.answer, data.data.answer, or data.data.content
+    return data.data?.answer || data.data?.data?.content || data.answer || "";
   } catch (err: any) {
     aiLog("ERROR", `ragflow exception | ${err.message}`);
     throw err;
