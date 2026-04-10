@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { X, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 interface ExcelPreviewProps {
   file: File;
@@ -110,33 +109,30 @@ export default function ExcelPreview({ file, onClose }: ExcelPreviewProps) {
           ) : !sheet || sheet.headers.length === 0 ? (
             <div className="flex items-center justify-center h-full text-sm text-gray-500">No data found in this sheet.</div>
           ) : (
-            <ScrollArea className="h-full w-full">
-              <div className="min-w-max">
-                <table className="text-xs border-collapse w-full">
-                  <thead>
-                    <tr style={{ backgroundColor: "#0D2E5C" }}>
-                      <th className="sticky left-0 z-10 px-2 py-2 text-center font-semibold text-white/60 w-10" style={{ backgroundColor: "#0D2E5C" }}>#</th>
-                      {sheet.headers.map((h, i) => (
-                        <th key={i} className="px-3 py-2 text-left font-semibold text-white whitespace-nowrap">{h || `Col ${i + 1}`}</th>
+            <div className="h-full w-full overflow-auto">
+              <table className="text-xs border-collapse min-w-max">
+                <thead>
+                  <tr style={{ backgroundColor: "#0D2E5C" }}>
+                    <th className="sticky top-0 left-0 z-20 px-2 py-2 text-center font-semibold text-white/60 w-10" style={{ backgroundColor: "#0D2E5C" }}>#</th>
+                    {sheet.headers.map((h, i) => (
+                      <th key={i} className="sticky top-0 z-10 px-3 py-2 text-left font-semibold text-white whitespace-nowrap" style={{ backgroundColor: "#0D2E5C" }}>{h || `Col ${i + 1}`}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sheet.rows.map((row, ri) => (
+                    <tr key={ri} style={{ backgroundColor: ri % 2 === 0 ? "#FFFFFF" : "#F9FAFB" }}>
+                      <td className="sticky left-0 z-10 px-2 py-1.5 text-center text-gray-400 font-mono" style={{ backgroundColor: ri % 2 === 0 ? "#FFFFFF" : "#F9FAFB" }}>{ri + 1}</td>
+                      {sheet.headers.map((_, ci) => (
+                        <td key={ci} className="px-3 py-1.5 text-gray-700 whitespace-nowrap border-b" style={{ borderColor: "#F3F4F6" }}>
+                          {row[ci] ?? ""}
+                        </td>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {sheet.rows.map((row, ri) => (
-                      <tr key={ri} style={{ backgroundColor: ri % 2 === 0 ? "#FFFFFF" : "#F9FAFB" }}>
-                        <td className="sticky left-0 z-10 px-2 py-1.5 text-center text-gray-400 font-mono" style={{ backgroundColor: ri % 2 === 0 ? "#FFFFFF" : "#F9FAFB" }}>{ri + 1}</td>
-                        {sheet.headers.map((_, ci) => (
-                          <td key={ci} className="px-3 py-1.5 text-gray-700 whitespace-nowrap max-w-[200px] truncate border-b" style={{ borderColor: "#F3F4F6" }}>
-                            {row[ci] ?? ""}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 

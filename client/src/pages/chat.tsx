@@ -1794,7 +1794,6 @@ function SidebarContent({
             src={theme.logo}
             alt="Logo"
             className={`h-14 mb-3 ${theme.logoInvert ? "brightness-0 invert" : ""}`}
-            style={{ filter: theme.logoInvert ? undefined : "brightness(0) invert(1)" }}
           />
           <h1 className="text-white font-bold text-sm text-center" data-testid="text-app-title">{theme.appTitle}</h1>
         </div>

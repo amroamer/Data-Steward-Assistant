@@ -91,7 +91,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             src={theme.logo}
             alt=""
             className={`h-16 mx-auto mb-8 ${theme.logoInvert ? "brightness-0 invert" : ""}`}
-            style={{ filter: theme.logoInvert ? undefined : "brightness(0) invert(1)" }}
           />
           <h2 className="text-2xl font-bold text-white mb-3">{theme.appTitle}</h2>
           <p className="text-sm text-white/60 leading-relaxed max-w-xs mx-auto">
@@ -108,11 +107,16 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         <div className="w-full max-w-[400px]">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-10">
-            <img
-              src={theme.logo}
-              alt=""
-              className={`h-12 mx-auto mb-4`}
-            />
+            <div
+              className="w-20 h-20 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+              style={{ backgroundColor: theme.sidebarBg }}
+            >
+              <img
+                src={theme.logo}
+                alt=""
+                className={`h-10 ${theme.logoInvert ? "brightness-0 invert" : ""}`}
+              />
+            </div>
             <h1 className="text-xl font-bold text-gray-900">{theme.appTitle}</h1>
           </div>
 

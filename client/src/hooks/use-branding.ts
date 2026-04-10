@@ -19,7 +19,7 @@ const DEFAULTS: BrandTheme = {
   primary: "#005EB8",
   secondary: "#00338D",
   accent: "#0091DA",
-  logoInvert: false,
+  logoInvert: true,
 };
 
 export function useBranding(): BrandTheme {
