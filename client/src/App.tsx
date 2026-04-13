@@ -44,6 +44,7 @@ function App() {
       return null;
     }
   });
+  const [loading, setLoading] = useState(true);
 
   function handleLogin(u: SessionUser) {
     setUser(u);
@@ -60,6 +61,55 @@ function App() {
     (window as any).__logout = handleLogout;
     return () => { delete (window as any).__logout; };
   }, []);
+
+  // SSO auto-login check
+  useEffect(() => {
+    if (user) {
+      setLoading(false);
+      return;
+    }
+
+    const attemptSSO = async () => {
+      try {
+        const res = await fetch("/auth/api/me", { credentials: "include" });
+        if (res.ok) {
+          const ssoUser = await res.json();
+          const sessionUser: SessionUser = {
+            id: 1,
+            name: ssoUser.full_name || ssoUser.email.split("@")[0],
+            email: ssoUser.email,
+          };
+          handleLogin(sessionUser);
+        }
+      } catch {
+        // SSO failed, show login form
+      }
+      setLoading(false);
+    };
+    attemptSSO();
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#0a1628"
+      }}>
+        <div style={{
+          width: "2rem",
+          height: "2rem",
+          border: "3px solid rgba(255,255,255,0.1)",
+          borderTopColor: "#3b82f6",
+          borderRadius: "50%",
+          animation: "spin 1s linear infinite"
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   return (
     <ThemeProvider>
