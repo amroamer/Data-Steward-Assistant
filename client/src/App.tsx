@@ -14,7 +14,7 @@ import SharingEligibilityPage from "@/pages/sharing-eligibility";
 import EntitySettingsPage from "@/pages/entity-settings";
 import LoginPage from "@/pages/login";
 
-const SESSION_KEY = "zatca-session-user";
+const SESSION_KEY  = "zatca-session-user";
 
 interface SessionUser {
   id: number;
